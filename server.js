@@ -19,6 +19,7 @@ app.use(session({
 const DB_FILE = path.join(__dirname, 'data.json');
 const USERS_FILE = path.join(__dirname, 'users.json');
 
+// --- HELPER FUNCTIONS ---
 function readDB() {
     if (!fs.existsSync(DB_FILE)) fs.writeFileSync(DB_FILE, JSON.stringify([]));
     return JSON.parse(fs.readFileSync(DB_FILE));
@@ -47,7 +48,9 @@ function requireLogin(req, res, next) {
     else res.redirect('/login');
 }
 
-// LOGIN PAGE
+// --- ROUTES ---
+
+// 1. LOGIN PAGE
 app.get('/login', (req, res) => {
     res.send(`
     <!DOCTYPE html>
@@ -61,6 +64,8 @@ app.get('/login', (req, res) => {
             input { width: 100%; padding: 12px; margin: 8px 0; background: #222; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
             .btn { background: #00ff88; color: black; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; margin-top: 10px; }
             .error { color: #ff4444; margin-top: 10px; }
+            .success { color: #00ff88; margin-top: 10px; }
+            .link { color: #00ff88; text-decoration: none; display: block; margin-top: 15px; }
         </style>
     </head>
     <body>
@@ -73,6 +78,8 @@ app.get('/login', (req, res) => {
                 <button type="submit" class="btn">Login</button>
             </form>
             <p class="error">${req.query.error ? 'Invalid username or password!' : ''}</p>
+            ${req.query.registered ? '<p class="success">Account created! Please login.</p>' : ''}
+            <a href="/register" class="link">Create new account</a>
         </div>
     </body>
     </html>
@@ -91,12 +98,67 @@ app.post('/login', (req, res) => {
     }
 });
 
+// 2. REGISTER PAGE
+app.get('/register', (req, res) => {
+    res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>ShieldHub - Register</title>
+        <style>
+            body { background: #0a0a0a; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+            .container { background: #111; padding: 40px; border-radius: 15px; border: 1px solid #333; width: 350px; text-align: center; }
+            h1 { color: #00ff88; }
+            input { width: 100%; padding: 12px; margin: 8px 0; background: #222; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
+            .btn { background: #00ff88; color: black; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; margin-top: 10px; }
+            .error { color: #ff4444; margin-top: 10px; }
+            .link { color: #00ff88; text-decoration: none; display: block; margin-top: 15px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>ShieldHub</h1>
+            <p style="color: #888;">Create New Account</p>
+            <form action="/register" method="POST">
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <input type="password" name="confirmPassword" placeholder="Confirm Password" required>
+                <button type="submit" class="btn">Register</button>
+            </form>
+            <p class="error">${req.query.error || ''}</p>
+            <a href="/login" class="link">Already have an account? Login here</a>
+        </div>
+    </body>
+    </html>
+    `);
+});
+
+app.post('/register', (req, res) => {
+    const { username, password, confirmPassword } = req.body;
+    if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match!');
+    if (username.length < 3 || password.length < 6) return res.redirect('/register?error=Username min 3 chars, Password min 6 chars');
+    
+    const users = readUsers();
+    if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
+        return res.redirect('/register?error=Username already taken!');
+    }
+    
+    users.push({
+        username: username,
+        password: bcrypt.hashSync(password, 10),
+        role: 'USER'
+    });
+    writeUsers(users);
+    res.redirect('/login?registered=1');
+});
+
+// 3. LOGOUT
 app.get('/logout', (req, res) => {
     req.session.destroy();
     res.redirect('/login');
 });
 
-// DASHBOARD
+// 4. DASHBOARD (Protected)
 app.get('/', requireLogin, (req, res) => {
     const scripts = readDB();
     const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
@@ -121,6 +183,7 @@ app.get('/', requireLogin, (req, res) => {
             <div>
                 <span>${req.session.user.username}</span>
                 <span class="badge">${req.session.user.role}</span>
+                <a href="/change-password" class="btn" style="margin-left: 10px;">Change Password</a>
                 <a href="/logout" class="btn btn-red" style="margin-left: 10px;">Logout</a>
             </div>
         </div>
@@ -149,7 +212,7 @@ app.get('/', requireLogin, (req, res) => {
     res.send(html);
 });
 
-// CREATE SCRIPT
+// 5. CREATE SCRIPT (Protected)
 app.post('/create', requireLogin, (req, res) => {
     const { name, content } = req.body;
     const scripts = readDB();
@@ -159,7 +222,7 @@ app.post('/create', requireLogin, (req, res) => {
     res.redirect('/');
 });
 
-// PROTECTED VIEW PAGE
+// 6. PROTECTED VIEW PAGE (Public)
 app.get('/view/:token', (req, res) => {
     const scripts = readDB();
     const script = scripts.find(s => s.token === req.params.token);
@@ -201,7 +264,7 @@ app.get('/view/:token', (req, res) => {
     `);
 });
 
-// RAW ENDPOINT (CLEAN URL)
+// 7. RAW ENDPOINT (CLEAN URL)
 app.get('/raw/:token', (req, res) => {
     const scripts = readDB();
     const script = scripts.find(s => s.token === req.params.token);
@@ -210,7 +273,7 @@ app.get('/raw/:token', (req, res) => {
     res.send(script.content);
 });
 
-// DELETE
+// 8. DELETE SCRIPT (Protected)
 app.get('/delete/:token', requireLogin, (req, res) => {
     let scripts = readDB();
     scripts = scripts.filter(s => s.token !== req.params.token);
@@ -218,6 +281,58 @@ app.get('/delete/:token', requireLogin, (req, res) => {
     res.redirect('/');
 });
 
+// 9. CHANGE PASSWORD PAGE
+app.get('/change-password', requireLogin, (req, res) => {
+    res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>ShieldHub - Change Password</title>
+        <style>
+            body { background: #0a0a0a; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+            .container { background: #111; padding: 40px; border-radius: 15px; border: 1px solid #333; width: 350px; }
+            h1 { color: #00ff88; text-align: center; }
+            input { width: 100%; padding: 12px; margin: 8px 0; background: #222; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
+            .btn { background: #00ff88; color: black; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; margin-top: 10px; }
+            .msg { text-align: center; margin-top: 10px; color: #00ff88; }
+            .err { color: #ff4444; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Change Password</h1>
+            <form action="/change-password" method="POST">
+                <input type="password" name="oldPassword" placeholder="Current Password" required>
+                <input type="password" name="newPassword" placeholder="New Password" required>
+                <input type="password" name="confirmPassword" placeholder="Confirm New Password" required>
+                <button type="submit" class="btn">Update Password</button>
+            </form>
+            <p class="msg">${req.query.msg || ''}</p>
+            <a href="/" style="color: #00ff88; display: block; text-align: center; margin-top: 15px;">Back to Dashboard</a>
+        </div>
+    </body>
+    </html>
+    `);
+});
+
+app.post('/change-password', requireLogin, (req, res) => {
+    const { oldPassword, newPassword, confirmPassword } = req.body;
+    if (newPassword !== confirmPassword) return res.redirect('/change-password?msg=Passwords do not match!');
+    
+    const users = readUsers();
+    const userIndex = users.findIndex(u => u.username === req.session.user.username);
+    
+    if (!bcrypt.compareSync(oldPassword, users[userIndex].password)) {
+        return res.redirect('/change-password?msg=Current password is incorrect!');
+    }
+    
+    users[userIndex].password = bcrypt.hashSync(newPassword, 10);
+    writeUsers(users);
+    res.redirect('/change-password?msg=Password updated successfully!');
+});
+
+// --- START SERVER ---
 app.listen(PORT, () => {
     console.log(`✅ ShieldHub running on port ${PORT}`);
+    console.log(`👤 Default login: Zyrox / admin123`);
 });
