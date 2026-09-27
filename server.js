@@ -21,10 +21,10 @@ const DB_FILE = path.join(__dirname, 'data.json');
 
 function readDB() {
     if (!fs.existsSync(DB_FILE)) {
-        fs.writeFileSync(DB_FILE, JSON.stringify({ users: [], scripts: [] }));
+        fs.writeFileSync(DB_FILE, JSON.stringify({ scripts: [] }));
     }
     try { return JSON.parse(fs.readFileSync(DB_FILE)); }
-    catch (e) { return { users: [], scripts: [] }; }
+    catch (e) { return { scripts: [] }; }
 }
 function writeDB(data) {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
@@ -66,24 +66,20 @@ app.get('/login', (req, res) => {
             h1 { color: #00ff88; }
             input { width: 100%; padding: 12px; margin: 8px 0; background: #222; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
             .btn { background: #00ff88; color: black; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; margin-top: 10px; }
-            .link { color: #00ff88; text-decoration: none; display: block; margin-top: 15px; font-size: 14px; }
-            .msg { margin-top: 10px; font-size: 13px; }
-            .error { color: #ff4444; }
-            .success { color: #00ff88; }
+            .info { color: #888; font-size: 12px; margin-top: 15px; }
+            .error { color: #ff4444; font-size: 13px; margin-top: 10px; }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>ShieldHub</h1>
-            <p style="color: #888;">Login to Dashboard</p>
+            <p style="color: #888;">Enter your name to continue</p>
             <form action="/login" method="POST">
-                <input type="text" name="username" placeholder="Username" required>
-                <input type="password" name="password" placeholder="Password" required>
+                <input type="text" name="username" placeholder="Enter your name" required>
                 <button type="submit" class="btn">Login</button>
             </form>
-            <p class="msg error">${req.query.error ? 'Invalid username or password!' : ''}</p>
-            <p class="msg success">${req.query.registered ? 'Account created! Please login.' : ''}</p>
-            <a href="/register" class="link">Create new account</a>
+            <p class="error">${req.query.error ? 'Name must be at least 2 characters.' : ''}</p>
+            <p class="info">No password needed. Just your name.</p>
         </div>
     </body>
     </html>
@@ -91,79 +87,20 @@ app.get('/login', (req, res) => {
 });
 
 app.post('/login', (req, res) => {
-    const { username, password } = req.body;
-    const db = readDB();
-    const user = db.users.find(u => u.username === username);
+    const { username } = req.body;
     
-    // Default owner account
-    if (username === 'Zyrox' && password === 'admin123') {
-        req.session.user = { username: 'Zyrox', role: 'OWNER' };
-        return res.redirect('/');
+    if (!username || username.length < 2) {
+        return res.redirect('/login?error=1');
     }
     
-    if (user && user.password === password) {
-        req.session.user = { username: user.username, role: user.role };
-        res.redirect('/');
+    // Z-K is the only ADMIN
+    if (username === 'Z-K') {
+        req.session.user = { username: 'Z-K', role: 'ADMIN' };
     } else {
-        res.redirect('/login?error=1');
+        req.session.user = { username: username, role: 'USER' };
     }
-});
-
-// ==================== REGISTER ====================
-app.get('/register', (req, res) => {
-    res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>ShieldHub - Register</title>
-        <style>
-            body { background: #0a0a0a; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-            .container { background: #111; padding: 40px; border-radius: 15px; border: 1px solid #333; width: 350px; text-align: center; }
-            h1 { color: #00ff88; }
-            input { width: 100%; padding: 12px; margin: 8px 0; background: #222; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
-            .btn { background: #00ff88; color: black; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; margin-top: 10px; }
-            .link { color: #00ff88; text-decoration: none; display: block; margin-top: 15px; font-size: 14px; }
-            .msg { margin-top: 10px; font-size: 13px; }
-            .error { color: #ff4444; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>ShieldHub</h1>
-            <p style="color: #888;">Create New Account</p>
-            <form action="/register" method="POST">
-                <input type="text" name="username" placeholder="Username" required>
-                <input type="password" name="password" placeholder="Password" required>
-                <input type="password" name="confirmPassword" placeholder="Confirm Password" required>
-                <button type="submit" class="btn">Register</button>
-            </form>
-            <p class="msg error">${req.query.error || ''}</p>
-            <a href="/login" class="link">Already have an account? Login here</a>
-        </div>
-    </body>
-    </html>
-    `);
-});
-
-app.post('/register', (req, res) => {
-    const { username, password, confirmPassword } = req.body;
-    const db = readDB();
     
-    if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match!');
-    if (username.length < 3 || password.length < 6) return res.redirect('/register?error=Username min 3 chars, Password min 6 chars');
-    if (username.toLowerCase() === 'zyrox') return res.redirect('/register?error=Username already taken!');
-    
-    const existing = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    if (existing) return res.redirect('/register?error=Username already taken!');
-    
-    db.users.push({
-        username: username,
-        password: password,
-        role: 'USER',
-        createdAt: new Date()
-    });
-    writeDB(db);
-    res.redirect('/login?registered=1');
+    res.redirect('/');
 });
 
 // ==================== LOGOUT ====================
@@ -177,6 +114,7 @@ app.get('/', requireLogin, (req, res) => {
     const db = readDB();
     const myScripts = db.scripts.filter(s => s.owner === req.session.user.username);
     const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+    const isAdmin = req.session.user.username === 'Z-K';
     
     let html = `
     <!DOCTYPE html>
@@ -192,7 +130,7 @@ app.get('/', requireLogin, (req, res) => {
             .btn-orange { background: #ffaa00; color: black; }
             .btn-blue { background: #0088ff; color: white; }
             input, textarea { width: 100%; padding: 10px; margin: 5px 0; background: #222; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
-            .badge { background: #00ff88; color: black; padding: 5px 10px; border-radius: 20px; font-size: 12px; margin-left: 10px; }
+            .badge { background: #00ff88; color: black; padding: 5px 10px; border-radius: 20px; font-size: 12px; margin-left: 10px; font-weight: bold; }
         </style>
     </head>
     <body>
@@ -200,7 +138,7 @@ app.get('/', requireLogin, (req, res) => {
             <h1>ShieldHub</h1>
             <div>
                 <span>${req.session.user.username}</span>
-                <span class="badge">${req.session.user.role}</span>
+                ${isAdmin ? '<span class="badge">ADMIN</span>' : ''}
                 <a href="/logout" class="btn btn-red" style="margin-left: 10px;">Logout</a>
             </div>
         </div>
@@ -277,7 +215,8 @@ app.get('/edit/:token', requireLogin, (req, res) => {
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.status(404).send("Script not found");
     
-    if (script.owner !== req.session.user.username && req.session.user.role !== 'OWNER') {
+    const isAdmin = req.session.user.username === 'Z-K';
+    if (script.owner !== req.session.user.username && !isAdmin) {
         return res.status(403).send("Access Denied");
     }
 
@@ -318,7 +257,8 @@ app.post('/edit/:token', requireLogin, (req, res) => {
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.status(404).send("Script not found");
     
-    if (script.owner !== req.session.user.username && req.session.user.role !== 'OWNER') {
+    const isAdmin = req.session.user.username === 'Z-K';
+    if (script.owner !== req.session.user.username && !isAdmin) {
         return res.status(403).send("Access Denied");
     }
 
@@ -387,7 +327,8 @@ app.get('/delete/:token', requireLogin, (req, res) => {
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.redirect('/');
     
-    if (script.owner !== req.session.user.username && req.session.user.role !== 'OWNER') {
+    const isAdmin = req.session.user.username === 'Z-K';
+    if (script.owner !== req.session.user.username && !isAdmin) {
         return res.status(403).send("Access Denied");
     }
     
@@ -399,6 +340,6 @@ app.get('/delete/:token', requireLogin, (req, res) => {
 // ==================== START ====================
 app.listen(PORT, () => {
     console.log(`✅ ShieldHub running on port ${PORT}`);
-    console.log(`👤 Default owner: Zyrox / admin123`);
+    console.log(`👑 Admin: Z-K`);
     console.log(`🔒 All scripts are obfuscated.`);
 });
