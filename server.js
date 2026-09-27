@@ -18,7 +18,6 @@ app.use(session({
 
 // ==================== DATA STORAGE ====================
 const DB_FILE = path.join(__dirname, 'data.json');
-const USERS_FILE = path.join(__dirname, 'users.json');
 
 function readDB() {
     if (!fs.existsSync(DB_FILE)) {
@@ -29,21 +28,6 @@ function readDB() {
 }
 function writeDB(data) {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-}
-
-function readUsers() {
-    if (!fs.existsSync(USERS_FILE)) {
-        // Default: Z-K is ADMIN
-        const defaultUsers = {
-            users: [
-                { username: 'Z-K', role: 'ADMIN' }
-            ]
-        };
-        fs.writeFileSync(USERS_FILE, JSON.stringify(defaultUsers, null, 2));
-        return defaultUsers;
-    }
-    try { return JSON.parse(fs.readFileSync(USERS_FILE)); }
-    catch (e) { return { users: [] }; }
 }
 
 function requireLogin(req, res, next) {
@@ -104,20 +88,15 @@ app.get('/login', (req, res) => {
 
 app.post('/login', (req, res) => {
     const { username } = req.body;
-    const usersData = readUsers();
     
     if (!username || username.length < 2) {
         return res.redirect('/login?error=1');
     }
     
-    // Check if user is in users.json (with role)
-    const user = usersData.users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    
-    if (user) {
-        // User found in users.json - use their role
-        req.session.user = { username: user.username, role: user.role };
+    // Z-K = ADMIN, lahat ng iba = USER
+    if (username === 'Z-K') {
+        req.session.user = { username: 'Z-K', role: 'ADMIN' };
     } else {
-        // Not in list - default to USER
         req.session.user = { username: username, role: 'USER' };
     }
     
