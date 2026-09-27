@@ -2,6 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -19,12 +20,11 @@ app.use(session({
 const DB_FILE = path.join(__dirname, 'data.json');
 
 function readDB() {
-    if (!fs.existsSync(DB_FILE)) fs.writeFileSync(DB_FILE, JSON.stringify({ scripts: [] }));
-    try {
-        return JSON.parse(fs.readFileSync(DB_FILE));
-    } catch (e) {
-        return { scripts: [] };
+    if (!fs.existsSync(DB_FILE)) {
+        fs.writeFileSync(DB_FILE, JSON.stringify({ users: [], scripts: [] }));
     }
+    try { return JSON.parse(fs.readFileSync(DB_FILE)); }
+    catch (e) { return { users: [], scripts: [] }; }
 }
 function writeDB(data) {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
@@ -33,6 +33,24 @@ function writeDB(data) {
 function requireLogin(req, res, next) {
     if (req.session.user) next();
     else res.redirect('/login');
+}
+
+// ==================== OBFUSCATION ====================
+function obfuscateScript(code) {
+    const base64 = Buffer.from(code).toString('base64');
+    const key = crypto.randomBytes(16).toString('hex');
+    const chunks = [];
+    for (let i = 0; i < base64.length; i += 50) {
+        chunks.push(base64.substring(i, i + 50));
+    }
+    return `
+-- ShieldHub Protected Script
+-- This script is obfuscated. Do not attempt to decode.
+local _k = "${key}"
+local _d = table.concat({${chunks.map(c => `"${c}"`).join(',')}})
+local _b = game:GetService("HttpService"):Base64Decode(_d)
+loadstring(_b)()
+`;
 }
 
 // ==================== LOGIN ====================
@@ -48,7 +66,10 @@ app.get('/login', (req, res) => {
             h1 { color: #00ff88; }
             input { width: 100%; padding: 12px; margin: 8px 0; background: #222; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
             .btn { background: #00ff88; color: black; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; margin-top: 10px; }
-            .info { color: #888; font-size: 12px; margin-top: 15px; }
+            .link { color: #00ff88; text-decoration: none; display: block; margin-top: 15px; font-size: 14px; }
+            .msg { margin-top: 10px; font-size: 13px; }
+            .error { color: #ff4444; }
+            .success { color: #00ff88; }
         </style>
     </head>
     <body>
@@ -60,7 +81,9 @@ app.get('/login', (req, res) => {
                 <input type="password" name="password" placeholder="Password" required>
                 <button type="submit" class="btn">Login</button>
             </form>
-            <p class="info">Kahit anong username at password, basta pareho sila.</p>
+            <p class="msg error">${req.query.error ? 'Invalid username or password!' : ''}</p>
+            <p class="msg success">${req.query.registered ? 'Account created! Please login.' : ''}</p>
+            <a href="/register" class="link">Create new account</a>
         </div>
     </body>
     </html>
@@ -69,17 +92,78 @@ app.get('/login', (req, res) => {
 
 app.post('/login', (req, res) => {
     const { username, password } = req.body;
+    const db = readDB();
+    const user = db.users.find(u => u.username === username);
     
-    // Simpleng login: basta may username at password
-    if (username && password) {
-        req.session.user = { 
-            username: username, 
-            role: username.toLowerCase() === 'zyrox' ? 'OWNER' : 'USER' 
-        };
+    // Default owner account
+    if (username === 'Zyrox' && password === 'admin123') {
+        req.session.user = { username: 'Zyrox', role: 'OWNER' };
+        return res.redirect('/');
+    }
+    
+    if (user && user.password === password) {
+        req.session.user = { username: user.username, role: user.role };
         res.redirect('/');
     } else {
         res.redirect('/login?error=1');
     }
+});
+
+// ==================== REGISTER ====================
+app.get('/register', (req, res) => {
+    res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>ShieldHub - Register</title>
+        <style>
+            body { background: #0a0a0a; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+            .container { background: #111; padding: 40px; border-radius: 15px; border: 1px solid #333; width: 350px; text-align: center; }
+            h1 { color: #00ff88; }
+            input { width: 100%; padding: 12px; margin: 8px 0; background: #222; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
+            .btn { background: #00ff88; color: black; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; margin-top: 10px; }
+            .link { color: #00ff88; text-decoration: none; display: block; margin-top: 15px; font-size: 14px; }
+            .msg { margin-top: 10px; font-size: 13px; }
+            .error { color: #ff4444; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>ShieldHub</h1>
+            <p style="color: #888;">Create New Account</p>
+            <form action="/register" method="POST">
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <input type="password" name="confirmPassword" placeholder="Confirm Password" required>
+                <button type="submit" class="btn">Register</button>
+            </form>
+            <p class="msg error">${req.query.error || ''}</p>
+            <a href="/login" class="link">Already have an account? Login here</a>
+        </div>
+    </body>
+    </html>
+    `);
+});
+
+app.post('/register', (req, res) => {
+    const { username, password, confirmPassword } = req.body;
+    const db = readDB();
+    
+    if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match!');
+    if (username.length < 3 || password.length < 6) return res.redirect('/register?error=Username min 3 chars, Password min 6 chars');
+    if (username.toLowerCase() === 'zyrox') return res.redirect('/register?error=Username already taken!');
+    
+    const existing = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    if (existing) return res.redirect('/register?error=Username already taken!');
+    
+    db.users.push({
+        username: username,
+        password: password,
+        role: 'USER',
+        createdAt: new Date()
+    });
+    writeDB(db);
+    res.redirect('/login?registered=1');
 });
 
 // ==================== LOGOUT ====================
@@ -121,7 +205,7 @@ app.get('/', requireLogin, (req, res) => {
             </div>
         </div>
 
-        <h2>My Pastes</h2>
+        <h2>My Scripts</h2>
         <div class="card">
             <h3>Create New Script</h3>
             <form action="/create" method="POST">
@@ -159,7 +243,7 @@ app.get('/', requireLogin, (req, res) => {
             alert('✅ Loadstring copied!\\n\\n' + loadstring);
         }
         function confirmDelete(token, name) {
-            if (confirm('⚠️ Sigurado ka bang gusto mong i-delete ang "' + name + '"?')) {
+            if (confirm('⚠️ Are you sure you want to delete "' + name + '"?')) {
                 window.location.href = '/delete/' + token;
             }
         }
@@ -173,10 +257,12 @@ app.get('/', requireLogin, (req, res) => {
 app.post('/create', requireLogin, (req, res) => {
     const { name, content } = req.body;
     const db = readDB();
-    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const token = crypto.randomBytes(16).toString('hex');
+    
     db.scripts.push({
         name,
-        content,
+        realContent: content,
+        publicContent: obfuscateScript(content),
         token,
         owner: req.session.user.username,
         createdAt: new Date()
@@ -199,7 +285,7 @@ app.get('/edit/:token', requireLogin, (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Edit Script</title>
+        <title>Edit Script - ShieldHub</title>
         <style>
             body { background: #0a0a0a; color: white; font-family: sans-serif; padding: 20px; }
             .header { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 15px; border-radius: 10px; }
@@ -211,14 +297,14 @@ app.get('/edit/:token', requireLogin, (req, res) => {
     <body>
         <div class="header">
             <h1>Edit Script</h1>
-            <a href="/" class="btn">← Back</a>
+            <a href="/" class="btn">← Back to Dashboard</a>
         </div>
         <div class="card">
             <form action="/edit/${script.token}" method="POST">
                 <label>Script Name:</label>
                 <input type="text" name="name" value="${script.name}" required>
-                <label>Script Content:</label>
-                <textarea name="content" rows="20" required>${script.content}</textarea>
+                <label>Script Content (Real Code):</label>
+                <textarea name="content" rows="20" required>${script.realContent}</textarea>
                 <button type="submit" class="btn">💾 Save Changes</button>
             </form>
         </div>
@@ -237,7 +323,8 @@ app.post('/edit/:token', requireLogin, (req, res) => {
     }
 
     script.name = req.body.name;
-    script.content = req.body.content;
+    script.realContent = req.body.content;
+    script.publicContent = obfuscateScript(req.body.content);
     writeDB(db);
     res.redirect('/');
 });
@@ -268,9 +355,10 @@ app.get('/view/:token', (req, res) => {
             <h2>${script.name}</h2>
             <div class="protected-box">
                 <p>🔒 Protected Script</p>
-                <small>Hindi makikita ang totoong code dito.</small>
+                <small>The real code is hidden. Use an executor to run it.</small>
             </div>
             <button class="btn" onclick="copyLoadstring()">📋 COPY LOADSTRING</button>
+            <p style="color: #555; font-size: 12px; margin-top: 20px;">Protected by ShieldHub</p>
         </div>
         <script>
             function copyLoadstring() {
@@ -283,13 +371,14 @@ app.get('/view/:token', (req, res) => {
     `);
 });
 
-// ==================== RAW ====================
+// ==================== RAW (OBFUSCATED ONLY) ====================
 app.get('/raw/:token', (req, res) => {
     const db = readDB();
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.status(403).send("-- Access Denied --");
+    
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.send(script.content);
+    res.send(script.publicContent);
 });
 
 // ==================== DELETE ====================
@@ -310,5 +399,6 @@ app.get('/delete/:token', requireLogin, (req, res) => {
 // ==================== START ====================
 app.listen(PORT, () => {
     console.log(`✅ ShieldHub running on port ${PORT}`);
-    console.log(`👤 Login: Kahit anong username at password`);
+    console.log(`👤 Default owner: Zyrox / admin123`);
+    console.log(`🔒 All scripts are obfuscated.`);
 });
