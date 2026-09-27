@@ -18,6 +18,7 @@ app.use(session({
 
 // ==================== DATA STORAGE ====================
 const DB_FILE = path.join(__dirname, 'data.json');
+const USERS_FILE = path.join(__dirname, 'users.json');
 
 function readDB() {
     if (!fs.existsSync(DB_FILE)) {
@@ -28,6 +29,21 @@ function readDB() {
 }
 function writeDB(data) {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+}
+
+function readUsers() {
+    if (!fs.existsSync(USERS_FILE)) {
+        // Default: Z-K is ADMIN
+        const defaultUsers = {
+            users: [
+                { username: 'Z-K', role: 'ADMIN' }
+            ]
+        };
+        fs.writeFileSync(USERS_FILE, JSON.stringify(defaultUsers, null, 2));
+        return defaultUsers;
+    }
+    try { return JSON.parse(fs.readFileSync(USERS_FILE)); }
+    catch (e) { return { users: [] }; }
 }
 
 function requireLogin(req, res, next) {
@@ -79,7 +95,7 @@ app.get('/login', (req, res) => {
                 <button type="submit" class="btn">Login</button>
             </form>
             <p class="error">${req.query.error ? 'Name must be at least 2 characters.' : ''}</p>
-            <p class="info">No password needed. Just your name.</p>
+            <p class="info">Just enter your name. No password needed.</p>
         </div>
     </body>
     </html>
@@ -88,15 +104,20 @@ app.get('/login', (req, res) => {
 
 app.post('/login', (req, res) => {
     const { username } = req.body;
+    const usersData = readUsers();
     
     if (!username || username.length < 2) {
         return res.redirect('/login?error=1');
     }
     
-    // Z-K is the only ADMIN
-    if (username === 'Z-K') {
-        req.session.user = { username: 'Z-K', role: 'ADMIN' };
+    // Check if user is in users.json (with role)
+    const user = usersData.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    
+    if (user) {
+        // User found in users.json - use their role
+        req.session.user = { username: user.username, role: user.role };
     } else {
+        // Not in list - default to USER
         req.session.user = { username: username, role: 'USER' };
     }
     
@@ -114,7 +135,7 @@ app.get('/', requireLogin, (req, res) => {
     const db = readDB();
     const myScripts = db.scripts.filter(s => s.owner === req.session.user.username);
     const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-    const isAdmin = req.session.user.username === 'Z-K';
+    const isAdmin = req.session.user.role === 'ADMIN';
     
     let html = `
     <!DOCTYPE html>
@@ -131,6 +152,7 @@ app.get('/', requireLogin, (req, res) => {
             .btn-blue { background: #0088ff; color: white; }
             input, textarea { width: 100%; padding: 10px; margin: 5px 0; background: #222; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
             .badge { background: #00ff88; color: black; padding: 5px 10px; border-radius: 20px; font-size: 12px; margin-left: 10px; font-weight: bold; }
+            .badge-admin { background: #ffaa00; color: black; }
         </style>
     </head>
     <body>
@@ -138,7 +160,7 @@ app.get('/', requireLogin, (req, res) => {
             <h1>ShieldHub</h1>
             <div>
                 <span>${req.session.user.username}</span>
-                ${isAdmin ? '<span class="badge">ADMIN</span>' : ''}
+                ${isAdmin ? '<span class="badge badge-admin">ADMIN</span>' : '<span class="badge">USER</span>'}
                 <a href="/logout" class="btn btn-red" style="margin-left: 10px;">Logout</a>
             </div>
         </div>
@@ -215,7 +237,7 @@ app.get('/edit/:token', requireLogin, (req, res) => {
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.status(404).send("Script not found");
     
-    const isAdmin = req.session.user.username === 'Z-K';
+    const isAdmin = req.session.user.role === 'ADMIN';
     if (script.owner !== req.session.user.username && !isAdmin) {
         return res.status(403).send("Access Denied");
     }
@@ -257,7 +279,7 @@ app.post('/edit/:token', requireLogin, (req, res) => {
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.status(404).send("Script not found");
     
-    const isAdmin = req.session.user.username === 'Z-K';
+    const isAdmin = req.session.user.role === 'ADMIN';
     if (script.owner !== req.session.user.username && !isAdmin) {
         return res.status(403).send("Access Denied");
     }
@@ -327,7 +349,7 @@ app.get('/delete/:token', requireLogin, (req, res) => {
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.redirect('/');
     
-    const isAdmin = req.session.user.username === 'Z-K';
+    const isAdmin = req.session.user.role === 'ADMIN';
     if (script.owner !== req.session.user.username && !isAdmin) {
         return res.status(403).send("Access Denied");
     }
@@ -340,6 +362,6 @@ app.get('/delete/:token', requireLogin, (req, res) => {
 // ==================== START ====================
 app.listen(PORT, () => {
     console.log(`✅ ShieldHub running on port ${PORT}`);
-    console.log(`👑 Admin: Z-K`);
+    console.log(`👑 Admin user: Z-K`);
     console.log(`🔒 All scripts are obfuscated.`);
 });
