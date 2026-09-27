@@ -6,7 +6,6 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ==================== MIDDLEWARE ====================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(session({
@@ -16,15 +15,14 @@ app.use(session({
     cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 }
 }));
 
-// ==================== DATA STORAGE ====================
 const DB_FILE = path.join(__dirname, 'data.json');
 
 function readDB() {
     if (!fs.existsSync(DB_FILE)) {
-        fs.writeFileSync(DB_FILE, JSON.stringify({ scripts: [] }));
+        fs.writeFileSync(DB_FILE, JSON.stringify({ users: [], scripts: [] }));
     }
     try { return JSON.parse(fs.readFileSync(DB_FILE)); }
-    catch (e) { return { scripts: [] }; }
+    catch (e) { return { users: [], scripts: [] }; }
 }
 function writeDB(data) {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
@@ -35,7 +33,6 @@ function requireLogin(req, res, next) {
     else res.redirect('/login');
 }
 
-// ==================== OBFUSCATION ====================
 function obfuscateScript(code) {
     const base64 = Buffer.from(code).toString('base64');
     const key = crypto.randomBytes(16).toString('hex');
@@ -66,20 +63,24 @@ app.get('/login', (req, res) => {
             h1 { color: #00ff88; }
             input { width: 100%; padding: 12px; margin: 8px 0; background: #222; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
             .btn { background: #00ff88; color: black; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; margin-top: 10px; }
-            .info { color: #888; font-size: 12px; margin-top: 15px; }
-            .error { color: #ff4444; font-size: 13px; margin-top: 10px; }
+            .link { color: #00ff88; text-decoration: none; display: block; margin-top: 15px; font-size: 14px; }
+            .msg { margin-top: 10px; font-size: 13px; }
+            .error { color: #ff4444; }
+            .success { color: #00ff88; }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>ShieldHub</h1>
-            <p style="color: #888;">Enter your name to continue</p>
+            <p style="color: #888;">Login to Dashboard</p>
             <form action="/login" method="POST">
-                <input type="text" name="username" placeholder="Enter your name" required>
+                <input type="text" name="username" placeholder="Name" required>
+                <input type="password" name="password" placeholder="Password" required>
                 <button type="submit" class="btn">Login</button>
             </form>
-            <p class="error">${req.query.error ? 'Name must be at least 2 characters.' : ''}</p>
-            <p class="info">Just enter your name. No password needed.</p>
+            <p class="msg error">${req.query.error ? 'Invalid name or password!' : ''}</p>
+            <p class="msg success">${req.query.registered ? 'Account created! Please login.' : ''}</p>
+            <a href="/register" class="link">Create new account</a>
         </div>
     </body>
     </html>
@@ -87,20 +88,64 @@ app.get('/login', (req, res) => {
 });
 
 app.post('/login', (req, res) => {
-    const { username } = req.body;
-    
-    if (!username || username.length < 2) {
-        return res.redirect('/login?error=1');
-    }
-    
-    // Z-K = ADMIN, lahat ng iba = USER
-    if (username === 'Z-K') {
-        req.session.user = { username: 'Z-K', role: 'ADMIN' };
-    } else {
-        req.session.user = { username: username, role: 'USER' };
-    }
-    
+    const { username, password } = req.body;
+    const db = readDB();
+    if (!db.users) db.users = [];
+    const user = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    if (!user) return res.redirect('/login?error=1');
+    if (user.password !== password) return res.redirect('/login?error=1');
+    req.session.user = { username: user.username, role: user.role };
     res.redirect('/');
+});
+
+// ==================== REGISTER ====================
+app.get('/register', (req, res) => {
+    res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>ShieldHub - Register</title>
+        <style>
+            body { background: #0a0a0a; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+            .container { background: #111; padding: 40px; border-radius: 15px; border: 1px solid #333; width: 350px; text-align: center; }
+            h1 { color: #00ff88; }
+            input { width: 100%; padding: 12px; margin: 8px 0; background: #222; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
+            .btn { background: #00ff88; color: black; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 16px; margin-top: 10px; }
+            .link { color: #00ff88; text-decoration: none; display: block; margin-top: 15px; font-size: 14px; }
+            .msg { margin-top: 10px; font-size: 13px; }
+            .error { color: #ff4444; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>ShieldHub</h1>
+            <p style="color: #888;">Create Account</p>
+            <form action="/register" method="POST">
+                <input type="text" name="username" placeholder="Name" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <input type="password" name="confirmPassword" placeholder="Confirm Password" required>
+                <button type="submit" class="btn">Register</button>
+            </form>
+            <p class="msg error">${req.query.error || ''}</p>
+            <a href="/login" class="link">Already have an account? Login here</a>
+        </div>
+    </body>
+    </html>
+    `);
+});
+
+app.post('/register', (req, res) => {
+    const { username, password, confirmPassword } = req.body;
+    const db = readDB();
+    if (!db.users) db.users = [];
+    if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match!');
+    if (username.length < 2 || password.length < 4) return res.redirect('/register?error=Name min 2 chars, Password min 4 chars');
+    const existing = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    if (existing) return res.redirect('/register?error=Name already taken!');
+    const role = username === 'Z-K' ? 'ADMIN' : 'USER';
+    db.users.push({ username, password, role, createdAt: new Date() });
+    writeDB(db);
+    res.redirect('/login?registered=1');
 });
 
 // ==================== LOGOUT ====================
@@ -115,7 +160,6 @@ app.get('/', requireLogin, (req, res) => {
     const myScripts = db.scripts.filter(s => s.owner === req.session.user.username);
     const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
     const isAdmin = req.session.user.role === 'ADMIN';
-    
     let html = `
     <!DOCTYPE html>
     <html>
@@ -143,7 +187,6 @@ app.get('/', requireLogin, (req, res) => {
                 <a href="/logout" class="btn btn-red" style="margin-left: 10px;">Logout</a>
             </div>
         </div>
-
         <h2>My Scripts</h2>
         <div class="card">
             <h3>Create New Script</h3>
@@ -155,7 +198,6 @@ app.get('/', requireLogin, (req, res) => {
         </div>
         <h3>Your Scripts</h3>
     `;
-    
     if (myScripts.length === 0) {
         html += `<div class="card"><p style="color: #888;">No scripts yet. Create one above!</p></div>`;
     } else {
@@ -197,14 +239,9 @@ app.post('/create', requireLogin, (req, res) => {
     const { name, content } = req.body;
     const db = readDB();
     const token = crypto.randomBytes(16).toString('hex');
-    
     db.scripts.push({
-        name,
-        realContent: content,
-        publicContent: obfuscateScript(content),
-        token,
-        owner: req.session.user.username,
-        createdAt: new Date()
+        name, realContent: content, publicContent: obfuscateScript(content),
+        token, owner: req.session.user.username, createdAt: new Date()
     });
     writeDB(db);
     res.redirect('/');
@@ -215,12 +252,8 @@ app.get('/edit/:token', requireLogin, (req, res) => {
     const db = readDB();
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.status(404).send("Script not found");
-    
     const isAdmin = req.session.user.role === 'ADMIN';
-    if (script.owner !== req.session.user.username && !isAdmin) {
-        return res.status(403).send("Access Denied");
-    }
-
+    if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
     res.send(`
     <!DOCTYPE html>
     <html>
@@ -257,12 +290,8 @@ app.post('/edit/:token', requireLogin, (req, res) => {
     const db = readDB();
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.status(404).send("Script not found");
-    
     const isAdmin = req.session.user.role === 'ADMIN';
-    if (script.owner !== req.session.user.username && !isAdmin) {
-        return res.status(403).send("Access Denied");
-    }
-
+    if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
     script.name = req.body.name;
     script.realContent = req.body.content;
     script.publicContent = obfuscateScript(req.body.content);
@@ -312,12 +341,11 @@ app.get('/view/:token', (req, res) => {
     `);
 });
 
-// ==================== RAW (OBFUSCATED ONLY) ====================
+// ==================== RAW ====================
 app.get('/raw/:token', (req, res) => {
     const db = readDB();
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.status(403).send("-- Access Denied --");
-    
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.send(script.publicContent);
 });
@@ -327,12 +355,8 @@ app.get('/delete/:token', requireLogin, (req, res) => {
     const db = readDB();
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.redirect('/');
-    
     const isAdmin = req.session.user.role === 'ADMIN';
-    if (script.owner !== req.session.user.username && !isAdmin) {
-        return res.status(403).send("Access Denied");
-    }
-    
+    if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
     db.scripts = db.scripts.filter(s => s.token !== req.params.token);
     writeDB(db);
     res.redirect('/');
@@ -341,6 +365,5 @@ app.get('/delete/:token', requireLogin, (req, res) => {
 // ==================== START ====================
 app.listen(PORT, () => {
     console.log(`✅ ShieldHub running on port ${PORT}`);
-    console.log(`👑 Admin user: Z-K`);
     console.log(`🔒 All scripts are obfuscated.`);
 });
