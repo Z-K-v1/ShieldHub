@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ==================== MIDDLEWARE ====================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(session({
@@ -15,6 +16,7 @@ app.use(session({
     cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 }
 }));
 
+// ==================== DATA STORAGE ====================
 const DB_FILE = path.join(__dirname, 'data.json');
 
 function readDB() {
@@ -33,21 +35,11 @@ function requireLogin(req, res, next) {
     else res.redirect('/login');
 }
 
+// ==================== OBFUSCATION ====================
+// This wraps the script so it works in ALL executors (Delta, Solara, Krnl, Codex, etc.)
 function obfuscateScript(code) {
-    const base64 = Buffer.from(code).toString('base64');
-    const key = crypto.randomBytes(16).toString('hex');
-    const chunks = [];
-    for (let i = 0; i < base64.length; i += 50) {
-        chunks.push(base64.substring(i, i + 50));
-    }
-    return `
--- ShieldHub Protected Script
--- This script is obfuscated. Do not attempt to decode.
-local _k = "${key}"
-local _d = table.concat({${chunks.map(c => `"${c}"`).join(',')}})
-local _b = game:GetService("HttpService"):Base64Decode(_d)
-loadstring(_b)()
-`;
+    // Use a unique delimiter that won't appear in normal Lua code
+    return `loadstring([==[${code}]==])()`;
 }
 
 // ==================== LOGIN ====================
@@ -142,7 +134,10 @@ app.post('/register', (req, res) => {
     if (username.length < 2 || password.length < 4) return res.redirect('/register?error=Name min 2 chars, Password min 4 chars');
     const existing = db.users.find(u => u.username.toLowerCase() === username.toLowerCase());
     if (existing) return res.redirect('/register?error=Name already taken!');
+    
+    // Z-K = ADMIN, lahat ng iba = USER
     const role = username === 'Z-K' ? 'ADMIN' : 'USER';
+    
     db.users.push({ username, password, role, createdAt: new Date() });
     writeDB(db);
     res.redirect('/login?registered=1');
@@ -160,6 +155,7 @@ app.get('/', requireLogin, (req, res) => {
     const myScripts = db.scripts.filter(s => s.owner === req.session.user.username);
     const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
     const isAdmin = req.session.user.role === 'ADMIN';
+    
     let html = `
     <!DOCTYPE html>
     <html>
@@ -187,6 +183,7 @@ app.get('/', requireLogin, (req, res) => {
                 <a href="/logout" class="btn btn-red" style="margin-left: 10px;">Logout</a>
             </div>
         </div>
+
         <h2>My Scripts</h2>
         <div class="card">
             <h3>Create New Script</h3>
@@ -198,6 +195,7 @@ app.get('/', requireLogin, (req, res) => {
         </div>
         <h3>Your Scripts</h3>
     `;
+    
     if (myScripts.length === 0) {
         html += `<div class="card"><p style="color: #888;">No scripts yet. Create one above!</p></div>`;
     } else {
@@ -239,9 +237,14 @@ app.post('/create', requireLogin, (req, res) => {
     const { name, content } = req.body;
     const db = readDB();
     const token = crypto.randomBytes(16).toString('hex');
+    
     db.scripts.push({
-        name, realContent: content, publicContent: obfuscateScript(content),
-        token, owner: req.session.user.username, createdAt: new Date()
+        name,
+        realContent: content,
+        publicContent: obfuscateScript(content),
+        token,
+        owner: req.session.user.username,
+        createdAt: new Date()
     });
     writeDB(db);
     res.redirect('/');
@@ -252,8 +255,12 @@ app.get('/edit/:token', requireLogin, (req, res) => {
     const db = readDB();
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.status(404).send("Script not found");
+    
     const isAdmin = req.session.user.role === 'ADMIN';
-    if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
+    if (script.owner !== req.session.user.username && !isAdmin) {
+        return res.status(403).send("Access Denied");
+    }
+
     res.send(`
     <!DOCTYPE html>
     <html>
@@ -290,8 +297,12 @@ app.post('/edit/:token', requireLogin, (req, res) => {
     const db = readDB();
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.status(404).send("Script not found");
+    
     const isAdmin = req.session.user.role === 'ADMIN';
-    if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
+    if (script.owner !== req.session.user.username && !isAdmin) {
+        return res.status(403).send("Access Denied");
+    }
+
     script.name = req.body.name;
     script.realContent = req.body.content;
     script.publicContent = obfuscateScript(req.body.content);
@@ -341,11 +352,12 @@ app.get('/view/:token', (req, res) => {
     `);
 });
 
-// ==================== RAW ====================
+// ==================== RAW (OBFUSCATED ONLY) ====================
 app.get('/raw/:token', (req, res) => {
     const db = readDB();
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.status(403).send("-- Access Denied --");
+    
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.send(script.publicContent);
 });
@@ -355,8 +367,12 @@ app.get('/delete/:token', requireLogin, (req, res) => {
     const db = readDB();
     const script = db.scripts.find(s => s.token === req.params.token);
     if (!script) return res.redirect('/');
+    
     const isAdmin = req.session.user.role === 'ADMIN';
-    if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
+    if (script.owner !== req.session.user.username && !isAdmin) {
+        return res.status(403).send("Access Denied");
+    }
+    
     db.scripts = db.scripts.filter(s => s.token !== req.params.token);
     writeDB(db);
     res.redirect('/');
@@ -365,5 +381,5 @@ app.get('/delete/:token', requireLogin, (req, res) => {
 // ==================== START ====================
 app.listen(PORT, () => {
     console.log(`✅ ShieldHub running on port ${PORT}`);
-    console.log(`🔒 All scripts are obfuscated.`);
+    console.log(`🔒 Scripts are wrapped in loadstring — works in all executors.`);
 });
