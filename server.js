@@ -19,7 +19,7 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
-// ==================== DATABASE INIT (WITH AUTO-MIGRATION) ====================
+// ==================== DATABASE INIT ====================
 async function initDB() {
     try {
         await pool.query(`
@@ -52,13 +52,11 @@ async function initDB() {
                 CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
             );
         `);
-
-        // Auto-migration
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS slug VARCHAR(100) DEFAULT 'Script';`);
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS version VARCHAR(50) DEFAULT 'V1';`);
         await pool.query(`UPDATE scripts SET slug = LOWER(REPLACE(name, ' ', '_')) WHERE slug = 'Script' OR slug IS NULL;`);
         await pool.query(`UPDATE scripts SET version = 'V1' WHERE version IS NULL;`);
-        console.log('✅ Tables created/verified (with auto-migration)');
+        console.log('✅ Tables created/verified');
 
         const adminPass = process.env.ADMIN_PASSWORD;
         if (adminPass) {
@@ -93,11 +91,21 @@ function requireLogin(req, res, next) {
     else res.redirect('/login');
 }
 
+function requireAdmin(req, res, next) {
+    if (req.session.user && req.session.user.role === 'ADMIN') next();
+    else res.status(403).send('Access Denied: Admin only');
+}
+
+// ==================== LOGO & FAVICON ====================
+const LOGO_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%2300ff88;stop-opacity:1" /><stop offset="100%" style="stop-color:%2300cc66;stop-opacity:1" /></linearGradient></defs><path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(%23g)" stroke="%23006633" stroke-width="2"/><path d="M50 30 L65 40 L60 55 C58 62 54 67 50 70 C46 67 42 62 40 55 L35 40 Z" fill="%230a0a0a"/><circle cx="50" cy="48" r="5" fill="%2300ff88"/></svg>`;
+
+const FAVICON_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%2300ff88;stop-opacity:1" /><stop offset="100%" style="stop-color:%2300cc66;stop-opacity:1" /></linearGradient></defs><path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(%23g)"/><circle cx="50" cy="48" r="12" fill="%230a0a0a"/><circle cx="50" cy="48" r="5" fill="%2300ff88"/></svg>`;
+
 // ==================== OBFUSCATION ====================
 function obfuscateScript(code) {
     const encoded = Buffer.from(code, 'utf8').toString('base64');
     return `
--- ShieldHub Protected v9.0
+-- ShieldHub Protected v12.0
 local _b="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local _d="${encoded}"
 local _o={}
@@ -130,265 +138,163 @@ function versionDropdown(selectedValue) {
 
 // ==================== SHARED STYLES ====================
 const SHARED_STYLES = `
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html { font-size: 16px; }
     body { 
-        background: #0a0a0a; 
-        color: #e0e0e0; 
+        background: #0a0a0a; color: #e0e0e0; 
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-        padding: 20px;
-        min-height: 100vh;
+        padding: 20px; min-height: 100vh;
         background: radial-gradient(circle at top left, #0f1f15 0%, #0a0a0a 40%);
+        overflow-x: hidden;
     }
-    .header { 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        background: rgba(17,17,17,0.8); 
-        backdrop-filter: blur(10px);
-        padding: 20px 25px; 
-        border-radius: 16px; 
-        border: 1px solid #222;
-        flex-wrap: wrap; 
-        gap: 15px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    }
-    .header h1 {
-        font-size: 24px;
-        color: #00ff88;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .header h1::before {
-        content: '🛡️';
-        font-size: 28px;
-    }
-    .header-right {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-    .badge { 
-        background: #00ff88; 
-        color: #000; 
-        padding: 6px 14px; 
-        border-radius: 20px; 
-        font-size: 12px; 
-        font-weight: 700;
-        letter-spacing: 0.5px;
-    }
-    .badge-admin { 
-        background: linear-gradient(135deg, #ffaa00, #ff6600); 
-        color: #000;
-    }
-    .btn { 
-        background: #00ff88; 
-        color: #000; 
-        padding: 11px 22px; 
-        border: none; 
-        border-radius: 10px; 
-        cursor: pointer; 
-        font-weight: 700; 
-        text-decoration: none; 
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        font-size: 14px;
-        transition: all 0.2s ease;
-        font-family: inherit;
-    }
-    .btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(0, 255, 136, 0.4);
-    }
-    .btn-red { 
-        background: linear-gradient(135deg, #ff4444, #cc0000); 
-        color: #fff; 
-    }
+    .header { display: flex; justify-content: space-between; align-items: center; background: rgba(17,17,17,0.85); backdrop-filter: blur(10px); padding: 18px 25px; border-radius: 16px; border: 1px solid #222; flex-wrap: wrap; gap: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-bottom: 20px; }
+    .header-brand { display: flex; align-items: center; gap: 12px; }
+    .header-logo { width: 42px; height: 42px; filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.4)); flex-shrink: 0; }
+    .header-title { font-size: 22px; color: #00ff88; font-weight: 800; letter-spacing: -0.5px; text-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
+    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .username { color: #ccc; font-weight: 600; font-size: 14px; }
+    .badge { background: #00ff88; color: #000; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
+    .badge-admin { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
+    .btn { background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 11px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; transition: all 0.2s ease; font-family: inherit; white-space: nowrap; }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 255, 136, 0.4); }
+    .btn-red { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
     .btn-red:hover { box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4); }
-    .btn-orange { 
-        background: linear-gradient(135deg, #ffaa00, #ff8800); 
-        color: #000; 
-    }
+    .btn-orange { background: linear-gradient(135deg, #ffaa00, #ff8800); color: #000; }
     .btn-orange:hover { box-shadow: 0 6px 20px rgba(255, 170, 0, 0.4); }
-    .btn-blue { 
-        background: linear-gradient(135deg, #0088ff, #0066cc); 
-        color: #fff; 
-    }
+    .btn-blue { background: linear-gradient(135deg, #0088ff, #0066cc); color: #fff; }
     .btn-blue:hover { box-shadow: 0 6px 20px rgba(0, 136, 255, 0.4); }
-    .card { 
-        background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%);
-        padding: 25px; 
-        border-radius: 16px; 
-        margin: 20px 0; 
-        border: 1px solid #222;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    }
+    .btn-purple { background: linear-gradient(135deg, #aa44ff, #8800cc); color: #fff; }
+    .btn-purple:hover { box-shadow: 0 6px 20px rgba(170, 68, 255, 0.4); }
+    .card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 25px; border-radius: 16px; margin: 20px 0; border: 1px solid #222; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
     .form-group { margin-bottom: 20px; }
-    .form-label {
-        display: block;
-        margin-bottom: 8px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #aaa;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .form-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-        margin-bottom: 20px;
-    }
-    input, textarea, select { 
-        width: 100%; 
-        padding: 14px 16px; 
-        background: #0a0a0a; 
-        border: 2px solid #2a2a2a; 
-        color: #fff; 
-        border-radius: 10px; 
-        font-size: 14px;
-        font-family: inherit;
-        transition: all 0.2s ease;
-        outline: none;
-    }
-    input:focus, textarea:focus, select:focus {
-        border-color: #00ff88;
-        box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.1);
-    }
-    textarea {
-        font-family: 'Consolas', 'Monaco', monospace;
-        resize: vertical;
-        min-height: 100px;
-    }
-    select {
-        cursor: pointer;
-        appearance: none;
-        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ff88' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e");
-        background-repeat: no-repeat;
-        background-position: right 15px center;
-        background-size: 20px;
-        padding-right: 45px;
-    }
-    .section-title {
-        font-size: 20px;
-        font-weight: 700;
-        color: #fff;
-        margin: 30px 0 15px 0;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .version-badge { 
-        background: linear-gradient(135deg, #aa44ff, #8800cc); 
-        color: #fff; 
-        padding: 4px 12px; 
-        border-radius: 8px; 
-        font-size: 12px; 
-        font-weight: 700;
-        margin-left: 8px;
-    }
-    .url-preview { 
-        background: #0a0a0a; 
-        border: 1px solid #2a2a2a; 
-        padding: 12px 16px; 
-        border-radius: 10px; 
-        font-family: 'Consolas', 'Monaco', monospace; 
-        font-size: 12px; 
-        color: #00ff88; 
-        word-break: break-all; 
-        margin: 10px 0;
-    }
-    .script-card {
-        background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%);
-        padding: 25px; 
-        border-radius: 16px; 
-        margin: 15px 0; 
-        border: 1px solid #222;
-        transition: all 0.2s ease;
-    }
-    .script-card:hover {
-        border-color: #00ff88;
-        transform: translateY(-2px);
-    }
-    .script-card h3 {
-        font-size: 18px;
-        color: #fff;
-        margin-bottom: 8px;
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 8px;
-    }
+    .form-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.8px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    input, textarea, select { width: 100%; padding: 14px 16px; background: #0a0a0a; border: 2px solid #2a2a2a; color: #fff; border-radius: 10px; font-size: 14px; font-family: inherit; transition: all 0.2s ease; outline: none; }
+    input:focus, textarea:focus, select:focus { border-color: #00ff88; box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.1); }
+    textarea { font-family: 'Consolas', 'Monaco', monospace; resize: vertical; min-height: 120px; line-height: 1.5; }
+    select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ff88' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 15px center; background-size: 20px; padding-right: 45px; }
+    .section-title { font-size: 20px; font-weight: 800; color: #fff; margin: 30px 0 15px 0; display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px; }
+    .version-badge { background: linear-gradient(135deg, #aa44ff, #8800cc); color: #fff; padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: 800; margin-left: 8px; }
+    .url-preview { background: #0a0a0a; border: 1px solid #2a2a2a; padding: 12px 16px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; word-break: break-all; margin: 10px 0; line-height: 1.5; }
+    .script-card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 25px; border-radius: 16px; margin: 15px 0; border: 1px solid #222; transition: all 0.2s ease; }
+    .script-card:hover { border-color: #00ff88; transform: translateY(-2px); }
+    .script-card h3 { font-size: 18px; color: #fff; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 700; }
     .script-meta { color: #666; font-size: 12px; margin-bottom: 15px; }
     .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
-    .empty-state { text-align: center; padding: 40px; color: #666; }
-    .empty-state-icon { font-size: 48px; margin-bottom: 15px; opacity: 0.5; }
+    .empty-state { text-align: center; padding: 50px 20px; color: #666; }
+    .empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.4; }
 
-    /* Toast notification */
-    @keyframes slideIn {
-        from { transform: translateX(400px); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes fadeOut {
-        from { opacity: 1; transform: translateX(0); }
-        to { opacity: 0; transform: translateX(400px); }
-    }
-    .toast {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        background: linear-gradient(135deg, #00ff88, #00cc66);
-        color: #000;
-        padding: 16px 24px;
-        border-radius: 12px;
-        font-weight: 700;
-        font-size: 14px;
-        box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4);
-        z-index: 9999;
+    /* User cards in admin panel */
+    .user-card {
+        background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%);
+        padding: 20px 25px;
+        border-radius: 14px;
+        margin: 12px 0;
+        border: 1px solid #222;
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        gap: 10px;
-        animation: slideIn 0.3s ease;
-        font-family: sans-serif;
+        gap: 15px;
+        flex-wrap: wrap;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        color: inherit;
     }
-    .toast.hiding {
-        animation: fadeOut 0.3s ease forwards;
+    .user-card:hover {
+        border-color: #aa44ff;
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(170, 68, 255, 0.15);
+    }
+    .user-info { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 200px; }
+    .user-avatar {
+        width: 48px; height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #00ff88, #00cc66);
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 800; font-size: 20px; color: #000;
+        flex-shrink: 0;
+        text-transform: uppercase;
+    }
+    .user-avatar-admin { background: linear-gradient(135deg, #ffaa00, #ff6600); }
+    .user-details { display: flex; flex-direction: column; gap: 4px; }
+    .user-name { font-weight: 700; font-size: 16px; color: #fff; }
+    .user-meta { font-size: 12px; color: #666; }
+    .role-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+    .role-admin-tag { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
+    .role-user-tag { background: #00ff88; color: #000; }
+
+    /* Toast */
+    @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(400px); } }
+    .toast { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 16px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4); z-index: 9999; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 90vw; }
+    .toast.hiding { animation: fadeOut 0.3s ease forwards; }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+        body { padding: 12px; }
+        .header { padding: 15px 18px; }
+        .header-title { font-size: 18px; }
+        .header-logo { width: 36px; height: 36px; }
+        .form-row { grid-template-columns: 1fr; gap: 15px; }
+        .card { padding: 20px; }
+        .script-card { padding: 20px; }
+        .section-title { font-size: 18px; }
+        .btn { padding: 10px 16px; font-size: 13px; }
+        .toast { bottom: 15px; right: 15px; left: 15px; padding: 14px 18px; font-size: 13px; }
+        .user-card { padding: 16px 18px; }
+    }
+    @media (max-width: 480px) {
+        body { padding: 8px; }
+        .header { padding: 12px 15px; border-radius: 12px; }
+        .header-title { font-size: 16px; }
+        .header-logo { width: 32px; height: 32px; }
+        .header-right { width: 100%; justify-content: space-between; }
+        .card { padding: 16px; border-radius: 12px; }
+        .script-card { padding: 16px; border-radius: 12px; }
+        .script-card h3 { font-size: 16px; }
+        .section-title { font-size: 16px; }
+        .btn { padding: 10px 14px; font-size: 12px; }
+        .actions .btn { flex: 1; min-width: calc(50% - 4px); }
+        input, textarea, select { padding: 12px 14px; font-size: 14px; }
+        .empty-state-icon { font-size: 48px; }
+        .user-card { padding: 14px 15px; }
+        .user-avatar { width: 42px; height: 42px; font-size: 18px; }
+        .user-name { font-size: 14px; }
     }
 
-    @media (max-width: 600px) {
-        .form-row { grid-template-columns: 1fr; }
-        body { padding: 10px; }
-        .toast { bottom: 15px; right: 15px; left: 15px; }
-    }
+    /* Login */
+    .login-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 420px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.6); position: relative; overflow: hidden; }
+    .login-container::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%); animation: pulse 4s ease-in-out infinite; pointer-events: none; }
+    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 0.8; } }
+    .login-container h1 { color: #00ff88; font-size: 32px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 12px; position: relative; z-index: 1; font-weight: 800; letter-spacing: -1px; text-shadow: 0 0 30px rgba(0, 255, 136, 0.4); }
+    .login-logo { width: 48px; height: 48px; filter: drop-shadow(0 0 15px rgba(0, 255, 136, 0.6)); animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+    .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; position: relative; z-index: 1; }
+    .login-container input { margin-bottom: 15px; text-align: center; position: relative; z-index: 1; }
+    .login-container .btn { width: 100%; margin-top: 10px; position: relative; z-index: 1; }
+    .msg { margin-top: 15px; font-size: 13px; position: relative; z-index: 1; }
+    .error { color: #ff4444; }
+    .success { color: #00ff88; }
+    .link { color: #00ff88; text-decoration: none; display: block; margin-top: 20px; font-size: 14px; position: relative; z-index: 1; font-weight: 600; }
+    .link:hover { text-decoration: underline; }
+    @media (max-width: 480px) { .login-container { padding: 40px 25px; border-radius: 16px; } .login-container h1 { font-size: 26px; } .login-logo { width: 40px; height: 40px; } }
 `;
 
-// ==================== TOAST SCRIPT (Shared) ====================
+// ==================== TOAST SCRIPT ====================
 const TOAST_SCRIPT = `
     function showToast(message, type = 'success') {
         const existing = document.querySelector('.toast');
         if (existing) existing.remove();
-        
         const toast = document.createElement('div');
         toast.className = 'toast';
         toast.innerHTML = '<span>' + (type === 'success' ? '✅' : '❌') + '</span><span>' + message + '</span>';
-        
         if (type === 'error') {
             toast.style.background = 'linear-gradient(135deg, #ff4444, #cc0000)';
             toast.style.color = '#fff';
-            toast.style.boxShadow = '0 10px 30px rgba(255, 68, 68, 0.4)';
         }
-        
         document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.classList.add('hiding');
-            setTimeout(() => toast.remove(), 300);
-        }, 2500);
+        setTimeout(() => { toast.classList.add('hiding'); setTimeout(() => toast.remove(), 300); }, 2500);
     }
-    
     function copyLoadstring(url, btn) {
         const loadstring = 'loadstring(game:HttpGet("' + url + '"))()';
         navigator.clipboard.writeText(loadstring).then(() => {
@@ -396,17 +302,11 @@ const TOAST_SCRIPT = `
                 const original = btn.innerHTML;
                 btn.innerHTML = '✅ Copied!';
                 btn.style.background = 'linear-gradient(135deg, #00cc66, #009944)';
-                setTimeout(() => {
-                    btn.innerHTML = original;
-                    btn.style.background = '';
-                }, 1800);
+                setTimeout(() => { btn.innerHTML = original; btn.style.background = ''; }, 1800);
             }
             showToast('Loadstring copied!');
-        }).catch(() => {
-            showToast('Failed to copy!', 'error');
-        });
+        }).catch(() => showToast('Failed to copy!', 'error'));
     }
-    
     function confirmDelete(token, name) {
         if (confirm('⚠️ Are you sure you want to delete "' + name + '"?')) {
             window.location.href = '/delete/' + token;
@@ -418,49 +318,21 @@ const TOAST_SCRIPT = `
 app.get('/login', (req, res) => {
     res.send(`
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>ShieldHub - Login</title>
-        <style>
-            ${SHARED_STYLES}
-            body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-            .login-container { 
-                background: linear-gradient(135deg, #1a1a1a 0%, #111 100%);
-                padding: 50px 40px; 
-                border-radius: 20px; 
-                border: 1px solid #222; 
-                width: 400px; 
-                max-width: 100%;
-                text-align: center;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-            }
-            .login-container h1 { 
-                color: #00ff88; 
-                font-size: 32px;
-                margin-bottom: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 10px;
-            }
-            .login-container h1::before { content: '🛡️'; font-size: 36px; }
-            .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
-            .login-container input { margin-bottom: 15px; text-align: center; }
-            .login-container .btn { width: 100%; margin-top: 10px; }
-            .msg { margin-top: 15px; font-size: 13px; }
-            .error { color: #ff4444; }
-            .success { color: #00ff88; }
-            .link { color: #00ff88; text-decoration: none; display: block; margin-top: 20px; font-size: 14px; }
-            .link:hover { text-decoration: underline; }
-        </style>
+        <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+        <style>${SHARED_STYLES} body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }</style>
     </head>
     <body>
         <div class="login-container">
-            <h1>ShieldHub</h1>
+            <h1><img src="${LOGO_SVG}" class="login-logo" alt="ShieldHub"> ShieldHub</h1>
             <p class="subtitle">Login to your dashboard</p>
             <form action="/login" method="POST">
-                <input type="text" name="username" placeholder="Username" required>
-                <input type="password" name="password" placeholder="Password" required>
+                <input type="text" name="username" placeholder="Username" required autocomplete="username">
+                <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
                 <button type="submit" class="btn">🔓 Login</button>
             </form>
             <p class="msg error">${req.query.error ? '❌ Invalid name or password!' : ''}</p>
@@ -488,44 +360,17 @@ app.post('/login', async (req, res) => {
 app.get('/register', (req, res) => {
     res.send(`
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>ShieldHub - Register</title>
-        <style>
-            ${SHARED_STYLES}
-            body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-            .login-container { 
-                background: linear-gradient(135deg, #1a1a1a 0%, #111 100%);
-                padding: 50px 40px; 
-                border-radius: 20px; 
-                border: 1px solid #222; 
-                width: 400px; 
-                max-width: 100%;
-                text-align: center;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-            }
-            .login-container h1 { 
-                color: #00ff88; 
-                font-size: 32px;
-                margin-bottom: 8px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 10px;
-            }
-            .login-container h1::before { content: '🛡️'; font-size: 36px; }
-            .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
-            .login-container input { margin-bottom: 15px; text-align: center; }
-            .login-container .btn { width: 100%; margin-top: 10px; }
-            .msg { margin-top: 15px; font-size: 13px; }
-            .error { color: #ff4444; }
-            .link { color: #00ff88; text-decoration: none; display: block; margin-top: 20px; font-size: 14px; }
-            .link:hover { text-decoration: underline; }
-        </style>
+        <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+        <style>${SHARED_STYLES} body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }</style>
     </head>
     <body>
         <div class="login-container">
-            <h1>ShieldHub</h1>
+            <h1><img src="${LOGO_SVG}" class="login-logo" alt="ShieldHub"> ShieldHub</h1>
             <p class="subtitle">Create your account</p>
             <form action="/register" method="POST">
                 <input type="text" name="username" placeholder="Username" required>
@@ -567,17 +412,24 @@ app.get('/', requireLogin, async (req, res) => {
         
         let html = `
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>ShieldHub - Dashboard</title>
+            <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
             <style>${SHARED_STYLES}</style>
         </head>
         <body>
             <div class="header">
-                <h1>ShieldHub</h1>
+                <div class="header-brand">
+                    <img src="${LOGO_SVG}" class="header-logo" alt="ShieldHub">
+                    <span class="header-title">ShieldHub</span>
+                </div>
                 <div class="header-right">
-                    <span>${req.session.user.username}</span>
+                    <span class="username">${req.session.user.username}</span>
                     ${isAdmin ? '<span class="badge badge-admin">ADMIN</span>' : '<span class="badge">USER</span>'}
+                    ${isAdmin ? '<a href="/admin" class="btn btn-purple">👑 Admin Panel</a>' : ''}
                     <a href="/logout" class="btn btn-red">Logout</a>
                 </div>
             </div>
@@ -592,9 +444,7 @@ app.get('/', requireLogin, async (req, res) => {
                         </div>
                         <div class="form-group">
                             <label class="form-label">🏷️ Version</label>
-                            <select name="version" required>
-                                ${versionDropdown('V1')}
-                            </select>
+                            <select name="version" required>${versionDropdown('V1')}</select>
                         </div>
                     </div>
                     <div class="form-group">
@@ -609,11 +459,7 @@ app.get('/', requireLogin, async (req, res) => {
         `;
         
         if (myScripts.length === 0) {
-            html += `
-            <div class="card empty-state">
-                <div class="empty-state-icon">📭</div>
-                <p>No scripts yet. Create your first script above!</p>
-            </div>`;
+            html += `<div class="card empty-state"><div class="empty-state-icon">📭</div><p>No scripts yet. Create your first script above!</p></div>`;
         } else {
             myScripts.forEach(s => {
                 const slug = s.slug || 'Script';
@@ -634,10 +480,7 @@ app.get('/', requireLogin, async (req, res) => {
                 `;
             });
         }
-        html += `
-        <script>${TOAST_SCRIPT}</script>
-        </body></html>
-        `;
+        html += `<script>${TOAST_SCRIPT}</script></body></html>`;
         res.send(html);
     } catch (e) { 
         console.error('DASHBOARD ERROR:', e.message); 
@@ -674,14 +517,20 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
 
         res.send(`
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>Edit Script - ShieldHub</title>
+            <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
             <style>${SHARED_STYLES}</style>
         </head>
         <body>
             <div class="header">
-                <h1>Edit Script</h1>
+                <div class="header-brand">
+                    <img src="${LOGO_SVG}" class="header-logo" alt="ShieldHub">
+                    <span class="header-title">Edit Script</span>
+                </div>
                 <a href="/" class="btn">← Back</a>
             </div>
             <div class="card">
@@ -693,9 +542,7 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
                         </div>
                         <div class="form-group">
                             <label class="form-label">🏷️ Version</label>
-                            <select name="version" required>
-                                ${versionDropdown(script.version)}
-                            </select>
+                            <select name="version" required>${versionDropdown(script.version)}</select>
                         </div>
                     </div>
                     <div class="form-group">
@@ -746,54 +593,30 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
         const loadstring = `loadstring(game:HttpGet("${prettyUrl}"))()`;
         res.send(`
         <!DOCTYPE html>
-        <html>
+        <html lang="en">
         <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <title>ShieldHub - ${script.name}</title>
+            <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
             <style>
                 ${SHARED_STYLES}
                 body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-                .view-container {
-                    background: linear-gradient(135deg, #1a1a1a 0%, #111 100%);
-                    padding: 50px 40px;
-                    border-radius: 20px;
-                    border: 1px solid #222;
-                    width: 500px;
-                    max-width: 100%;
-                    text-align: center;
-                    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-                }
-                .view-container h1 {
-                    color: #00ff88;
-                    font-size: 32px;
-                    margin-bottom: 8px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 10px;
-                }
-                .view-container h1::before { content: '🛡️'; font-size: 36px; }
+                .view-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 500px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+                .view-container h1 { color: #00ff88; font-size: 32px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+                .view-logo { width: 40px; height: 40px; filter: drop-shadow(0 0 15px rgba(0, 255, 136, 0.6)); }
                 .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
-                .protected-box {
-                    border: 2px solid #ff4444;
-                    padding: 25px;
-                    border-radius: 12px;
-                    margin: 25px 0;
-                    background: rgba(255, 68, 68, 0.05);
-                }
-                .protected-box p {
-                    color: #ff4444;
-                    font-weight: 700;
-                    font-size: 16px;
-                    margin-bottom: 8px;
-                }
+                .protected-box { border: 2px solid #ff4444; padding: 25px; border-radius: 12px; margin: 25px 0; background: rgba(255, 68, 68, 0.05); }
+                .protected-box p { color: #ff4444; font-weight: 700; font-size: 16px; margin-bottom: 8px; }
                 .protected-box small { color: #888; font-size: 12px; }
                 .view-container .btn { width: 100%; padding: 16px; font-size: 15px; }
                 .footer-text { color: #444; font-size: 12px; margin-top: 25px; }
+                @media (max-width: 480px) { .view-container { padding: 35px 25px; } .view-container h1 { font-size: 26px; } }
             </style>
         </head>
         <body>
             <div class="view-container">
-                <h1>ShieldHub</h1>
+                <h1><img src="${LOGO_SVG}" class="view-logo" alt="ShieldHub"> ShieldHub</h1>
                 <p class="subtitle">Script Protection System</p>
                 <h2 style="margin: 20px 0; color: #fff;">${script.name}</h2>
                 <div class="version-badge" style="display:inline-block; font-size: 14px; padding: 6px 16px;">${script.version}</div>
@@ -838,6 +661,154 @@ app.get('/raw/:slug/:version/:token', async (req, res) => {
     }
 });
 
+// ==================== ADMIN PANEL ====================
+app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
+    try {
+        const usersResult = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
+        const users = usersResult.rows;
+        
+        // Get script count per user
+        const scriptsCountResult = await pool.query('SELECT owner, COUNT(*) as count FROM scripts GROUP BY owner');
+        const scriptsCount = {};
+        scriptsCountResult.rows.forEach(r => { scriptsCount[r.owner] = r.count; });
+        
+        let userCards = '';
+        users.forEach(u => {
+            const count = scriptsCount[u.username] || 0;
+            const isUserAdmin = u.role === 'ADMIN';
+            const avatarClass = isUserAdmin ? 'user-avatar user-avatar-admin' : 'user-avatar';
+            const roleTag = isUserAdmin ? 'role-admin-tag' : 'role-user-tag';
+            userCards += `
+                <a href="/admin/user/${encodeURIComponent(u.username)}" class="user-card">
+                    <div class="user-info">
+                        <div class="${avatarClass}">${u.username.charAt(0)}</div>
+                        <div class="user-details">
+                            <span class="user-name">${u.username} <span class="role-tag ${roleTag}">${u.role}</span></span>
+                            <span class="user-meta">Joined: ${new Date(u.created_at).toLocaleDateString()} • ${count} script${count !== 1 ? 's' : ''}</span>
+                        </div>
+                    </div>
+                    <span class="btn btn-purple">View →</span>
+                </a>
+            `;
+        });
+        
+        res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <title>Admin Panel - ShieldHub</title>
+            <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+            <style>${SHARED_STYLES}</style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="header-brand">
+                    <img src="${LOGO_SVG}" class="header-logo" alt="ShieldHub">
+                    <span class="header-title">👑 Admin Panel</span>
+                </div>
+                <div class="header-right">
+                    <a href="/" class="btn">← Dashboard</a>
+                    <a href="/logout" class="btn btn-red">Logout</a>
+                </div>
+            </div>
+
+            <h2 class="section-title">👥 All Users (${users.length})</h2>
+            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">Click on a user to view their scripts.</p>
+            ${userCards || '<div class="card empty-state"><div class="empty-state-icon">👥</div><p>No users found.</p></div>'}
+        </body>
+        </html>
+        `);
+    } catch (e) {
+        console.error('ADMIN ERROR:', e.message);
+        res.status(500).send('Server error: ' + e.message);
+    }
+});
+
+// ==================== ADMIN: VIEW USER SCRIPTS ====================
+app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) => {
+    try {
+        const targetUser = req.params.username;
+        
+        // Check if user exists
+        const userResult = await pool.query('SELECT * FROM users WHERE username = $1', [targetUser]);
+        if (userResult.rows.length === 0) return res.status(404).send('User not found');
+        const targetUserData = userResult.rows[0];
+        
+        // Get user's scripts
+        const scriptsResult = await pool.query('SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC', [targetUser]);
+        const userScripts = scriptsResult.rows;
+        const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+        
+        let scriptCards = '';
+        if (userScripts.length === 0) {
+            scriptCards = `<div class="card empty-state"><div class="empty-state-icon">📭</div><p>This user has no scripts yet.</p></div>`;
+        } else {
+            userScripts.forEach(s => {
+                const slug = s.slug || 'Script';
+                const version = s.version || 'V1';
+                const prettyUrl = `${baseUrl}/raw/${slug}/${version}/${s.token}`;
+                scriptCards += `
+                    <div class="script-card">
+                        <h3>📄 ${s.name} <span class="version-badge">${version}</span></h3>
+                        <div class="script-meta">Created: ${new Date(s.created_at).toLocaleDateString()}</div>
+                        <div class="url-preview">${prettyUrl}</div>
+                        <div class="actions">
+                            <button class="btn" onclick="copyLoadstring('${prettyUrl}', this)">📋 Copy Loadstring</button>
+                            <a href="/edit/${s.token}" class="btn btn-orange">✏️ Edit</a>
+                            <a href="/view/${slug}/${version}/${s.token}" class="btn btn-blue" target="_blank">👁️ View</a>
+                            <button class="btn btn-red" onclick="confirmDelete('${s.token}', '${s.name}')">🗑️ Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            <title>${targetUser}'s Scripts - Admin</title>
+            <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+            <style>${SHARED_STYLES}</style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="header-brand">
+                    <img src="${LOGO_SVG}" class="header-logo" alt="ShieldHub">
+                    <span class="header-title">👤 ${targetUser}</span>
+                </div>
+                <div class="header-right">
+                    <a href="/admin" class="btn btn-purple">← All Users</a>
+                    <a href="/" class="btn">Dashboard</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="user-info" style="padding: 10px 0;">
+                    <div class="${targetUserData.role === 'ADMIN' ? 'user-avatar user-avatar-admin' : 'user-avatar'}">${targetUser.charAt(0)}</div>
+                    <div class="user-details">
+                        <span class="user-name">${targetUser} <span class="role-tag ${targetUserData.role === 'ADMIN' ? 'role-admin-tag' : 'role-user-tag'}">${targetUserData.role}</span></span>
+                        <span class="user-meta">Joined: ${new Date(targetUserData.created_at).toLocaleDateString()}</span>
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="section-title">📁 Scripts (${userScripts.length})</h2>
+            ${scriptCards}
+            <script>${TOAST_SCRIPT}</script>
+        </body>
+        </html>
+        `);
+    } catch (e) {
+        console.error('ADMIN USER ERROR:', e.message);
+        res.status(500).send('Server error: ' + e.message);
+    }
+});
+
 // ==================== DELETE ====================
 app.get('/delete/:token', requireLogin, async (req, res) => {
     try {
@@ -848,14 +819,18 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
         if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
 
         await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]);
+        
+        // Redirect back to admin user page if admin deleted someone else's script
+        if (isAdmin && script.owner !== req.session.user.username) {
+            return res.redirect('/admin/user/' + encodeURIComponent(script.owner));
+        }
         res.redirect('/');
     } catch (e) { console.error(e); res.status(500).send('Server error'); }
 });
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ShieldHub v9.0 running on port ${PORT}`);
-    console.log(`🔧 Auto-migration enabled`);
+    console.log(`✅ ShieldHub v12.0 running on port ${PORT}`);
+    console.log(`👑 Admin Panel enabled at /admin`);
     console.log(`🎨 Beautiful UI + Toast notifications`);
-    console.log(`📋 Version dropdown: V1 to V1000`);
 });
