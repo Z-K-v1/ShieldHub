@@ -1,62 +1,86 @@
 const express = require('express');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
-const mongoose = require('mongoose');
+const pgSession = require('connect-pg-simple')(session);
+const { Pool } = require('pg');
 const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ==================== MONGODB CONNECTION ====================
-const MONGO_URI = process.env.MONGO_URI;
+// ==================== POSTGRES CONNECTION ====================
+const DATABASE_URL = process.env.DATABASE_URL;
 
-if (!MONGO_URI) {
-    console.error('❌ MONGO_URI is not set! Add it in Render Environment Variables.');
+if (!DATABASE_URL) {
+    console.error('❌ DATABASE_URL is not set! Add it in Render Environment Variables.');
     process.exit(1);
 }
 
-mongoose.connect(MONGO_URI)
-    .then(async () => {
-        console.log('✅ Connected to MongoDB');
-        // Auto-create Admin account if it doesn't exist
+const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+});
+
+// ==================== CREATE TABLES ====================
+async function initDB() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                role VARCHAR(20) DEFAULT 'USER',
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+        `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS scripts (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                real_content TEXT NOT NULL,
+                public_content TEXT NOT NULL,
+                token VARCHAR(64) UNIQUE NOT NULL,
+                owner VARCHAR(50) NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+        `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS "session" (
+                "sid" VARCHAR NOT NULL COLLATE "default",
+                "sess" JSON NOT NULL,
+                "expire" TIMESTAMP(6) NOT NULL,
+                CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+            );
+        `);
+        console.log('✅ Tables created/verified');
+
+        // Auto-create admin
         const adminPass = process.env.ADMIN_PASSWORD;
         if (adminPass) {
-            const existingAdmin = await User.findOne({ username: 'Z-K' });
-            if (!existingAdmin) {
-                await User.create({ username: 'Z-K', password: adminPass, role: 'ADMIN' });
-                console.log('👑 Admin account "Z-K" created automatically.');
+            const existing = await pool.query('SELECT * FROM users WHERE username = $1', ['Z-K']);
+            if (existing.rows.length === 0) {
+                await pool.query(
+                    'INSERT INTO users (username, password, role) VALUES ($1, $2, $3)',
+                    ['Z-K', adminPass, 'ADMIN']
+                );
+                console.log('👑 Admin account "Z-K" created.');
             }
         }
-    })
-    .catch(err => console.error('❌ MongoDB Error:', err));
-
-// ==================== SCHEMAS ====================
-const userSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: { type: String, default: 'USER' },
-    createdAt: { type: Date, default: Date.now }
-});
-
-const scriptSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    realContent: { type: String, required: true },
-    publicContent: { type: String, required: true },
-    token: { type: String, required: true, unique: true },
-    owner: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now }
-});
-
-const User = mongoose.model('User', userSchema);
-const Script = mongoose.model('Script', scriptSchema);
+    } catch (e) {
+        console.error('❌ DB Init error:', e);
+    }
+}
+initDB();
 
 // ==================== MIDDLEWARE ====================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(session({
+    store: new pgSession({
+        pool: pool,
+        tableName: 'session'
+    }),
     secret: process.env.SESSION_SECRET || 'shieldhub-secret-key',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: MONGO_URI }),
     cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 }
 }));
 
@@ -110,8 +134,13 @@ app.get('/login', (req, res) => {
 app.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
-        const user = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
-        if (!user || user.password !== password) return res.redirect('/login?error=1');
+        const result = await pool.query(
+            'SELECT * FROM users WHERE LOWER(username) = LOWER($1)',
+            [username]
+        );
+        if (result.rows.length === 0) return res.redirect('/login?error=1');
+        const user = result.rows[0];
+        if (user.password !== password) return res.redirect('/login?error=1');
         req.session.user = { username: user.username, role: user.role };
         res.redirect('/');
     } catch (e) {
@@ -162,11 +191,17 @@ app.post('/register', async (req, res) => {
         if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match!');
         if (username.length < 2 || password.length < 4) return res.redirect('/register?error=Name min 2 chars, Password min 4 chars');
         
-        const existing = await User.findOne({ username: new RegExp(`^${username}$`, 'i') });
-        if (existing) return res.redirect('/register?error=Name already taken!');
+        const existing = await pool.query(
+            'SELECT * FROM users WHERE LOWER(username) = LOWER($1)',
+            [username]
+        );
+        if (existing.rows.length > 0) return res.redirect('/register?error=Name already taken!');
         
         const role = username === 'Z-K' ? 'ADMIN' : 'USER';
-        await User.create({ username, password, role });
+        await pool.query(
+            'INSERT INTO users (username, password, role) VALUES ($1, $2, $3)',
+            [username, password, role]
+        );
         res.redirect('/login?registered=1');
     } catch (e) {
         console.error(e);
@@ -183,7 +218,11 @@ app.get('/logout', (req, res) => {
 // ==================== DASHBOARD ====================
 app.get('/', requireLogin, async (req, res) => {
     try {
-        const myScripts = await Script.find({ owner: req.session.user.username });
+        const result = await pool.query(
+            'SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC',
+            [req.session.user.username]
+        );
+        const myScripts = result.rows;
         const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
         const isAdmin = req.session.user.role === 'ADMIN';
         
@@ -234,7 +273,7 @@ app.get('/', requireLogin, async (req, res) => {
                 html += `
                 <div class="card">
                     <h3>📄 ${s.name}</h3>
-                    <p style="color: #888; font-size: 12px;">Created: ${new Date(s.createdAt).toLocaleDateString()}</p>
+                    <p style="color: #888; font-size: 12px;">Created: ${new Date(s.created_at).toLocaleDateString()}</p>
                     <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
                         <button class="btn" onclick="copyRaw('${baseUrl}/raw/${s.token}')">📋 Copy Raw</button>
                         <a href="/edit/${s.token}" class="btn btn-orange">✏️ Edit</a>
@@ -273,13 +312,10 @@ app.post('/create', requireLogin, async (req, res) => {
         const { name, content } = req.body;
         const token = crypto.randomBytes(16).toString('hex');
         
-        await Script.create({
-            name,
-            realContent: content,
-            publicContent: obfuscateScript(content),
-            token,
-            owner: req.session.user.username
-        });
+        await pool.query(
+            'INSERT INTO scripts (name, real_content, public_content, token, owner) VALUES ($1, $2, $3, $4, $5)',
+            [name, content, obfuscateScript(content), token, req.session.user.username]
+        );
         res.redirect('/');
     } catch (e) {
         console.error(e);
@@ -290,8 +326,9 @@ app.post('/create', requireLogin, async (req, res) => {
 // ==================== EDIT ====================
 app.get('/edit/:token', requireLogin, async (req, res) => {
     try {
-        const script = await Script.findOne({ token: req.params.token });
-        if (!script) return res.status(404).send("Script not found");
+        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (result.rows.length === 0) return res.status(404).send("Script not found");
+        const script = result.rows[0];
         
         const isAdmin = req.session.user.role === 'ADMIN';
         if (script.owner !== req.session.user.username && !isAdmin) {
@@ -321,7 +358,7 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
                     <label>Script Name:</label>
                     <input type="text" name="name" value="${script.name}" required>
                     <label>Script Content (Real Code):</label>
-                    <textarea name="content" rows="20" required>${script.realContent}</textarea>
+                    <textarea name="content" rows="20" required>${script.real_content}</textarea>
                     <button type="submit" class="btn">💾 Save Changes</button>
                 </form>
             </div>
@@ -336,18 +373,19 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
 
 app.post('/edit/:token', requireLogin, async (req, res) => {
     try {
-        const script = await Script.findOne({ token: req.params.token });
-        if (!script) return res.status(404).send("Script not found");
+        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (result.rows.length === 0) return res.status(404).send("Script not found");
+        const script = result.rows[0];
         
         const isAdmin = req.session.user.role === 'ADMIN';
         if (script.owner !== req.session.user.username && !isAdmin) {
             return res.status(403).send("Access Denied");
         }
 
-        script.name = req.body.name;
-        script.realContent = req.body.content;
-        script.publicContent = obfuscateScript(req.body.content);
-        await script.save();
+        await pool.query(
+            'UPDATE scripts SET name = $1, real_content = $2, public_content = $3 WHERE token = $4',
+            [req.body.name, req.body.content, obfuscateScript(req.body.content), req.params.token]
+        );
         res.redirect('/');
     } catch (e) {
         console.error(e);
@@ -358,8 +396,9 @@ app.post('/edit/:token', requireLogin, async (req, res) => {
 // ==================== VIEW ====================
 app.get('/view/:token', async (req, res) => {
     try {
-        const script = await Script.findOne({ token: req.params.token });
-        if (!script) return res.status(404).send("Script not found");
+        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (result.rows.length === 0) return res.status(404).send("Script not found");
+        const script = result.rows[0];
         const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
         const loadstring = `loadstring(game:HttpGet("${baseUrl}/raw/${script.token}"))()`;
         res.send(`
@@ -404,11 +443,11 @@ app.get('/view/:token', async (req, res) => {
 // ==================== RAW ====================
 app.get('/raw/:token', async (req, res) => {
     try {
-        const script = await Script.findOne({ token: req.params.token });
-        if (!script) return res.status(403).send("-- Access Denied --");
+        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (result.rows.length === 0) return res.status(403).send("-- Access Denied --");
         
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.send(script.publicContent);
+        res.send(result.rows[0].public_content);
     } catch (e) {
         console.error(e);
         res.status(500).send("-- Server Error --");
@@ -418,15 +457,16 @@ app.get('/raw/:token', async (req, res) => {
 // ==================== DELETE ====================
 app.get('/delete/:token', requireLogin, async (req, res) => {
     try {
-        const script = await Script.findOne({ token: req.params.token });
-        if (!script) return res.redirect('/');
+        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (result.rows.length === 0) return res.redirect('/');
+        const script = result.rows[0];
         
         const isAdmin = req.session.user.role === 'ADMIN';
         if (script.owner !== req.session.user.username && !isAdmin) {
             return res.status(403).send("Access Denied");
         }
         
-        await Script.deleteOne({ token: req.params.token });
+        await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]);
         res.redirect('/');
     } catch (e) {
         console.error(e);
