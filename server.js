@@ -53,7 +53,7 @@ async function initDB() {
             );
         `);
 
-        // 🔧 AUTO-MIGRATION: Add missing columns if they don't exist
+        // Auto-migration
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS slug VARCHAR(100) DEFAULT 'Script';`);
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS version VARCHAR(50) DEFAULT 'V1';`);
         await pool.query(`UPDATE scripts SET slug = LOWER(REPLACE(name, ' ', '_')) WHERE slug = 'Script' OR slug IS NULL;`);
@@ -97,7 +97,7 @@ function requireLogin(req, res, next) {
 function obfuscateScript(code) {
     const encoded = Buffer.from(code, 'utf8').toString('base64');
     return `
--- ShieldHub Protected v8.0
+-- ShieldHub Protected v9.0
 local _b="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local _d="${encoded}"
 local _o={}
@@ -326,9 +326,91 @@ const SHARED_STYLES = `
     .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
     .empty-state { text-align: center; padding: 40px; color: #666; }
     .empty-state-icon { font-size: 48px; margin-bottom: 15px; opacity: 0.5; }
+
+    /* Toast notification */
+    @keyframes slideIn {
+        from { transform: translateX(400px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes fadeOut {
+        from { opacity: 1; transform: translateX(0); }
+        to { opacity: 0; transform: translateX(400px); }
+    }
+    .toast {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: linear-gradient(135deg, #00ff88, #00cc66);
+        color: #000;
+        padding: 16px 24px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 14px;
+        box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideIn 0.3s ease;
+        font-family: sans-serif;
+    }
+    .toast.hiding {
+        animation: fadeOut 0.3s ease forwards;
+    }
+
     @media (max-width: 600px) {
         .form-row { grid-template-columns: 1fr; }
         body { padding: 10px; }
+        .toast { bottom: 15px; right: 15px; left: 15px; }
+    }
+`;
+
+// ==================== TOAST SCRIPT (Shared) ====================
+const TOAST_SCRIPT = `
+    function showToast(message, type = 'success') {
+        const existing = document.querySelector('.toast');
+        if (existing) existing.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerHTML = '<span>' + (type === 'success' ? '✅' : '❌') + '</span><span>' + message + '</span>';
+        
+        if (type === 'error') {
+            toast.style.background = 'linear-gradient(135deg, #ff4444, #cc0000)';
+            toast.style.color = '#fff';
+            toast.style.boxShadow = '0 10px 30px rgba(255, 68, 68, 0.4)';
+        }
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.classList.add('hiding');
+            setTimeout(() => toast.remove(), 300);
+        }, 2500);
+    }
+    
+    function copyLoadstring(url, btn) {
+        const loadstring = 'loadstring(game:HttpGet("' + url + '"))()';
+        navigator.clipboard.writeText(loadstring).then(() => {
+            if (btn) {
+                const original = btn.innerHTML;
+                btn.innerHTML = '✅ Copied!';
+                btn.style.background = 'linear-gradient(135deg, #00cc66, #009944)';
+                setTimeout(() => {
+                    btn.innerHTML = original;
+                    btn.style.background = '';
+                }, 1800);
+            }
+            showToast('Loadstring copied!');
+        }).catch(() => {
+            showToast('Failed to copy!', 'error');
+        });
+    }
+    
+    function confirmDelete(token, name) {
+        if (confirm('⚠️ Are you sure you want to delete "' + name + '"?')) {
+            window.location.href = '/delete/' + token;
+        }
     }
 `;
 
@@ -543,7 +625,7 @@ app.get('/', requireLogin, async (req, res) => {
                     <div class="script-meta">Created: ${new Date(s.created_at).toLocaleDateString()}</div>
                     <div class="url-preview">${prettyUrl}</div>
                     <div class="actions">
-                        <button class="btn" onclick="copyLoadstring('${prettyUrl}')">📋 Copy Loadstring</button>
+                        <button class="btn" onclick="copyLoadstring('${prettyUrl}', this)">📋 Copy Loadstring</button>
                         <a href="/edit/${s.token}" class="btn btn-orange">✏️ Edit</a>
                         <a href="/view/${slug}/${version}/${s.token}" class="btn btn-blue" target="_blank">👁️ View</a>
                         <button class="btn btn-red" onclick="confirmDelete('${s.token}', '${s.name}')">🗑️ Delete</button>
@@ -553,18 +635,7 @@ app.get('/', requireLogin, async (req, res) => {
             });
         }
         html += `
-        <script>
-            function copyLoadstring(url) {
-                const loadstring = \`loadstring(game:HttpGet("\${url}"))()\`;
-                navigator.clipboard.writeText(loadstring);
-                alert('✅ Loadstring copied!\\n\\n' + loadstring);
-            }
-            function confirmDelete(token, name) {
-                if (confirm('⚠️ Are you sure you want to delete "' + name + '"?')) {
-                    window.location.href = '/delete/' + token;
-                }
-            }
-        </script>
+        <script>${TOAST_SCRIPT}</script>
         </body></html>
         `;
         res.send(html);
@@ -730,15 +801,10 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
                     <p>🔒 Protected Script</p>
                     <small>The real code is hidden. Use an executor to run it.</small>
                 </div>
-                <button class="btn" onclick="copyLoadstring()">📋 COPY LOADSTRING</button>
+                <button class="btn" onclick="copyLoadstring('${prettyUrl}', this)">📋 COPY LOADSTRING</button>
                 <p class="footer-text">Protected by ShieldHub</p>
             </div>
-            <script>
-                function copyLoadstring() {
-                    navigator.clipboard.writeText(\`${loadstring}\`);
-                    alert('✅ Loadstring copied!');
-                }
-            </script>
+            <script>${TOAST_SCRIPT}</script>
         </body>
         </html>
         `);
@@ -788,8 +854,8 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ShieldHub v8.0 running on port ${PORT}`);
+    console.log(`✅ ShieldHub v9.0 running on port ${PORT}`);
     console.log(`🔧 Auto-migration enabled`);
-    console.log(`🎨 Beautiful UI enabled`);
+    console.log(`🎨 Beautiful UI + Toast notifications`);
     console.log(`📋 Version dropdown: V1 to V1000`);
 });
