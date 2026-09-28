@@ -96,16 +96,56 @@ function requireAdmin(req, res, next) {
     else res.status(403).send('Access Denied: Admin only');
 }
 
-// ==================== LOGO & FAVICON ====================
-const LOGO_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%2300ff88;stop-opacity:1" /><stop offset="100%" style="stop-color:%2300cc66;stop-opacity:1" /></linearGradient></defs><path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(%23g)" stroke="%23006633" stroke-width="2"/><path d="M50 30 L65 40 L60 55 C58 62 54 67 50 70 C46 67 42 62 40 55 L35 40 Z" fill="%230a0a0a"/><circle cx="50" cy="48" r="5" fill="%2300ff88"/></svg>`;
+// ==================== FAVICON & LOGO ROUTES (Serve as separate files) ====================
+const LOGO_SVG_CONTENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<defs>
+<linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" style="stop-color:#00ff88;stop-opacity:1" />
+<stop offset="100%" style="stop-color:#00aa55;stop-opacity:1" />
+</linearGradient>
+</defs>
+<path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(#grad)" stroke="#006633" stroke-width="2"/>
+<path d="M50 30 L65 40 L60 55 C58 62 54 67 50 70 C46 67 42 62 40 55 L35 40 Z" fill="#0a0a0a"/>
+<circle cx="50" cy="48" r="5" fill="#00ff88"/>
+</svg>`;
 
-const FAVICON_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%2300ff88;stop-opacity:1" /><stop offset="100%" style="stop-color:%2300cc66;stop-opacity:1" /></linearGradient></defs><path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(%23g)"/><circle cx="50" cy="48" r="12" fill="%230a0a0a"/><circle cx="50" cy="48" r="5" fill="%2300ff88"/></svg>`;
+const FAVICON_SVG_CONTENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<defs>
+<linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" style="stop-color:#00ff88;stop-opacity:1" />
+<stop offset="100%" style="stop-color:#00aa55;stop-opacity:1" />
+</linearGradient>
+</defs>
+<path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(#grad)"/>
+<circle cx="50" cy="48" r="14" fill="#0a0a0a"/>
+<path d="M42 38 L58 44 L54 56 C52 61 49 64 47 66 L42 56 Z" fill="#00ff88"/>
+</svg>`;
+
+// Serve logo as PNG-like image
+app.get('/logo.svg', (req, res) => {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(LOGO_SVG_CONTENT);
+});
+
+// Serve favicon
+app.get('/favicon.svg', (req, res) => {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(FAVICON_SVG_CONTENT);
+});
+
+app.get('/favicon.ico', (req, res) => {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(FAVICON_SVG_CONTENT);
+});
 
 // ==================== OBFUSCATION ====================
 function obfuscateScript(code) {
     const encoded = Buffer.from(code, 'utf8').toString('base64');
     return `
--- ShieldHub Protected v12.0
+-- ShieldHub Protected v13.0
 local _b="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local _d="${encoded}"
 local _o={}
@@ -134,6 +174,23 @@ function versionDropdown(selectedValue) {
         options += `<option value="${v}" ${selected}>${v}</option>`;
     }
     return options;
+}
+
+// HTML head generator para sa lahat ng pages
+function getHtmlHead(title) {
+    return `
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>${title}</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="alternate icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="apple-touch-icon" href="/favicon.svg">
+    <meta name="theme-color" content="#00ff88">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ShieldHub">
+    <meta name="application-name" content="ShieldHub">
+    `;
 }
 
 // ==================== SHARED STYLES ====================
@@ -184,37 +241,10 @@ const SHARED_STYLES = `
     .empty-state { text-align: center; padding: 50px 20px; color: #666; }
     .empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.4; }
 
-    /* User cards in admin panel */
-    .user-card {
-        background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%);
-        padding: 20px 25px;
-        border-radius: 14px;
-        margin: 12px 0;
-        border: 1px solid #222;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 15px;
-        flex-wrap: wrap;
-        transition: all 0.2s ease;
-        text-decoration: none;
-        color: inherit;
-    }
-    .user-card:hover {
-        border-color: #aa44ff;
-        transform: translateY(-2px);
-        box-shadow: 0 10px 30px rgba(170, 68, 255, 0.15);
-    }
+    .user-card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px 25px; border-radius: 14px; margin: 12px 0; border: 1px solid #222; display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; transition: all 0.2s ease; text-decoration: none; color: inherit; }
+    .user-card:hover { border-color: #aa44ff; transform: translateY(-2px); box-shadow: 0 10px 30px rgba(170, 68, 255, 0.15); }
     .user-info { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 200px; }
-    .user-avatar {
-        width: 48px; height: 48px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #00ff88, #00cc66);
-        display: flex; align-items: center; justify-content: center;
-        font-weight: 800; font-size: 20px; color: #000;
-        flex-shrink: 0;
-        text-transform: uppercase;
-    }
+    .user-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #00ff88, #00cc66); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #000; flex-shrink: 0; text-transform: uppercase; }
     .user-avatar-admin { background: linear-gradient(135deg, #ffaa00, #ff6600); }
     .user-details { display: flex; flex-direction: column; gap: 4px; }
     .user-name { font-weight: 700; font-size: 16px; color: #fff; }
@@ -223,13 +253,11 @@ const SHARED_STYLES = `
     .role-admin-tag { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
     .role-user-tag { background: #00ff88; color: #000; }
 
-    /* Toast */
     @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     @keyframes fadeOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(400px); } }
     .toast { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 16px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4); z-index: 9999; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 90vw; }
     .toast.hiding { animation: fadeOut 0.3s ease forwards; }
 
-    /* Mobile */
     @media (max-width: 768px) {
         body { padding: 12px; }
         .header { padding: 15px 18px; }
@@ -262,7 +290,6 @@ const SHARED_STYLES = `
         .user-name { font-size: 14px; }
     }
 
-    /* Login */
     .login-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 420px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.6); position: relative; overflow: hidden; }
     .login-container::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%); animation: pulse 4s ease-in-out infinite; pointer-events: none; }
     @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 0.8; } }
@@ -320,15 +347,12 @@ app.get('/login', (req, res) => {
     <!DOCTYPE html>
     <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>ShieldHub - Login</title>
-        <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+        ${getHtmlHead('ShieldHub - Login')}
         <style>${SHARED_STYLES} body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }</style>
     </head>
     <body>
         <div class="login-container">
-            <h1><img src="${LOGO_SVG}" class="login-logo" alt="ShieldHub"> ShieldHub</h1>
+            <h1><img src="/logo.svg" class="login-logo" alt="ShieldHub"> ShieldHub</h1>
             <p class="subtitle">Login to your dashboard</p>
             <form action="/login" method="POST">
                 <input type="text" name="username" placeholder="Username" required autocomplete="username">
@@ -362,15 +386,12 @@ app.get('/register', (req, res) => {
     <!DOCTYPE html>
     <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>ShieldHub - Register</title>
-        <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+        ${getHtmlHead('ShieldHub - Register')}
         <style>${SHARED_STYLES} body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }</style>
     </head>
     <body>
         <div class="login-container">
-            <h1><img src="${LOGO_SVG}" class="login-logo" alt="ShieldHub"> ShieldHub</h1>
+            <h1><img src="/logo.svg" class="login-logo" alt="ShieldHub"> ShieldHub</h1>
             <p class="subtitle">Create your account</p>
             <form action="/register" method="POST">
                 <input type="text" name="username" placeholder="Username" required>
@@ -414,16 +435,13 @@ app.get('/', requireLogin, async (req, res) => {
         <!DOCTYPE html>
         <html lang="en">
         <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <title>ShieldHub - Dashboard</title>
-            <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+            ${getHtmlHead('ShieldHub - Dashboard')}
             <style>${SHARED_STYLES}</style>
         </head>
         <body>
             <div class="header">
                 <div class="header-brand">
-                    <img src="${LOGO_SVG}" class="header-logo" alt="ShieldHub">
+                    <img src="/logo.svg" class="header-logo" alt="ShieldHub">
                     <span class="header-title">ShieldHub</span>
                 </div>
                 <div class="header-right">
@@ -519,16 +537,13 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
         <!DOCTYPE html>
         <html lang="en">
         <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <title>Edit Script - ShieldHub</title>
-            <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+            ${getHtmlHead('Edit Script - ShieldHub')}
             <style>${SHARED_STYLES}</style>
         </head>
         <body>
             <div class="header">
                 <div class="header-brand">
-                    <img src="${LOGO_SVG}" class="header-logo" alt="ShieldHub">
+                    <img src="/logo.svg" class="header-logo" alt="ShieldHub">
                     <span class="header-title">Edit Script</span>
                 </div>
                 <a href="/" class="btn">← Back</a>
@@ -595,10 +610,7 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
         <!DOCTYPE html>
         <html lang="en">
         <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <title>ShieldHub - ${script.name}</title>
-            <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+            ${getHtmlHead('ShieldHub - ' + script.name)}
             <style>
                 ${SHARED_STYLES}
                 body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
@@ -616,7 +628,7 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
         </head>
         <body>
             <div class="view-container">
-                <h1><img src="${LOGO_SVG}" class="view-logo" alt="ShieldHub"> ShieldHub</h1>
+                <h1><img src="/logo.svg" class="view-logo" alt="ShieldHub"> ShieldHub</h1>
                 <p class="subtitle">Script Protection System</p>
                 <h2 style="margin: 20px 0; color: #fff;">${script.name}</h2>
                 <div class="version-badge" style="display:inline-block; font-size: 14px; padding: 6px 16px;">${script.version}</div>
@@ -667,7 +679,6 @@ app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
         const usersResult = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
         const users = usersResult.rows;
         
-        // Get script count per user
         const scriptsCountResult = await pool.query('SELECT owner, COUNT(*) as count FROM scripts GROUP BY owner');
         const scriptsCount = {};
         scriptsCountResult.rows.forEach(r => { scriptsCount[r.owner] = r.count; });
@@ -696,16 +707,13 @@ app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
         <!DOCTYPE html>
         <html lang="en">
         <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <title>Admin Panel - ShieldHub</title>
-            <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+            ${getHtmlHead('Admin Panel - ShieldHub')}
             <style>${SHARED_STYLES}</style>
         </head>
         <body>
             <div class="header">
                 <div class="header-brand">
-                    <img src="${LOGO_SVG}" class="header-logo" alt="ShieldHub">
+                    <img src="/logo.svg" class="header-logo" alt="ShieldHub">
                     <span class="header-title">👑 Admin Panel</span>
                 </div>
                 <div class="header-right">
@@ -731,12 +739,10 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) =>
     try {
         const targetUser = req.params.username;
         
-        // Check if user exists
         const userResult = await pool.query('SELECT * FROM users WHERE username = $1', [targetUser]);
         if (userResult.rows.length === 0) return res.status(404).send('User not found');
         const targetUserData = userResult.rows[0];
         
-        // Get user's scripts
         const scriptsResult = await pool.query('SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC', [targetUser]);
         const userScripts = scriptsResult.rows;
         const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
@@ -769,16 +775,13 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) =>
         <!DOCTYPE html>
         <html lang="en">
         <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <title>${targetUser}'s Scripts - Admin</title>
-            <link rel="icon" type="image/svg+xml" href="${FAVICON_SVG}">
+            ${getHtmlHead(targetUser + "'s Scripts - Admin")}
             <style>${SHARED_STYLES}</style>
         </head>
         <body>
             <div class="header">
                 <div class="header-brand">
-                    <img src="${LOGO_SVG}" class="header-logo" alt="ShieldHub">
+                    <img src="/logo.svg" class="header-logo" alt="ShieldHub">
                     <span class="header-title">👤 ${targetUser}</span>
                 </div>
                 <div class="header-right">
@@ -820,7 +823,6 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
         await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]);
         
-        // Redirect back to admin user page if admin deleted someone else's script
         if (isAdmin && script.owner !== req.session.user.username) {
             return res.redirect('/admin/user/' + encodeURIComponent(script.owner));
         }
@@ -830,7 +832,8 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ShieldHub v12.0 running on port ${PORT}`);
-    console.log(`👑 Admin Panel enabled at /admin`);
-    console.log(`🎨 Beautiful UI + Toast notifications`);
+    console.log(`✅ ShieldHub v13.0 running on port ${PORT}`);
+    console.log(`🎨 Logo served at /logo.svg`);
+    console.log(`⭐ Favicon served at /favicon.svg`);
+    console.log(`👑 Admin Panel at /admin`);
 });
