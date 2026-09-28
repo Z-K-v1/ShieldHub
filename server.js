@@ -19,7 +19,7 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
-// ==================== DATABASE INIT ====================
+// ==================== DATABASE INIT (WITH AUTO-MIGRATION) ====================
 async function initDB() {
     try {
         await pool.query(`
@@ -35,7 +35,7 @@ async function initDB() {
             CREATE TABLE IF NOT EXISTS scripts (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
-                slug VARCHAR(100) NOT NULL,
+                slug VARCHAR(100) NOT NULL DEFAULT 'Script',
                 version VARCHAR(50) NOT NULL DEFAULT 'V1',
                 real_content TEXT NOT NULL,
                 public_content TEXT NOT NULL,
@@ -52,7 +52,13 @@ async function initDB() {
                 CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
             );
         `);
-        console.log('✅ Tables created/verified');
+
+        // 🔧 AUTO-MIGRATION: Add missing columns if they don't exist
+        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS slug VARCHAR(100) DEFAULT 'Script';`);
+        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS version VARCHAR(50) DEFAULT 'V1';`);
+        await pool.query(`UPDATE scripts SET slug = LOWER(REPLACE(name, ' ', '_')) WHERE slug = 'Script' OR slug IS NULL;`);
+        await pool.query(`UPDATE scripts SET version = 'V1' WHERE version IS NULL;`);
+        console.log('✅ Tables created/verified (with auto-migration)');
 
         const adminPass = process.env.ADMIN_PASSWORD;
         if (adminPass) {
@@ -91,7 +97,7 @@ function requireLogin(req, res, next) {
 function obfuscateScript(code) {
     const encoded = Buffer.from(code, 'utf8').toString('base64');
     return `
--- ShieldHub Protected v7.0
+-- ShieldHub Protected v8.0
 local _b="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local _d="${encoded}"
 local _o={}
@@ -201,30 +207,17 @@ const SHARED_STYLES = `
         background: linear-gradient(135deg, #ff4444, #cc0000); 
         color: #fff; 
     }
-    .btn-red:hover {
-        box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4);
-    }
+    .btn-red:hover { box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4); }
     .btn-orange { 
         background: linear-gradient(135deg, #ffaa00, #ff8800); 
         color: #000; 
     }
-    .btn-orange:hover {
-        box-shadow: 0 6px 20px rgba(255, 170, 0, 0.4);
-    }
+    .btn-orange:hover { box-shadow: 0 6px 20px rgba(255, 170, 0, 0.4); }
     .btn-blue { 
         background: linear-gradient(135deg, #0088ff, #0066cc); 
         color: #fff; 
     }
-    .btn-blue:hover {
-        box-shadow: 0 6px 20px rgba(0, 136, 255, 0.4);
-    }
-    .btn-purple {
-        background: linear-gradient(135deg, #aa44ff, #8800cc);
-        color: #fff;
-    }
-    .btn-purple:hover {
-        box-shadow: 0 6px 20px rgba(170, 68, 255, 0.4);
-    }
+    .btn-blue:hover { box-shadow: 0 6px 20px rgba(0, 136, 255, 0.4); }
     .card { 
         background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%);
         padding: 25px; 
@@ -233,17 +226,7 @@ const SHARED_STYLES = `
         border: 1px solid #222;
         box-shadow: 0 4px 20px rgba(0,0,0,0.3);
     }
-    .card h3 {
-        margin-bottom: 20px;
-        font-size: 18px;
-        color: #fff;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .form-group {
-        margin-bottom: 20px;
-    }
+    .form-group { margin-bottom: 20px; }
     .form-label {
         display: block;
         margin-bottom: 8px;
@@ -339,27 +322,10 @@ const SHARED_STYLES = `
         flex-wrap: wrap;
         gap: 8px;
     }
-    .script-meta {
-        color: #666;
-        font-size: 12px;
-        margin-bottom: 15px;
-    }
-    .actions {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-top: 15px;
-    }
-    .empty-state {
-        text-align: center;
-        padding: 40px;
-        color: #666;
-    }
-    .empty-state-icon {
-        font-size: 48px;
-        margin-bottom: 15px;
-        opacity: 0.5;
-    }
+    .script-meta { color: #666; font-size: 12px; margin-bottom: 15px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+    .empty-state { text-align: center; padding: 40px; color: #666; }
+    .empty-state-icon { font-size: 48px; margin-bottom: 15px; opacity: 0.5; }
     @media (max-width: 600px) {
         .form-row { grid-template-columns: 1fr; }
         body { padding: 10px; }
@@ -568,16 +534,18 @@ app.get('/', requireLogin, async (req, res) => {
             </div>`;
         } else {
             myScripts.forEach(s => {
-                const prettyUrl = `${baseUrl}/raw/${s.slug}/${s.version}/${s.token}`;
+                const slug = s.slug || 'Script';
+                const version = s.version || 'V1';
+                const prettyUrl = `${baseUrl}/raw/${slug}/${version}/${s.token}`;
                 html += `
                 <div class="script-card">
-                    <h3>📄 ${s.name} <span class="version-badge">${s.version}</span></h3>
+                    <h3>📄 ${s.name} <span class="version-badge">${version}</span></h3>
                     <div class="script-meta">Created: ${new Date(s.created_at).toLocaleDateString()}</div>
                     <div class="url-preview">${prettyUrl}</div>
                     <div class="actions">
                         <button class="btn" onclick="copyLoadstring('${prettyUrl}')">📋 Copy Loadstring</button>
                         <a href="/edit/${s.token}" class="btn btn-orange">✏️ Edit</a>
-                        <a href="/view/${s.slug}/${s.version}/${s.token}" class="btn btn-blue" target="_blank">👁️ View</a>
+                        <a href="/view/${slug}/${version}/${s.token}" class="btn btn-blue" target="_blank">👁️ View</a>
                         <button class="btn btn-red" onclick="confirmDelete('${s.token}', '${s.name}')">🗑️ Delete</button>
                     </div>
                 </div>
@@ -600,7 +568,10 @@ app.get('/', requireLogin, async (req, res) => {
         </body></html>
         `;
         res.send(html);
-    } catch (e) { console.error(e); res.status(500).send('Server error'); }
+    } catch (e) { 
+        console.error('DASHBOARD ERROR:', e.message); 
+        res.status(500).send('Server error: ' + e.message); 
+    }
 });
 
 // ==================== CREATE ====================
@@ -615,7 +586,10 @@ app.post('/create', requireLogin, async (req, res) => {
             [name, slug, ver, content, obfuscateScript(content), token, req.session.user.username]
         );
         res.redirect('/');
-    } catch (e) { console.error(e); res.status(500).send('Error creating script'); }
+    } catch (e) { 
+        console.error('CREATE ERROR:', e.message); 
+        res.status(500).send('Error creating script: ' + e.message); 
+    }
 });
 
 // ==================== EDIT ====================
@@ -663,7 +637,10 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
         </body>
         </html>
         `);
-    } catch (e) { console.error(e); res.status(500).send('Server error'); }
+    } catch (e) { 
+        console.error('EDIT ERROR:', e.message); 
+        res.status(500).send('Server error: ' + e.message); 
+    }
 });
 
 app.post('/edit/:token', requireLogin, async (req, res) => {
@@ -681,7 +658,10 @@ app.post('/edit/:token', requireLogin, async (req, res) => {
             [req.body.name, slug, ver, req.body.content, obfuscateScript(req.body.content), req.params.token]
         );
         res.redirect('/');
-    } catch (e) { console.error(e); res.status(500).send('Server error'); }
+    } catch (e) { 
+        console.error('EDIT SAVE ERROR:', e.message); 
+        res.status(500).send('Server error: ' + e.message); 
+    }
 });
 
 // ==================== VIEW ====================
@@ -735,10 +715,7 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
                     font-size: 16px;
                     margin-bottom: 8px;
                 }
-                .protected-box small {
-                    color: #888;
-                    font-size: 12px;
-                }
+                .protected-box small { color: #888; font-size: 12px; }
                 .view-container .btn { width: 100%; padding: 16px; font-size: 15px; }
                 .footer-text { color: #444; font-size: 12px; margin-top: 25px; }
             </style>
@@ -811,7 +788,8 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ShieldHub v7.0 running on port ${PORT}`);
+    console.log(`✅ ShieldHub v8.0 running on port ${PORT}`);
+    console.log(`🔧 Auto-migration enabled`);
     console.log(`🎨 Beautiful UI enabled`);
     console.log(`📋 Version dropdown: V1 to V1000`);
 });
