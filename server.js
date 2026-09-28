@@ -85,26 +85,23 @@ function requireLogin(req, res, next) {
     else res.redirect('/login');
 }
 
-// ==================== OBFUSCATION (XOR ENCRYPTION) ====================
+// ==================== OBFUSCATION (FAST BASE64) ====================
 function obfuscateScript(code) {
-    const bytes = Buffer.from(code, 'utf8');
-    const key = crypto.randomBytes(16);
-    const encrypted = Buffer.alloc(bytes.length);
-    for (let i = 0; i < bytes.length; i++) {
-        encrypted[i] = bytes[i] ^ key[i % key.length];
-    }
-    const keyArray = Array.from(key).join(',');
-    const encArray = Array.from(encrypted).join(',');
+    const encoded = Buffer.from(code, 'utf8').toString('base64');
     return `
--- ShieldHub Protected v3.0
-local _k={${keyArray}}
-local _e={${encArray}}
-local _d={}
-for _i=1,#_e do
-    _d[_i]=string.char(bit32.bxor(_e[_i],_k[((_i-1)%#_k)+1]))
+-- ShieldHub Protected v4.0
+local _b="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local _d="${encoded}"
+local _o={}
+_d:gsub(".", function(_c) local _n=_b:find(_c,1,true) if _n then _o[#_o+1]=_n-1 end end)
+local _r=""
+for _i=1,#_o,4 do
+    local _n=_o[_i]*262144+(_o[_i+1] or 0)*4096+(_o[_i+2] or 0)*64+(_o[_i+3] or 0)
+    _r=_r..string.char(math.floor(_n/65536)%256)
+    if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end
+    if _o[_i+3] then _r=_r..string.char(_n%256) end
 end
-local _c=table.concat(_d)
-local _f=loadstring(_c)
+local _f=loadstring(_r)
 if _f then _f() end
 `;
 }
@@ -448,6 +445,6 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ShieldHub v3.0 running on port ${PORT}`);
-    console.log(`🔒 XOR-encrypted scripts + browser blocking enabled.`);
+    console.log(`✅ ShieldHub v4.0 running on port ${PORT}`);
+    console.log(`⚡ Fast Base64 encryption enabled.`);
 });
