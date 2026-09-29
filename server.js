@@ -1304,7 +1304,7 @@ app.get('/create', requireLogin, (req, res) => {
                     <textarea name="content" placeholder="-- Paste your Lua script here..." required></textarea>
                 </div>
                 <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                    <button type="submit" class="btn btn-primary">💾 Save Script</button>
+                    <button type="submit" class="btn btn-primary">Save Script</button>
                     <a href="/" class="btn btn-ghost">Cancel</a>
                 </div>
             </form>
