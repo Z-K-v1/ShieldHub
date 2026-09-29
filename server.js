@@ -44,17 +44,10 @@ async function initDB() {
                 created_at TIMESTAMP DEFAULT NOW()
             );
         `);
-        // HWID Keys table
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS hwid_keys (
-                id SERIAL PRIMARY KEY,
-                script_token VARCHAR(64) NOT NULL,
-                key_value VARCHAR(128) UNIQUE NOT NULL,
-                hwid VARCHAR(256),
-                used BOOLEAN DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT NOW()
-            );
-        `);
+        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS slug VARCHAR(100) DEFAULT 'Script';`);
+        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS version VARCHAR(50) DEFAULT 'V1';`);
+        await pool.query(`UPDATE scripts SET slug = LOWER(REPLACE(name, ' ', '_')) WHERE slug = 'Script' OR slug IS NULL;`);
+        await pool.query(`UPDATE scripts SET version = 'V1' WHERE version IS NULL;`);
         await pool.query(`
             CREATE TABLE IF NOT EXISTS "session" (
                 "sid" VARCHAR NOT NULL COLLATE "default",
@@ -63,10 +56,6 @@ async function initDB() {
                 CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
             );
         `);
-        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS slug VARCHAR(100) DEFAULT 'Script';`);
-        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS version VARCHAR(50) DEFAULT 'V1';`);
-        await pool.query(`UPDATE scripts SET slug = LOWER(REPLACE(name, ' ', '_')) WHERE slug = 'Script' OR slug IS NULL;`);
-        await pool.query(`UPDATE scripts SET version = 'V1' WHERE version IS NULL;`);
         console.log('✅ Tables created/verified');
 
         const adminPass = process.env.ADMIN_PASSWORD;
@@ -137,8 +126,7 @@ app.get('/favicon.ico', (req, res) => {
 // ==================== OBFUSCATION ====================
 function obfuscateScript(code) {
     const encoded = Buffer.from(code, 'utf8').toString('base64');
-    return `
--- ${BRAND_NAME} | Protected
+    return `-- ${BRAND_NAME} | Protected
 local _b="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local _d="${encoded}"
 local _o={}
@@ -151,75 +139,41 @@ for _i=1,#_o,4 do
     if _o[_i+3] then _r=_r..string.char(_n%256) end
 end
 local _f=loadstring(_r)
-if _f then _f() end
-`;
+if _f then _f() end`;
 }
 
-// ==================== HWID-LOCKED OBFUSCATION ====================
-function buildProtectedLoader(scriptToken, baseUrl) {
-    // Generate HWID-locked Lua loader
+// Heavy obfuscation with extra layers
+function heavyObfuscate(code) {
+    const b64 = Buffer.from(code, 'utf8').toString('base64');
+    const chunks = [];
+    for (let i = 0; i < b64.length; i += 50) {
+        chunks.push(b64.substr(i, 50));
+    }
+    const chunkStr = chunks.map(c => `"${c}"`).join('..');
+    const timestamp = new Date().toISOString();
+    
     return `-- ═══════════════════════════════════════════
--- 🔒 HWID-Locked Loader ${BRAND_NAME}
+-- 🔒 Obfuscated ${BRAND_NAME}
+-- Generated: ${timestamp}
 -- ═══════════════════════════════════════════
--- DO NOT SHARE THIS KEY!
--- It is locked to YOUR device only.
-
-local _hwid = "UNKNOWN"
-pcall(function()
-    if gethwid then _hwid = gethwid()
-    elseif game and game.GetService then
-        local _svc = game:GetService("RbxAnalyticsService")
-        if _svc and _svc.GetClientId then _hwid = _svc:GetClientId() end
-    end
-end)
-
-if _hwid == "UNKNOWN" or _hwid == "" then
-    warn("[${BRAND_SHORT}] ❌ Cannot detect HWID. Executor not supported.")
-    return
+local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local _d=${chunkStr}
+local _o={}
+_d:gsub(".",function(_c)local _n=_b64:find(_c,1,true)if _n then _o[#_o+1]=_n-1 end end)
+local _r=""
+for _i=1,#_o,4 do
+    local _n=_o[_i]*262144+(_o[_i+1] or 0)*4096+(_o[_i+2] or 0)*64+(_o[_i+3] or 0)
+    _r=_r..string.char(math.floor(_n/65536)%256)
+    if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end
+    if _o[_i+3] then _r=_r..string.char(_n%256) end
 end
-
-local _key = nil
-if writefile and readfile then
-    pcall(function() _key = readfile("${BRAND_SHORT}_key.txt") end)
-end
-
-if not _key and getgenv then
-    _key = getgenv().ZyroxKidoKey
-end
-
-if not _key or _key == "" then
-    warn("[${BRAND_SHORT}] ❌ No key found!")
-    warn("[${BRAND_SHORT}] Set your key with: getgenv().ZyroxKidoKey = 'YOUR-KEY'")
-    return
-end
-
-local _http = game:GetService("HttpService")
-local _url = "${baseUrl}/validate/${scriptToken}?key=" .. _http:UrlEncode(_key) .. "&hwid=" .. _http:UrlEncode(_hwid)
-
-local _ok, _res = pcall(function() return _http:GetAsync(_url) end)
-if not _ok then
-    warn("[${BRAND_SHORT}] ❌ Server error: " .. tostring(_res))
-    return
-end
-
-local _data = _http:JSONDecode(_res)
-if not _data.valid then
-    warn("[${BRAND_SHORT}] ❌ " .. (_data.error or "Invalid key"))
-    return
-end
-
-local _f = loadstring(_data.payload)
+local _f=loadstring(_r)
 if _f then _f() end
--- 🔒 Protected by ${BRAND_NAME}
-`;
+-- 🔒 Protected by ${BRAND_NAME}`;
 }
 
 function makeSlug(name) {
     return name.toString().trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 50) || 'Script';
-}
-
-function generateKey() {
-    return 'ZK-' + crypto.randomBytes(16).toString('hex').toUpperCase();
 }
 
 function versionDropdown(selectedValue) {
@@ -240,7 +194,6 @@ function getHtmlHead(title) {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="apple-touch-icon" href="/favicon.svg">
     <meta name="theme-color" content="#00ff88">
-    <meta name="author" content="${BRAND_NAME}">
     `;
 }
 
@@ -261,15 +214,10 @@ const SHARED_STYLES = `
     .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 255, 136, 0.4); }
     .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     .btn-red { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
-    .btn-red:hover { box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4); }
     .btn-orange { background: linear-gradient(135deg, #ffaa00, #ff8800); color: #000; }
-    .btn-orange:hover { box-shadow: 0 6px 20px rgba(255, 170, 0, 0.4); }
     .btn-blue { background: linear-gradient(135deg, #0088ff, #0066cc); color: #fff; }
-    .btn-blue:hover { box-shadow: 0 6px 20px rgba(0, 136, 255, 0.4); }
     .btn-purple { background: linear-gradient(135deg, #aa44ff, #8800cc); color: #fff; }
-    .btn-purple:hover { box-shadow: 0 6px 20px rgba(170, 68, 255, 0.4); }
     .btn-gold { background: linear-gradient(135deg, #ffd700, #ffaa00); color: #000; font-weight: 800; }
-    .btn-gold:hover { box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5); transform: translateY(-2px); }
     .card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 25px; border-radius: 16px; margin: 20px 0; border: 1px solid #222; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
     .form-group { margin-bottom: 20px; }
     .form-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.8px; }
@@ -278,44 +226,45 @@ const SHARED_STYLES = `
     input:focus, textarea:focus, select:focus { border-color: #00ff88; box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.1); }
     textarea { font-family: 'Consolas', 'Monaco', monospace; resize: vertical; min-height: 120px; line-height: 1.5; }
     select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ff88' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 15px center; background-size: 20px; padding-right: 45px; }
-    .section-title { font-size: 20px; font-weight: 800; color: #fff; margin: 30px 0 15px 0; display: flex; align-items: center; gap: 10px; letter-spacing: -0.5px; }
+    .section-title { font-size: 20px; font-weight: 800; color: #fff; margin: 30px 0 15px 0; display: flex; align-items: center; gap: 10px; }
     .version-badge { background: linear-gradient(135deg, #aa44ff, #8800cc); color: #fff; padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: 800; margin-left: 8px; }
-    .url-preview { background: #0a0a0a; border: 1px solid #2a2a2a; padding: 12px 16px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; word-break: break-all; margin: 10px 0; line-height: 1.5; }
+    .url-preview { background: #0a0a0a; border: 1px solid #2a2a2a; padding: 12px 16px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; word-break: break-all; margin: 10px 0; }
     .script-card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 25px; border-radius: 16px; margin: 15px 0; border: 1px solid #222; transition: all 0.2s ease; }
     .script-card:hover { border-color: #00ff88; transform: translateY(-2px); }
-    .script-card h3 { font-size: 18px; color: #fff; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 700; }
+    .script-card h3 { font-size: 18px; color: #fff; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
     .script-meta { color: #666; font-size: 12px; margin-bottom: 15px; }
     .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
     .empty-state { text-align: center; padding: 50px 20px; color: #666; }
     .empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.4; }
 
+    /* 2-Column Obfuscator Layout */
+    .obfuscator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+    @media (max-width: 900px) { .obfuscator-grid { grid-template-columns: 1fr; } }
+    .obf-panel { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px; border-radius: 16px; border: 1px solid #222; }
+    .obf-panel-title { font-size: 13px; font-weight: 800; color: #00ff88; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; justify-content: space-between; }
+    .obf-panel-title .badge-live { background: #00ff88; color: #000; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 800; }
+    .obf-textarea { width: 100%; min-height: 400px; padding: 15px; background: #0a0a0a; border: 1px solid #2a2a2a; color: #fff; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; line-height: 1.5; resize: vertical; outline: none; }
+    .obf-textarea:focus { border-color: #00ff88; box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1); }
+    .obf-output { width: 100%; min-height: 400px; padding: 15px; background: #0a0a0a; border: 1px solid #ffd700; color: #ffd700; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; line-height: 1.4; overflow-y: auto; word-break: break-all; white-space: pre-wrap; }
+    .obf-actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
+
+    /* Loadstring box */
+    .loadstring-box { background: #0a0a0a; border: 1px solid #00ff88; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; word-break: break-all; margin: 10px 0; line-height: 1.5; }
+
+    .footer-brand { text-align: center; padding: 20px; color: #444; font-size: 12px; margin-top: 30px; }
+    .footer-brand strong { background: linear-gradient(135deg, #00ff88, #aa44ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 800; }
+
     .user-card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px 25px; border-radius: 14px; margin: 12px 0; border: 1px solid #222; display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; transition: all 0.2s ease; text-decoration: none; color: inherit; }
-    .user-card:hover { border-color: #aa44ff; transform: translateY(-2px); box-shadow: 0 10px 30px rgba(170, 68, 255, 0.15); }
+    .user-card:hover { border-color: #aa44ff; transform: translateY(-2px); }
     .user-info { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 200px; }
     .user-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #00ff88, #00cc66); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #000; flex-shrink: 0; text-transform: uppercase; }
     .user-avatar-admin { background: linear-gradient(135deg, #ffaa00, #ff6600); }
     .user-details { display: flex; flex-direction: column; gap: 4px; }
     .user-name { font-weight: 700; font-size: 16px; color: #fff; }
     .user-meta { font-size: 12px; color: #666; }
-    .role-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+    .role-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
     .role-admin-tag { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
     .role-user-tag { background: #00ff88; color: #000; }
-
-    .footer-brand { text-align: center; padding: 20px; color: #444; font-size: 12px; margin-top: 30px; }
-    .footer-brand strong { background: linear-gradient(135deg, #00ff88, #aa44ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 800; }
-
-    /* KEY STYLES */
-    .key-box { background: #0a0a0a; border: 2px solid #ffd700; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; color: #ffd700; word-break: break-all; margin: 10px 0; line-height: 1.5; letter-spacing: 1px; }
-    .key-used { border-color: #ff4444; color: #ff4444; }
-    .key-available { border-color: #00ff88; color: #00ff88; }
-    .key-card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px; border-radius: 14px; margin: 12px 0; border: 1px solid #222; }
-    .key-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
-    .hwid-info { color: #666; font-size: 11px; font-family: monospace; }
-
-    .obf-container { margin-top: 15px; padding: 15px; background: rgba(255, 215, 0, 0.05); border: 2px dashed #ffd700; border-radius: 12px; }
-    .obf-label { color: #ffd700; font-weight: 800; font-size: 13px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .obf-box { background: #0a0a0a; border: 1px solid #ffd700; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: #ffd700; word-break: break-all; margin: 10px 0; max-height: 300px; overflow-y: auto; line-height: 1.4; white-space: pre-wrap; }
-    .obf-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
 
     @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     @keyframes fadeOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(400px); } }
@@ -336,47 +285,31 @@ const SHARED_STYLES = `
         .section-title { font-size: 18px; }
         .btn { padding: 10px 16px; font-size: 13px; }
         .toast { bottom: 15px; right: 15px; left: 15px; padding: 14px 18px; font-size: 13px; }
-        .user-card { padding: 16px 18px; }
+        .obf-textarea, .obf-output { min-height: 250px; font-size: 11px; }
     }
     @media (max-width: 480px) {
         body { padding: 8px; }
-        .header { padding: 12px 15px; border-radius: 12px; }
+        .header { padding: 12px 15px; }
         .header-title { font-size: 16px; }
-        .header-logo { width: 32px; height: 32px; }
-        .header-right { width: 100%; justify-content: space-between; }
-        .card { padding: 16px; border-radius: 12px; }
-        .script-card { padding: 16px; border-radius: 12px; }
-        .script-card h3 { font-size: 16px; }
-        .section-title { font-size: 16px; }
-        .btn { padding: 10px 14px; font-size: 12px; }
         .actions .btn { flex: 1; min-width: calc(50% - 4px); }
-        input, textarea, select { padding: 12px 14px; font-size: 14px; }
-        .empty-state-icon { font-size: 48px; }
-        .user-card { padding: 14px 15px; }
-        .user-avatar { width: 42px; height: 42px; font-size: 18px; }
-        .user-name { font-size: 14px; }
-        .obf-actions .btn { flex: 1; }
+        .obf-actions-row .btn { flex: 1; }
     }
 
-    .login-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 420px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.6); position: relative; overflow: hidden; }
-    .login-container::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%); animation: pulse 4s ease-in-out infinite; pointer-events: none; }
-    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 0.8; } }
-    .login-container h1 { color: #00ff88; font-size: 30px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 12px; position: relative; z-index: 1; font-weight: 800; letter-spacing: -1px; text-shadow: 0 0 30px rgba(0, 255, 136, 0.4); }
-    .login-container h1 small { display: block; font-size: 12px; color: #aa44ff; font-weight: 600; letter-spacing: 1px; text-shadow: 0 0 10px rgba(170, 68, 255, 0.5); margin-top: 4px; }
-    .login-logo { width: 48px; height: 48px; filter: drop-shadow(0 0 15px rgba(0, 255, 136, 0.6)); animation: float 3s ease-in-out infinite; }
-    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-    .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; position: relative; z-index: 1; }
-    .login-container input { margin-bottom: 15px; text-align: center; position: relative; z-index: 1; }
-    .login-container .btn { width: 100%; margin-top: 10px; position: relative; z-index: 1; }
-    .msg { margin-top: 15px; font-size: 13px; position: relative; z-index: 1; }
+    .login-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 420px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+    .login-container h1 { color: #00ff88; font-size: 30px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 800; }
+    .login-container h1 small { display: block; font-size: 12px; color: #aa44ff; font-weight: 600; letter-spacing: 1px; margin-top: 4px; }
+    .login-logo { width: 48px; height: 48px; filter: drop-shadow(0 0 15px rgba(0, 255, 136, 0.6)); }
+    .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
+    .login-container input { margin-bottom: 15px; text-align: center; }
+    .login-container .btn { width: 100%; margin-top: 10px; }
+    .msg { margin-top: 15px; font-size: 13px; }
     .error { color: #ff4444; }
     .success { color: #00ff88; }
-    .link { color: #00ff88; text-decoration: none; display: block; margin-top: 20px; font-size: 14px; position: relative; z-index: 1; font-weight: 600; }
+    .link { color: #00ff88; text-decoration: none; display: block; margin-top: 20px; font-size: 14px; font-weight: 600; }
     .link:hover { text-decoration: underline; }
-    @media (max-width: 480px) { .login-container { padding: 40px 25px; border-radius: 16px; } .login-container h1 { font-size: 24px; } .login-logo { width: 40px; height: 40px; } }
 `;
 
-// ==================== TOAST + SCRIPT UTILITIES ====================
+// ==================== TOAST + UTILITIES ====================
 const TOAST_SCRIPT = `
     function showToast(message, type = 'success') {
         const existing = document.querySelector('.toast');
@@ -392,18 +325,10 @@ const TOAST_SCRIPT = `
             if (btn) {
                 const original = btn.innerHTML;
                 btn.innerHTML = '✅ Copied!';
-                btn.style.background = 'linear-gradient(135deg, #00cc66, #009944)';
-                setTimeout(() => { btn.innerHTML = original; btn.style.background = ''; }, 1800);
+                setTimeout(() => { btn.innerHTML = original; }, 1500);
             }
             showToast('Copied!');
         }).catch(() => showToast('Failed to copy!', 'error'));
-    }
-    function copyLoadstring(url, btn) {
-        const loadstring = 'loadstring(game:HttpGet("' + url + '"))()';
-        copyText(loadstring, btn);
-    }
-    function copyRaw(text, btn) {
-        copyText(text, btn);
     }
     function confirmDelete(token, name) {
         if (confirm('⚠️ Are you sure you want to delete "' + name + '"?')) {
@@ -412,13 +337,12 @@ const TOAST_SCRIPT = `
     }
 `;
 
-// ==================== FOOTER ====================
 function getFooter() {
     return `<div class="footer-brand">Made with 💚 by <strong>${BRAND_NAME}</strong></div>`;
 }
 
 // ==================== SCRIPT CARD RENDERER ====================
-function renderScriptCard(s, baseUrl, includeGenerate = true) {
+function renderScriptCard(s, baseUrl) {
     const slug = s.slug || 'Script';
     const version = s.version || 'V1';
     const prettyUrl = `${baseUrl}/raw/${slug}/${version}/${s.token}`;
@@ -428,7 +352,7 @@ function renderScriptCard(s, baseUrl, includeGenerate = true) {
         <div class="script-meta">Created: ${new Date(s.created_at).toLocaleDateString()}</div>
         <div class="url-preview">${prettyUrl}</div>
         <div class="actions">
-            <a href="/keys/${s.token}" class="btn btn-gold">🔑 Manage HWID Keys</a>
+            <button class="btn" onclick="copyText('loadstring(game:HttpGet(\\'${prettyUrl}\\'))()', this)">📋 Copy Loadstring</button>
             <a href="/edit/${s.token}" class="btn btn-orange">✏️ Edit</a>
             <a href="/view/${slug}/${version}/${s.token}" class="btn btn-blue" target="_blank">👁️ View</a>
             <button class="btn btn-red" onclick="confirmDelete('${s.token}', '${s.name}')">🗑️ Delete</button>
@@ -448,8 +372,8 @@ app.get('/login', (req, res) => {
             <h1><img src="/logo.svg" class="login-logo" alt="${BRAND_NAME}"> ${BRAND_SHORT}<small>By Zyrox-Kido</small></h1>
             <p class="subtitle">Login to your dashboard</p>
             <form action="/login" method="POST">
-                <input type="text" name="username" placeholder="Username" required autocomplete="username">
-                <input type="password" name="password" placeholder="Password" required autocomplete="current-password">
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="password" name="password" placeholder="Password" required>
                 <button type="submit" class="btn">🔓 Login</button>
             </form>
             <p class="msg error">${req.query.error ? '❌ Invalid name or password!' : ''}</p>
@@ -542,35 +466,14 @@ app.get('/', requireLogin, async (req, res) => {
                 </div>
             </div>
 
-            <h2 class="section-title">✨ Create New Script</h2>
-            <div class="card">
-                <form action="/create" method="POST">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">📝 Script Name</label>
-                            <input type="text" name="name" placeholder="e.g., Bee Hub" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">🏷️ Version</label>
-                            <select name="version" required>${versionDropdown('V1')}</select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">💻 Script Content (Lua Code)</label>
-                        <textarea name="content" rows="10" placeholder="-- Paste your Lua script here..." required></textarea>
-                    </div>
-                    <button type="submit" class="btn">➕ Create Script</button>
-                </form>
-            </div>
-
             <h2 class="section-title">📁 Your Scripts (${myScripts.length})</h2>
         `;
         
         if (myScripts.length === 0) {
-            html += `<div class="card empty-state"><div class="empty-state-icon">📭</div><p>No scripts yet. Create your first script above!</p></div>`;
+            html += `<div class="card empty-state"><div class="empty-state-icon">📭</div><p>No scripts yet. Create your first script!</p></div>`;
         } else {
             myScripts.forEach(s => {
-                html += renderScriptCard(s, baseUrl, true);
+                html += renderScriptCard(s, baseUrl);
             });
         }
         html += `${getFooter()}<script>${TOAST_SCRIPT}</script></body></html>`;
@@ -581,7 +484,146 @@ app.get('/', requireLogin, async (req, res) => {
     }
 });
 
-// ==================== CREATE ====================
+// ==================== CREATE PAGE (LuaU-Style 2-Column) ====================
+app.get('/create', requireLogin, (req, res) => {
+    const isAdmin = req.session.user.role === 'ADMIN';
+    res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>${getHtmlHead('Create Script')}<style>${SHARED_STYLES}</style></head>
+    <body>
+        <div class="header">
+            <div class="header-brand">
+                <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
+                <div>
+                    <div class="header-title">✨ Create Script</div>
+                    <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
+                </div>
+            </div>
+            <div class="header-right">
+                <a href="/" class="btn">← Dashboard</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <form action="/create" method="POST" id="createForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">📝 Script Name</label>
+                        <input type="text" name="name" id="scriptName" placeholder="e.g., Zyrox Hub" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">🏷️ Version</label>
+                        <select name="version" required>${versionDropdown('V1')}</select>
+                    </div>
+                </div>
+
+                <div class="obfuscator-grid">
+                    <!-- LEFT: INPUT -->
+                    <div class="obf-panel">
+                        <div class="obf-panel-title">
+                            <span>💻 Original Lua Code</span>
+                            <span class="badge-live">INPUT</span>
+                        </div>
+                        <textarea class="obf-textarea" name="content" id="scriptInput" placeholder="-- Paste your Lua script here...&#10;print('Hello World!')" required></textarea>
+                    </div>
+
+                    <!-- RIGHT: OBFUSCATED OUTPUT (LIVE) -->
+                    <div class="obf-panel">
+                        <div class="obf-panel-title">
+                            <span>🔒 Obfuscated By Zyrox-Kido</span>
+                            <span class="badge-live" style="background:#ffd700;">LIVE</span>
+                        </div>
+                        <div class="obf-output" id="obfOutput">-- Obfuscated code will appear here...&#10;-- Start typing on the left →</div>
+                        <div class="obf-actions-row">
+                            <button type="button" class="btn btn-gold" onclick="copyObfuscated(this)">📋 Copy Obfuscated</button>
+                            <button type="button" class="btn btn-purple" onclick="copyLoadstring(this)">🔗 Copy Loadstring</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px; display:flex; gap:10px; flex-wrap:wrap;">
+                    <button type="submit" class="btn">💾 Save Script</button>
+                    <a href="/" class="btn btn-red">Cancel</a>
+                </div>
+            </form>
+        </div>
+
+        <script>
+            ${TOAST_SCRIPT}
+            const inputArea = document.getElementById('scriptInput');
+            const outputArea = document.getElementById('obfOutput');
+            let currentObfuscated = '';
+
+            // Simple client-side Base64 encode for live preview
+            function b64EncodeUnicode(str) {
+                return btoa(unescape(encodeURIComponent(str)));
+            }
+
+            function generateObfuscation(code) {
+                if (!code.trim()) return '-- Obfuscated code will appear here...\\n-- Start typing on the left →';
+                const b64 = b64EncodeUnicode(code);
+                // Split into chunks of 50
+                const chunks = [];
+                for (let i = 0; i < b64.length; i += 50) {
+                    chunks.push('"' + b64.substr(i, 50) + '"');
+                }
+                const chunkStr = chunks.join('..');
+                const timestamp = new Date().toISOString();
+                return '-- ═══════════════════════════════════════════\\n' +
+                       '-- 🔒 Obfuscated ${BRAND_NAME}\\n' +
+                       '-- Generated: ' + timestamp + '\\n' +
+                       '-- ═══════════════════════════════════════════\\n' +
+                       'local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"\\n' +
+                       'local _d=' + chunkStr + '\\n' +
+                       'local _o={}\\n' +
+                       '_d:gsub(".",function(_c)local _n=_b64:find(_c,1,true)if _n then _o[#_o+1]=_n-1 end end)\\n' +
+                       'local _r=""\\n' +
+                       'for _i=1,#_o,4 do\\n' +
+                       '    local _n=_o[_i]*262144+(_o[_i+1] or 0)*4096+(_o[_i+2] or 0)*64+(_o[_i+3] or 0)\\n' +
+                       '    _r=_r..string.char(math.floor(_n/65536)%256)\\n' +
+                       '    if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end\\n' +
+                       '    if _o[_i+3] then _r=_r..string.char(_n%256) end\\n' +
+                       'end\\n' +
+                       'local _f=loadstring(_r)\\n' +
+                       'if _f then _f() end\\n' +
+                       '-- 🔒 Protected by ${BRAND_NAME}';
+            }
+
+            function updateObfuscation() {
+                currentObfuscated = generateObfuscation(inputArea.value);
+                outputArea.innerText = currentObfuscated;
+            }
+
+            // Live update on typing
+            inputArea.addEventListener('input', updateObfuscation);
+            
+            // Initialize
+            updateObfuscation();
+
+            function copyObfuscated(btn) {
+                if (!currentObfuscated) { showToast('Nothing to copy!', 'error'); return; }
+                copyText(currentObfuscated, btn);
+            }
+
+            function copyLoadstring(btn) {
+                const name = document.getElementById('scriptName').value || 'Script';
+                const slug = name.trim().replace(/\\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '') || 'Script';
+                const baseUrl = window.location.origin;
+                // We don't know the token yet (created after save), so show placeholder
+                const url = baseUrl + '/raw/' + slug + '/V1/YOUR-TOKEN-HERE';
+                const loadstring = 'loadstring(game:HttpGet("' + url + '"))()';
+                copyText(loadstring, btn);
+                showToast('⚠️ Save first to get real token!', 'error');
+            }
+        </script>
+        ${getFooter()}
+    </body>
+    </html>
+    `);
+});
+
+// ==================== CREATE (POST) ====================
 app.post('/create', requireLogin, async (req, res) => {
     try {
         const { name, version, content } = req.body;
@@ -599,7 +641,7 @@ app.post('/create', requireLogin, async (req, res) => {
     }
 });
 
-// ==================== EDIT ====================
+// ==================== EDIT PAGE (2-Column) ====================
 app.get('/edit/:token', requireLogin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
@@ -607,6 +649,9 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
         const script = result.rows[0];
         const isAdmin = req.session.user.role === 'ADMIN';
         if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
+
+        // Escape for textarea
+        const escapedContent = script.real_content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
         res.send(`
         <!DOCTYPE html>
@@ -617,31 +662,107 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
                 <div class="header-brand">
                     <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
                     <div>
-                        <div class="header-title">Edit Script</div>
+                        <div class="header-title">✏️ Edit Script</div>
                         <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
                     </div>
                 </div>
-                <a href="/" class="btn">← Back</a>
+                <div class="header-right">
+                    <a href="/" class="btn">← Dashboard</a>
+                </div>
             </div>
+
             <div class="card">
                 <form action="/edit/${script.token}" method="POST">
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">📝 Script Name</label>
-                            <input type="text" name="name" value="${script.name}" required>
+                            <input type="text" name="name" id="scriptName" value="${script.name}" required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">🏷️ Version</label>
                             <select name="version" required>${versionDropdown(script.version)}</select>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">💻 Script Content (Real Code)</label>
-                        <textarea name="content" rows="20" required>${script.real_content}</textarea>
+
+                    <div class="obfuscator-grid">
+                        <div class="obf-panel">
+                            <div class="obf-panel-title">
+                                <span>💻 Original Lua Code</span>
+                                <span class="badge-live">INPUT</span>
+                            </div>
+                            <textarea class="obf-textarea" name="content" id="scriptInput" required>${escapedContent}</textarea>
+                        </div>
+                        <div class="obf-panel">
+                            <div class="obf-panel-title">
+                                <span>🔒 Obfuscated By Zyrox-Kido</span>
+                                <span class="badge-live" style="background:#ffd700;">LIVE</span>
+                            </div>
+                            <div class="obf-output" id="obfOutput"></div>
+                            <div class="obf-actions-row">
+                                <button type="button" class="btn btn-gold" onclick="copyObfuscated(this)">📋 Copy Obfuscated</button>
+                            </div>
+                        </div>
                     </div>
-                    <button type="submit" class="btn">💾 Save Changes</button>
+
+                    <div style="margin-top: 20px; display:flex; gap:10px; flex-wrap:wrap;">
+                        <button type="submit" class="btn">💾 Save Changes</button>
+                        <a href="/" class="btn btn-red">Cancel</a>
+                    </div>
                 </form>
             </div>
+
+            <script>
+                ${TOAST_SCRIPT}
+                const inputArea = document.getElementById('scriptInput');
+                const outputArea = document.getElementById('obfOutput');
+                let currentObfuscated = '';
+
+                function b64EncodeUnicode(str) {
+                    return btoa(unescape(encodeURIComponent(str)));
+                }
+
+                function generateObfuscation(code) {
+                    if (!code.trim()) return '-- Obfuscated code will appear here...';
+                    const b64 = b64EncodeUnicode(code);
+                    const chunks = [];
+                    for (let i = 0; i < b64.length; i += 50) {
+                        chunks.push('"' + b64.substr(i, 50) + '"');
+                    }
+                    const chunkStr = chunks.join('..');
+                    const timestamp = new Date().toISOString();
+                    return '-- ═══════════════════════════════════════════\\n' +
+                           '-- 🔒 Obfuscated ${BRAND_NAME}\\n' +
+                           '-- Generated: ' + timestamp + '\\n' +
+                           '-- ═══════════════════════════════════════════\\n' +
+                           'local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"\\n' +
+                           'local _d=' + chunkStr + '\\n' +
+                           'local _o={}\\n' +
+                           '_d:gsub(".",function(_c)local _n=_b64:find(_c,1,true)if _n then _o[#_o+1]=_n-1 end end)\\n' +
+                           'local _r=""\\n' +
+                           'for _i=1,#_o,4 do\\n' +
+                           '    local _n=_o[_i]*262144+(_o[_i+1] or 0)*4096+(_o[_i+2] or 0)*64+(_o[_i+3] or 0)\\n' +
+                           '    _r=_r..string.char(math.floor(_n/65536)%256)\\n' +
+                           '    if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end\\n' +
+                           '    if _o[_i+3] then _r=_r..string.char(_n%256) end\\n' +
+                           'end\\n' +
+                           'local _f=loadstring(_r)\\n' +
+                           'if _f then _f() end\\n' +
+                           '-- 🔒 Protected by ${BRAND_NAME}';
+                }
+
+                function updateObfuscation() {
+                    currentObfuscated = generateObfuscation(inputArea.value);
+                    outputArea.innerText = currentObfuscated;
+                }
+
+                inputArea.addEventListener('input', updateObfuscation);
+                updateObfuscation();
+
+                function copyObfuscated(btn) {
+                    if (!currentObfuscated) { showToast('Nothing to copy!', 'error'); return; }
+                    copyText(currentObfuscated, btn);
+                }
+            </script>
             ${getFooter()}
         </body>
         </html>
@@ -673,119 +794,6 @@ app.post('/edit/:token', requireLogin, async (req, res) => {
     }
 });
 
-// ==================== KEY MANAGEMENT ====================
-app.get('/keys/:token', requireLogin, async (req, res) => {
-    try {
-        const scriptResult = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
-        if (scriptResult.rows.length === 0) return res.status(404).send("Script not found");
-        const script = scriptResult.rows[0];
-        const isAdmin = req.session.user.role === 'ADMIN';
-        if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
-
-        const keysResult = await pool.query('SELECT * FROM hwid_keys WHERE script_token = $1 ORDER BY created_at DESC', [req.params.token]);
-        const keys = keysResult.rows;
-        const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-
-        let keyCards = '';
-        if (keys.length === 0) {
-            keyCards = `<div class="card empty-state"><div class="empty-state-icon">🔑</div><p>No keys generated yet. Click "Generate New Key" above.</p></div>`;
-        } else {
-            keys.forEach(k => {
-                const statusClass = k.used ? 'key-used' : 'key-available';
-                const statusText = k.used ? '🔒 LOCKED to HWID' : '✨ AVAILABLE';
-                keyCards += `
-                <div class="key-card">
-                    <div class="key-box ${statusClass}">${k.key_value}</div>
-                    <div class="key-row">
-                        <div class="hwid-info">
-                            <div><strong>Status:</strong> ${statusText}</div>
-                            ${k.hwid ? `<div><strong>HWID:</strong> ${k.hwid.substring(0, 32)}...</div>` : ''}
-                            <div><strong>Created:</strong> ${new Date(k.created_at).toLocaleString()}</div>
-                        </div>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                            <button class="btn" onclick="copyText('${k.key_value}', this)">📋 Copy</button>
-                            <a href="/keys/delete/${k.id}" class="btn btn-red" onclick="return confirm('Delete this key?')">🗑️</a>
-                        </div>
-                    </div>
-                </div>
-                `;
-            });
-        }
-
-        res.send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>${getHtmlHead('HWID Keys - ' + script.name)}<style>${SHARED_STYLES}</style></head>
-        <body>
-            <div class="header">
-                <div class="header-brand">
-                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
-                    <div>
-                        <div class="header-title">🔑 HWID Keys</div>
-                        <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
-                    </div>
-                </div>
-                <div class="header-right">
-                    <a href="/" class="btn">← Back</a>
-                </div>
-            </div>
-
-            <div class="card">
-                <h3 style="color:#fff; margin-bottom:10px;">📄 ${script.name} <span class="version-badge">${script.version}</span></h3>
-                <p style="color:#888; font-size:13px; margin-bottom:15px;">Each key can only be used on ONE device (HWID-locked). This prevents sharing/leaking.</p>
-                <form action="/keys/${script.token}/generate" method="POST">
-                    <button type="submit" class="btn btn-gold">🔑 Generate New HWID Key</button>
-                </form>
-            </div>
-
-            <h2 class="section-title">🔑 Keys (${keys.length})</h2>
-            ${keyCards}
-            <script>${TOAST_SCRIPT}</script>
-            ${getFooter()}
-        </body>
-        </html>
-        `);
-    } catch (e) {
-        console.error('KEYS ERROR:', e.message);
-        res.status(500).send('Server error: ' + e.message);
-    }
-});
-
-app.post('/keys/:token/generate', requireLogin, async (req, res) => {
-    try {
-        const scriptResult = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
-        if (scriptResult.rows.length === 0) return res.status(404).send("Script not found");
-        const script = scriptResult.rows[0];
-        const isAdmin = req.session.user.role === 'ADMIN';
-        if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
-
-        const newKey = generateKey();
-        await pool.query(
-            'INSERT INTO hwid_keys (script_token, key_value) VALUES ($1, $2)',
-            [req.params.token, newKey]
-        );
-        res.redirect('/keys/' + req.params.token);
-    } catch (e) { 
-        console.error('KEY GEN ERROR:', e.message); 
-        res.status(500).send('Server error: ' + e.message); 
-    }
-});
-
-app.get('/keys/delete/:id', requireLogin, async (req, res) => {
-    try {
-        const keyResult = await pool.query('SELECT * FROM hwid_keys WHERE id = $1', [req.params.id]);
-        if (keyResult.rows.length === 0) return res.redirect('/');
-        const key = keyResult.rows[0];
-        const scriptResult = await pool.query('SELECT * FROM scripts WHERE token = $1', [key.script_token]);
-        const script = scriptResult.rows[0];
-        const isAdmin = req.session.user.role === 'ADMIN';
-        if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
-
-        await pool.query('DELETE FROM hwid_keys WHERE id = $1', [req.params.id]);
-        res.redirect('/keys/' + key.script_token);
-    } catch (e) { console.error(e); res.status(500).send('Server error'); }
-});
-
 // ==================== VIEW ====================
 app.get('/view/:slug/:version/:token', async (req, res) => {
     try {
@@ -793,132 +801,67 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
         if (result.rows.length === 0) return res.status(404).send("Script not found");
         const script = result.rows[0];
         const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-        const loader = buildProtectedLoader(script.token, baseUrl);
+        const prettyUrl = `${baseUrl}/raw/${script.slug}/${script.version}/${script.token}`;
+        const loadstring = `loadstring(game:HttpGet("${prettyUrl}"))()`;
         res.send(`
         <!DOCTYPE html>
         <html lang="en">
-        <head>${getHtmlHead(script.name)}
-            <style>
-                ${SHARED_STYLES}
-                body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-                .view-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 600px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
-                .view-container h1 { color: #00ff88; font-size: 30px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
-                .view-container h1 small { display: block; font-size: 12px; color: #aa44ff; font-weight: 600; letter-spacing: 1px; margin-top: 4px; }
-                .view-logo { width: 40px; height: 40px; filter: drop-shadow(0 0 15px rgba(0, 255, 136, 0.6)); }
-                .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
-                .protected-box { border: 2px solid #ffd700; padding: 25px; border-radius: 12px; margin: 25px 0; background: rgba(255, 215, 0, 0.05); text-align:left; }
-                .protected-box p { color: #ffd700; font-weight: 700; font-size: 16px; margin-bottom: 12px; text-align:center; }
-                .protected-box small { color: #888; font-size: 12px; display:block; text-align:center; margin-bottom: 15px; }
-                .step-box { background: #0a0a0a; border: 1px solid #333; padding: 15px; border-radius: 10px; margin: 10px 0; }
-                .step-num { display:inline-block; background: #00ff88; color: #000; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-weight: 800; font-size: 12px; margin-right: 8px; }
-                .step-box code { display:block; margin-top: 10px; background: #000; padding: 12px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 11px; color: #00ff88; word-break: break-all; }
-                .view-container .btn { width: 100%; padding: 16px; font-size: 15px; margin: 5px 0; }
-                .footer-text { color: #444; font-size: 12px; margin-top: 25px; }
-                @media (max-width: 480px) { .view-container { padding: 35px 25px; } .view-container h1 { font-size: 24px; } }
-            </style>
-        </head>
+        <head>${getHtmlHead(script.name)}<style>${SHARED_STYLES}
+            body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+            .view-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 600px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+            .view-container h1 { color: #00ff88; font-size: 30px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+            .view-container h1 small { display: block; font-size: 12px; color: #aa44ff; font-weight: 600; letter-spacing: 1px; margin-top: 4px; }
+            .view-logo { width: 40px; height: 40px; }
+            .protected-box { border: 2px solid #ff4444; padding: 25px; border-radius: 12px; margin: 25px 0; background: rgba(255, 68, 68, 0.05); }
+            .protected-box p { color: #ff4444; font-weight: 700; font-size: 16px; margin-bottom: 8px; }
+            .protected-box small { color: #888; font-size: 12px; }
+            .loadstring-box { background: #0a0a0a; border: 2px solid #00ff88; padding: 18px; border-radius: 10px; font-family: 'Consolas', monospace; font-size: 12px; color: #00ff88; word-break: break-all; margin: 15px 0; line-height: 1.5; text-align: left; }
+        </style></head>
         <body>
             <div class="view-container">
                 <h1><img src="/logo.svg" class="view-logo" alt="${BRAND_NAME}"> ${BRAND_SHORT}<small>By Zyrox-Kido</small></h1>
-                <p class="subtitle">🔒 HWID-Locked Script Protection</p>
+                <p style="color:#666;margin-bottom:20px;">Script Protection System</p>
                 <h2 style="margin: 20px 0; color: #fff;">${script.name}</h2>
                 <div class="version-badge" style="display:inline-block; font-size: 14px; padding: 6px 16px;">${script.version}</div>
-
                 <div class="protected-box">
                     <p>🔒 Protected Script</p>
-                    <small>This script is HWID-Locked. Only ONE device can run it.</small>
-
-                    <div class="step-box">
-                        <span class="step-num">1</span><strong>Get your key</strong>
-                        <code>You need a key from the owner</code>
-                    </div>
-
-                    <div class="step-box">
-                        <span class="step-num">2</span><strong>Set your key in executor</strong>
-                        <code>getgenv().ZyroxKidoKey = "YOUR-KEY-HERE"</code>
-                    </div>
-
-                    <div class="step-box">
-                        <span class="step-num">3</span><strong>Run this loader</strong>
-                        <code id="loader-code">${loader.replace(/</g, '&lt;').replace(/>/g, '&gt;').substring(0, 200)}...</code>
-                    </div>
+                    <small>The real code is hidden. Use an executor to run it.</small>
                 </div>
-
-                <button class="btn btn-gold" onclick="copyLoader()">📋 COPY FULL LOADER</button>
-                <p class="footer-text">Protected by ${BRAND_NAME}</p>
+                <div class="loadstring-box" id="lsBox">${loadstring}</div>
+                <button class="btn btn-gold" onclick="copyText(document.getElementById('lsBox').innerText, this)" style="width:100%;padding:16px;font-size:15px;">📋 COPY LOADSTRING</button>
+                <p style="color:#444;font-size:12px;margin-top:25px;">Protected by ${BRAND_NAME}</p>
             </div>
-            <script>
-                ${TOAST_SCRIPT}
-                const FULL_LOADER = ${JSON.stringify(loader)};
-                function copyLoader() {
-                    copyText(FULL_LOADER);
-                }
-            </script>
+            <script>${TOAST_SCRIPT}</script>
         </body>
         </html>
         `);
     } catch (e) { console.error(e); res.status(500).send('Server error'); }
 });
 
-// ==================== RAW (DISABLED - HWID PROTECTED) ====================
+// ==================== RAW ====================
 app.get('/raw/:slug/:version/:token', async (req, res) => {
-    // Always return fake code - no real script
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.status(403).send(`-- ═══════════════════════════════════════════
--- 🔒 ${BRAND_NAME} | HWID-LOCKED
--- ═══════════════════════════════════════════
--- This script is protected by HWID-Lock.
--- Direct access is NOT allowed.
--- 
--- To use this script, you need:
--- 1. A valid HWID key (from owner)
--- 2. Set: getgenv().ZyroxKidoKey = "YOUR-KEY"
--- 3. Use the loader from the /view page
--- ═══════════════════════════════════════════
-warn("[${BRAND_SHORT}] ❌ Protected. Use the loader.")`);
-});
-
-// ==================== VALIDATE KEY (HWID-Locked) ====================
-app.get('/validate/:token', async (req, res) => {
     try {
-        const { key, hwid } = req.query;
+        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (result.rows.length === 0) return res.status(403).send("-- Access Denied --");
         
-        if (!key || !hwid) {
-            return res.json({ valid: false, error: 'Missing key or HWID' });
+        const script = result.rows[0];
+        if (script.slug !== req.params.slug || script.version !== req.params.version) {
+            return res.status(403).send("-- Access Denied --");
         }
-
-        const scriptResult = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
-        if (scriptResult.rows.length === 0) {
-            return res.json({ valid: false, error: 'Script not found' });
+        
+        const ua = req.headers['user-agent'] || '';
+        const blocked = ['Mozilla', 'Chrome', 'Safari', 'Firefox', 'Edge', 'curl', 'wget', 'Postman'];
+        for (const b of blocked) {
+            if (ua.includes(b)) {
+                return res.status(403).send(`-- ${BRAND_NAME} Protected -- Direct browser access denied. --`);
+            }
         }
-        const script = scriptResult.rows[0];
-
-        // Check if key exists
-        const keyResult = await pool.query('SELECT * FROM hwid_keys WHERE key_value = $1 AND script_token = $2', [key, req.params.token]);
-        if (keyResult.rows.length === 0) {
-            return res.json({ valid: false, error: 'Invalid key' });
-        }
-        const keyData = keyResult.rows[0];
-
-        // Check HWID lock
-        if (keyData.hwid && keyData.hwid !== hwid) {
-            return res.json({ valid: false, error: '❌ Key locked to another device' });
-        }
-
-        // If HWID is empty, bind it now (first use)
-        if (!keyData.hwid) {
-            await pool.query('UPDATE hwid_keys SET hwid = $1, used = TRUE WHERE id = $2', [hwid, keyData.id]);
-            console.log(`🔒 Key ${key} locked to HWID: ${hwid.substring(0, 16)}...`);
-        }
-
-        // Return the obfuscated payload
-        res.json({
-            valid: true,
-            payload: script.public_content
-        });
+        
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.send(script.public_content);
     } catch (e) {
-        console.error('VALIDATE ERROR:', e.message);
-        res.json({ valid: false, error: 'Server error' });
+        console.error(e);
+        res.status(500).send("-- Server Error --");
     }
 });
 
@@ -972,7 +915,6 @@ app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
             </div>
 
             <h2 class="section-title">👥 All Users (${users.length})</h2>
-            <p style="color: #666; font-size: 13px; margin-bottom: 15px;">Click on a user to view their scripts.</p>
             ${userCards || '<div class="card empty-state"><div class="empty-state-icon">👥</div><p>No users found.</p></div>'}
             ${getFooter()}
         </body>
@@ -1002,7 +944,7 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) =>
             scriptCards = `<div class="card empty-state"><div class="empty-state-icon">📭</div><p>This user has no scripts yet.</p></div>`;
         } else {
             userScripts.forEach(s => {
-                scriptCards += renderScriptCard(s, baseUrl, true);
+                scriptCards += renderScriptCard(s, baseUrl);
             });
         }
         
@@ -1057,8 +999,6 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
         const isAdmin = req.session.user.role === 'ADMIN';
         if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
 
-        // Delete HWID keys first
-        await pool.query('DELETE FROM hwid_keys WHERE script_token = $1', [req.params.token]);
         await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]);
         
         if (isAdmin && script.owner !== req.session.user.username) {
@@ -1070,8 +1010,7 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v18.0 running on port ${PORT}`);
-    console.log(`🔒 HWID-Locked Protection enabled`);
-    console.log(`🔑 Key Management: /keys/:token`);
+    console.log(`✅ ${BRAND_NAME} v19.0 running on port ${PORT}`);
+    console.log(`🎨 LuaU-Style UI with Live Obfuscation`);
     console.log(`👑 Admin Panel at /admin`);
 });
