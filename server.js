@@ -123,20 +123,26 @@ app.get('/favicon.ico', (req, res) => {
     res.send(FAVICON_SVG_CONTENT);
 });
 
-// ==================== OBFUSCATION ====================
+// ==================== OBFUSCATION (PURE — walang print, walang warn) ====================
 function obfuscateScript(code) {
     const encoded = Buffer.from(code, 'utf8').toString('base64');
-    return `-- ${BRAND_NAME} | Protected
-local _b="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    return `local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local _d="${encoded}"
 local _o={}
-_d:gsub(".", function(_c) local _n=_b:find(_c,1,true) if _n then _o[#_o+1]=_n-1 end end)
+for _c in _d:gmatch(".") do
+    local _n=_b64:find(_c,1,true)
+    if _n then _o[#_o+1]=_n-1 end
+end
 local _r=""
 for _i=1,#_o,4 do
-    local _n=_o[_i]*262144+(_o[_i+1] or 0)*4096+(_o[_i+2] or 0)*64+(_o[_i+3] or 0)
+    local _a=_o[_i] or 0
+    local _b=_o[_i+1] or 0
+    local _c=_o[_i+2] or 0
+    local _d2=_o[_i+3] or 0
+    local _n=_a*262144+_b*4096+_c*64+_d2
     _r=_r..string.char(math.floor(_n/65536)%256)
-    if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end
-    if _o[_i+3] then _r=_r..string.char(_n%256) end
+    if _c then _r=_r..string.char(math.floor(_n/256)%256) end
+    if _d2 then _r=_r..string.char(_n%256) end
 end
 local _f=loadstring(_r)
 if _f then _f() end`;
@@ -208,29 +214,10 @@ const SHARED_STYLES = `
     .empty-state { text-align: center; padding: 50px 20px; color: #666; }
     .empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.4; }
 
-    /* Big New Script Button */
     .new-script-btn-wrap { display: flex; justify-content: center; margin: 30px 0; }
-    .new-script-btn { 
-        background: linear-gradient(135deg, #00ff88, #00cc66); 
-        color: #000; 
-        padding: 20px 50px; 
-        border-radius: 16px; 
-        font-size: 18px; 
-        font-weight: 800; 
-        text-decoration: none; 
-        display: inline-flex; 
-        align-items: center; 
-        gap: 12px; 
-        box-shadow: 0 10px 40px rgba(0, 255, 136, 0.4);
-        transition: all 0.3s ease;
-        letter-spacing: 0.5px;
-    }
-    .new-script-btn:hover { 
-        transform: translateY(-4px) scale(1.03); 
-        box-shadow: 0 15px 50px rgba(0, 255, 136, 0.6);
-    }
+    .new-script-btn { background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 20px 50px; border-radius: 16px; font-size: 18px; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 12px; box-shadow: 0 10px 40px rgba(0, 255, 136, 0.4); transition: all 0.3s ease; letter-spacing: 0.5px; }
+    .new-script-btn:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 15px 50px rgba(0, 255, 136, 0.6); }
 
-    /* 2-Column Obfuscator Layout */
     .obfuscator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
     @media (max-width: 900px) { .obfuscator-grid { grid-template-columns: 1fr; } }
     .obf-panel { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px; border-radius: 16px; border: 1px solid #222; }
@@ -258,7 +245,6 @@ const SHARED_STYLES = `
 
     @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     @keyframes fadeOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(400px); } }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .toast { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 16px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4); z-index: 9999; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 90vw; }
     .toast.hiding { animation: fadeOut 0.3s ease forwards; }
     .toast.error { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
@@ -324,6 +310,43 @@ const TOAST_SCRIPT = `
         if (confirm('⚠️ Are you sure you want to delete "' + name + '"?')) {
             window.location.href = '/delete/' + token;
         }
+    }
+`;
+
+// ==================== SHARED OBFUSCATOR JS (ginagamit sa /create at /edit) ====================
+const OBFUSCATOR_JS = `
+    function b64EncodeUnicode(str) {
+        return btoa(unescape(encodeURIComponent(str)));
+    }
+
+    function generateObfuscation(code) {
+        if (!code.trim()) return '';
+        const b64 = b64EncodeUnicode(code);
+        const chunks = [];
+        for (let i = 0; i < b64.length; i += 50) {
+            chunks.push('"' + b64.substr(i, 50) + '"');
+        }
+        const chunkStr = chunks.join('..');
+        return 'local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"\\n' +
+               'local _d=' + chunkStr + '\\n' +
+               'local _o={}\\n' +
+               'for _c in _d:gmatch(".") do\\n' +
+               '    local _n=_b64:find(_c,1,true)\\n' +
+               '    if _n then _o[#_o+1]=_n-1 end\\n' +
+               'end\\n' +
+               'local _r=""\\n' +
+               'for _i=1,#_o,4 do\\n' +
+               '    local _a=_o[_i] or 0\\n' +
+               '    local _b=_o[_i+1] or 0\\n' +
+               '    local _c=_o[_i+2] or 0\\n' +
+               '    local _d2=_o[_i+3] or 0\\n' +
+               '    local _n=_a*262144+_b*4096+_c*64+_d2\\n' +
+               '    _r=_r..string.char(math.floor(_n/65536)%256)\\n' +
+               '    if _c then _r=_r..string.char(math.floor(_n/256)%256) end\\n' +
+               '    if _d2 then _r=_r..string.char(_n%256) end\\n' +
+               'end\\n' +
+               'local _f=loadstring(_r)\\n' +
+               'if _f then _f() end';
     }
 `;
 
@@ -478,7 +501,7 @@ app.get('/', requireLogin, async (req, res) => {
     }
 });
 
-// ==================== CREATE PAGE (2-Column LuaU-style) ====================
+// ==================== CREATE PAGE ====================
 app.get('/create', requireLogin, (req, res) => {
     res.send(`
     <!DOCTYPE html>
@@ -524,7 +547,7 @@ app.get('/create', requireLogin, (req, res) => {
                             <span>🔒 Obfuscated By Zyrox-Kido</span>
                             <span class="badge-live" style="background:#ffd700;">LIVE</span>
                         </div>
-                        <div class="obf-output" id="obfOutput">-- Obfuscated code will appear here...\n-- Start typing on the left →</div>
+                        <div class="obf-output" id="obfOutput"></div>
                         <div class="obf-actions-row">
                             <button type="button" class="btn btn-gold" onclick="copyObfuscated(this)">📋 Copy Obfuscated</button>
                         </div>
@@ -540,42 +563,11 @@ app.get('/create', requireLogin, (req, res) => {
 
         <script>
             ${TOAST_SCRIPT}
+            ${OBFUSCATOR_JS}
+            
             const inputArea = document.getElementById('scriptInput');
             const outputArea = document.getElementById('obfOutput');
             let currentObfuscated = '';
-
-            function b64EncodeUnicode(str) {
-                return btoa(unescape(encodeURIComponent(str)));
-            }
-
-            function generateObfuscation(code) {
-                if (!code.trim()) return '-- Obfuscated code will appear here...\\n-- Start typing on the left →';
-                const b64 = b64EncodeUnicode(code);
-                const chunks = [];
-                for (let i = 0; i < b64.length; i += 50) {
-                    chunks.push('"' + b64.substr(i, 50) + '"');
-                }
-                const chunkStr = chunks.join('..');
-                const ts = new Date().toISOString();
-                return '-- ═══════════════════════════════════════════\\n' +
-                       '-- 🔒 Obfuscated ${BRAND_NAME}\\n' +
-                       '-- Generated: ' + ts + '\\n' +
-                       '-- ═══════════════════════════════════════════\\n' +
-                       'local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"\\n' +
-                       'local _d=' + chunkStr + '\\n' +
-                       'local _o={}\\n' +
-                       '_d:gsub(".",function(_c)local _n=_b64:find(_c,1,true)if _n then _o[#_o+1]=_n-1 end end)\\n' +
-                       'local _r=""\\n' +
-                       'for _i=1,#_o,4 do\\n' +
-                       '    local _n=_o[_i]*262144+(_o[_i+1] or 0)*4096+(_o[_i+2] or 0)*64+(_o[_i+3] or 0)\\n' +
-                       '    _r=_r..string.char(math.floor(_n/65536)%256)\\n' +
-                       '    if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end\\n' +
-                       '    if _o[_i+3] then _r=_r..string.char(_n%256) end\\n' +
-                       'end\\n' +
-                       'local _f=loadstring(_r)\\n' +
-                       'if _f then _f() end\\n' +
-                       '-- 🔒 Protected by ${BRAND_NAME}';
-            }
 
             function updateObfuscation() {
                 currentObfuscated = generateObfuscation(inputArea.value);
@@ -614,7 +606,7 @@ app.post('/create', requireLogin, async (req, res) => {
     }
 });
 
-// ==================== EDIT (2-Column) ====================
+// ==================== EDIT PAGE ====================
 app.get('/edit/:token', requireLogin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
@@ -685,42 +677,11 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
 
             <script>
                 ${TOAST_SCRIPT}
+                ${OBFUSCATOR_JS}
+                
                 const inputArea = document.getElementById('scriptInput');
                 const outputArea = document.getElementById('obfOutput');
                 let currentObfuscated = '';
-
-                function b64EncodeUnicode(str) {
-                    return btoa(unescape(encodeURIComponent(str)));
-                }
-
-                function generateObfuscation(code) {
-                    if (!code.trim()) return '-- Obfuscated code will appear here...';
-                    const b64 = b64EncodeUnicode(code);
-                    const chunks = [];
-                    for (let i = 0; i < b64.length; i += 50) {
-                        chunks.push('"' + b64.substr(i, 50) + '"');
-                    }
-                    const chunkStr = chunks.join('..');
-                    const ts = new Date().toISOString();
-                    return '-- ═══════════════════════════════════════════\\n' +
-                           '-- 🔒 Obfuscated ${BRAND_NAME}\\n' +
-                           '-- Generated: ' + ts + '\\n' +
-                           '-- ═══════════════════════════════════════════\\n' +
-                           'local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"\\n' +
-                           'local _d=' + chunkStr + '\\n' +
-                           'local _o={}\\n' +
-                           '_d:gsub(".",function(_c)local _n=_b64:find(_c,1,true)if _n then _o[#_o+1]=_n-1 end end)\\n' +
-                           'local _r=""\\n' +
-                           'for _i=1,#_o,4 do\\n' +
-                           '    local _n=_o[_i]*262144+(_o[_i+1] or 0)*4096+(_o[_i+2] or 0)*64+(_o[_i+3] or 0)\\n' +
-                           '    _r=_r..string.char(math.floor(_n/65536)%256)\\n' +
-                           '    if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end\\n' +
-                           '    if _o[_i+3] then _r=_r..string.char(_n%256) end\\n' +
-                           'end\\n' +
-                           'local _f=loadstring(_r)\\n' +
-                           'if _f then _f() end\\n' +
-                           '-- 🔒 Protected by ${BRAND_NAME}';
-                }
 
                 function updateObfuscation() {
                     currentObfuscated = generateObfuscation(inputArea.value);
@@ -982,7 +943,7 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v20.0 running on port ${PORT}`);
-    console.log(`🎨 2-Column Obfuscator UI enabled`);
+    console.log(`✅ ${BRAND_NAME} v21.0 running on port ${PORT}`);
+    console.log(`🔒 Pure Obfuscation (walang print, walang warn)`);
     console.log(`👑 Admin Panel at /admin`);
 });
