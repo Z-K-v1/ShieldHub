@@ -123,7 +123,7 @@ app.get('/favicon.ico', (req, res) => {
     res.send(FAVICON_SVG_CONTENT);
 });
 
-// ==================== OBFUSCATION (PURE — walang print, walang warn) ====================
+// ==================== OBFUSCATION (Simple Base64) ====================
 function obfuscateScript(code) {
     const encoded = Buffer.from(code, 'utf8').toString('base64');
     return `local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -173,116 +173,454 @@ function getHtmlHead(title) {
     `;
 }
 
-// ==================== SHARED STYLES ====================
+// ==================== SHARED STYLES (Fov.it style) ====================
 const SHARED_STYLES = `
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { font-size: 16px; }
-    body { background: #0a0a0a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; min-height: 100vh; background: radial-gradient(circle at top left, #0f1f15 0%, #0a0a0a 40%); overflow-x: hidden; }
-    .header { display: flex; justify-content: space-between; align-items: center; background: rgba(17,17,17,0.85); backdrop-filter: blur(10px); padding: 18px 25px; border-radius: 16px; border: 1px solid #222; flex-wrap: wrap; gap: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-bottom: 20px; }
+    body { 
+        background: #0a0a0a; 
+        color: #e0e0e0; 
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        padding: 20px;
+        min-height: 100vh;
+        background: radial-gradient(ellipse at top, #1a3d2a 0%, #0a0a0a 50%);
+        overflow-x: hidden;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    /* ===== Header ===== */
+    .header { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        background: rgba(15,15,15,0.9); 
+        backdrop-filter: blur(20px);
+        padding: 16px 24px; 
+        border-radius: 16px; 
+        border: 1px solid #1f1f1f;
+        flex-wrap: wrap; 
+        gap: 15px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+        margin-bottom: 30px;
+    }
     .header-brand { display: flex; align-items: center; gap: 12px; }
-    .header-logo { width: 42px; height: 42px; filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.4)); flex-shrink: 0; }
-    .header-title { font-size: 22px; color: #00ff88; font-weight: 800; letter-spacing: -0.5px; text-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
+    .header-logo { width: 40px; height: 40px; filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.4)); }
+    .header-title { font-size: 20px; color: #00ff88; font-weight: 800; letter-spacing: -0.5px; }
+    .header-subtitle { font-size: 11px; color: #aa44ff; font-weight: 600; letter-spacing: 0.5px; margin-top: 2px; }
     .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .username { color: #ccc; font-weight: 600; font-size: 14px; }
-    .badge { background: #00ff88; color: #000; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
-    .badge-admin { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
-    .btn { background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 11px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; transition: all 0.2s ease; font-family: inherit; white-space: nowrap; }
+    .user-pill {
+        display: flex; align-items: center; gap: 8px;
+        background: linear-gradient(135deg, #1a1a1a, #111);
+        border: 1px solid #2a2a2a;
+        padding: 8px 14px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #fff;
+    }
+    .user-pill-avatar {
+        width: 24px; height: 24px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #00ff88, #00cc66);
+        color: #000;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 11px; font-weight: 800;
+    }
+    .role-badge {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+    .role-owner { background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; }
+    .role-admin { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
+    .role-user { background: linear-gradient(135deg, #0088ff, #0066cc); color: #fff; }
+
+    /* ===== Buttons ===== */
+    .btn { 
+        background: linear-gradient(135deg, #00ff88, #00cc66); 
+        color: #000; 
+        padding: 11px 20px; 
+        border: none; 
+        border-radius: 10px; 
+        cursor: pointer; 
+        font-weight: 700; 
+        text-decoration: none; 
+        display: inline-flex; 
+        align-items: center; 
+        justify-content: center; 
+        gap: 8px; 
+        font-size: 14px; 
+        transition: all 0.2s ease; 
+        font-family: inherit; 
+        white-space: nowrap;
+    }
     .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 255, 136, 0.4); }
-    .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .btn:active { transform: translateY(0); }
     .btn-red { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
+    .btn-red:hover { box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4); }
     .btn-orange { background: linear-gradient(135deg, #ffaa00, #ff8800); color: #000; }
+    .btn-orange:hover { box-shadow: 0 6px 20px rgba(255, 170, 0, 0.4); }
     .btn-blue { background: linear-gradient(135deg, #0088ff, #0066cc); color: #fff; }
+    .btn-blue:hover { box-shadow: 0 6px 20px rgba(0, 136, 255, 0.4); }
     .btn-purple { background: linear-gradient(135deg, #aa44ff, #8800cc); color: #fff; }
-    .btn-gold { background: linear-gradient(135deg, #ffd700, #ffaa00); color: #000; font-weight: 800; }
-    .btn-gold:hover { box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5); transform: translateY(-2px); }
-    .card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 25px; border-radius: 16px; margin: 20px 0; border: 1px solid #222; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .btn-purple:hover { box-shadow: 0 6px 20px rgba(170, 68, 255, 0.4); }
+    .btn-ghost {
+        background: transparent;
+        border: 2px solid #2a2a2a;
+        color: #aaa;
+    }
+    .btn-ghost:hover { border-color: #00ff88; color: #00ff88; box-shadow: 0 0 20px rgba(0, 255, 136, 0.2); }
+
+    /* ===== Welcome Banner ===== */
+    .welcome-banner {
+        background: linear-gradient(135deg, rgba(0,255,136,0.1), rgba(170,68,255,0.05));
+        border: 1px solid rgba(0,255,136,0.2);
+        border-radius: 16px;
+        padding: 20px 25px;
+        margin-bottom: 25px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    .welcome-banner-icon { font-size: 32px; }
+    .welcome-banner-text { flex: 1; min-width: 200px; }
+    .welcome-banner-title { font-size: 16px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+    .welcome-banner-desc { font-size: 13px; color: #888; }
+
+    /* ===== Stats Grid ===== */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+    .stat-card {
+        background: linear-gradient(135deg, #151515, #0f0f0f);
+        border: 1px solid #1f1f1f;
+        border-radius: 16px;
+        padding: 20px;
+        transition: all 0.2s ease;
+    }
+    .stat-card:hover { border-color: #00ff88; transform: translateY(-3px); }
+    .stat-label { font-size: 11px; font-weight: 800; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .stat-value { font-size: 32px; font-weight: 800; color: #00ff88; text-shadow: 0 0 20px rgba(0,255,136,0.4); }
+
+    /* ===== Section Title ===== */
+    .section-title { 
+        font-size: 18px; 
+        font-weight: 800; 
+        color: #fff; 
+        margin: 30px 0 15px 0; 
+        display: flex; 
+        align-items: center; 
+        gap: 10px;
+        letter-spacing: -0.3px;
+    }
+
+    /* ===== Script Card (Fov.it style) ===== */
+    .script-card {
+        background: linear-gradient(135deg, #151515, #0f0f0f);
+        padding: 22px;
+        border-radius: 16px;
+        margin: 12px 0;
+        border: 1px solid #1f1f1f;
+        transition: all 0.25s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .script-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(180deg, #00ff88, #00cc66);
+        opacity: 0;
+        transition: opacity 0.25s ease;
+    }
+    .script-card:hover { 
+        border-color: #00ff88; 
+        transform: translateY(-3px);
+        box-shadow: 0 15px 40px rgba(0,255,136,0.15);
+    }
+    .script-card:hover::before { opacity: 1; }
+
+    .script-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin-bottom: 15px;
+    }
+    .script-card-title {
+        font-size: 17px;
+        color: #fff;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .version-badge { 
+        background: linear-gradient(135deg, #aa44ff, #8800cc); 
+        color: #fff; 
+        padding: 3px 10px; 
+        border-radius: 8px; 
+        font-size: 10px; 
+        font-weight: 800;
+        letter-spacing: 0.5px;
+    }
+    .script-meta { color: #555; font-size: 11px; margin-bottom: 12px; font-weight: 600; }
+
+    .url-preview { 
+        background: #0a0a0a; 
+        border: 1px solid #1f1f1f; 
+        padding: 12px 14px; 
+        border-radius: 10px; 
+        font-family: 'Consolas', 'Monaco', monospace; 
+        font-size: 11px; 
+        color: #00ff88; 
+        word-break: break-all;
+        line-height: 1.5;
+    }
+
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 15px; }
+
+    /* ===== Empty State ===== */
+    .empty-state {
+        background: linear-gradient(135deg, #151515, #0f0f0f);
+        border: 1px dashed #2a2a2a;
+        border-radius: 16px;
+        padding: 60px 30px;
+        text-align: center;
+        margin-top: 20px;
+    }
+    .empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.3; }
+    .empty-state-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+    .empty-state-desc { color: #666; font-size: 13px; margin-bottom: 20px; }
+
+    /* ===== Form Styles ===== */
+    .card { 
+        background: linear-gradient(135deg, #151515, #0f0f0f);
+        padding: 30px; 
+        border-radius: 16px; 
+        margin: 20px 0; 
+        border: 1px solid #1f1f1f;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
     .form-group { margin-bottom: 20px; }
-    .form-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.8px; }
+    .form-label { 
+        display: block; 
+        margin-bottom: 8px; 
+        font-size: 12px; 
+        font-weight: 800; 
+        color: #aaa; 
+        text-transform: uppercase; 
+        letter-spacing: 0.8px; 
+    }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-    input, textarea, select { width: 100%; padding: 14px 16px; background: #0a0a0a; border: 2px solid #2a2a2a; color: #fff; border-radius: 10px; font-size: 14px; font-family: inherit; transition: all 0.2s ease; outline: none; }
-    input:focus, textarea:focus, select:focus { border-color: #00ff88; box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.1); }
-    textarea { font-family: 'Consolas', 'Monaco', monospace; resize: vertical; min-height: 120px; line-height: 1.5; }
-    select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ff88' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 15px center; background-size: 20px; padding-right: 45px; }
-    .section-title { font-size: 20px; font-weight: 800; color: #fff; margin: 30px 0 15px 0; display: flex; align-items: center; gap: 10px; }
-    .version-badge { background: linear-gradient(135deg, #aa44ff, #8800cc); color: #fff; padding: 4px 12px; border-radius: 8px; font-size: 11px; font-weight: 800; margin-left: 8px; }
-    .url-preview { background: #0a0a0a; border: 1px solid #2a2a2a; padding: 12px 16px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; word-break: break-all; margin: 10px 0; }
-    .script-card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 25px; border-radius: 16px; margin: 15px 0; border: 1px solid #222; transition: all 0.2s ease; }
-    .script-card:hover { border-color: #00ff88; transform: translateY(-2px); }
-    .script-card h3 { font-size: 18px; color: #fff; margin-bottom: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-    .script-meta { color: #666; font-size: 12px; margin-bottom: 15px; }
-    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
-    .empty-state { text-align: center; padding: 50px 20px; color: #666; }
-    .empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.4; }
+    input, textarea, select { 
+        width: 100%; 
+        padding: 14px 16px; 
+        background: #0a0a0a; 
+        border: 2px solid #1f1f1f; 
+        color: #fff; 
+        border-radius: 10px; 
+        font-size: 14px; 
+        font-family: inherit; 
+        transition: all 0.2s ease; 
+        outline: none;
+    }
+    input:focus, textarea:focus, select:focus { 
+        border-color: #00ff88; 
+        box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.1); 
+    }
+    textarea { 
+        font-family: 'Consolas', 'Monaco', monospace; 
+        resize: vertical; 
+        min-height: 300px; 
+        line-height: 1.5;
+    }
+    select { 
+        cursor: pointer; 
+        appearance: none; 
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ff88' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e"); 
+        background-repeat: no-repeat; 
+        background-position: right 15px center; 
+        background-size: 20px; 
+        padding-right: 45px; 
+    }
 
-    .new-script-btn-wrap { display: flex; justify-content: center; margin: 30px 0; }
-    .new-script-btn { background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 20px 50px; border-radius: 16px; font-size: 18px; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 12px; box-shadow: 0 10px 40px rgba(0, 255, 136, 0.4); transition: all 0.3s ease; letter-spacing: 0.5px; }
-    .new-script-btn:hover { transform: translateY(-4px) scale(1.03); box-shadow: 0 15px 50px rgba(0, 255, 136, 0.6); }
-
-    .obfuscator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
-    @media (max-width: 900px) { .obfuscator-grid { grid-template-columns: 1fr; } }
-    .obf-panel { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px; border-radius: 16px; border: 1px solid #222; }
-    .obf-panel-title { font-size: 13px; font-weight: 800; color: #00ff88; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; justify-content: space-between; }
-    .obf-panel-title .badge-live { background: #00ff88; color: #000; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 800; }
-    .obf-textarea { width: 100%; min-height: 400px; padding: 15px; background: #0a0a0a; border: 1px solid #2a2a2a; color: #fff; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; line-height: 1.5; resize: vertical; outline: none; }
-    .obf-textarea:focus { border-color: #00ff88; box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1); }
-    .obf-output { width: 100%; min-height: 400px; padding: 15px; background: #0a0a0a; border: 1px solid #ffd700; color: #ffd700; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; line-height: 1.4; overflow-y: auto; word-break: break-all; white-space: pre-wrap; }
-    .obf-actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
-
-    .footer-brand { text-align: center; padding: 20px; color: #444; font-size: 12px; margin-top: 30px; }
-    .footer-brand strong { background: linear-gradient(135deg, #00ff88, #aa44ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 800; }
-
-    .user-card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px 25px; border-radius: 14px; margin: 12px 0; border: 1px solid #222; display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; transition: all 0.2s ease; text-decoration: none; color: inherit; }
-    .user-card:hover { border-color: #aa44ff; transform: translateY(-2px); }
+    /* ===== User Cards (Admin) ===== */
+    .user-card { 
+        background: linear-gradient(135deg, #151515, #0f0f0f);
+        padding: 18px 22px; 
+        border-radius: 14px; 
+        margin: 10px 0; 
+        border: 1px solid #1f1f1f; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        gap: 15px; 
+        flex-wrap: wrap; 
+        transition: all 0.2s ease; 
+        text-decoration: none; 
+        color: inherit;
+    }
+    .user-card:hover { border-color: #aa44ff; transform: translateY(-2px); box-shadow: 0 10px 30px rgba(170, 68, 255, 0.15); }
     .user-info { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 200px; }
-    .user-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #00ff88, #00cc66); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: #000; flex-shrink: 0; text-transform: uppercase; }
+    .user-avatar { 
+        width: 46px; height: 46px; 
+        border-radius: 50%; 
+        background: linear-gradient(135deg, #00ff88, #00cc66); 
+        display: flex; align-items: center; justify-content: center; 
+        font-weight: 800; font-size: 18px; color: #000; 
+        flex-shrink: 0; 
+        text-transform: uppercase;
+    }
     .user-avatar-admin { background: linear-gradient(135deg, #ffaa00, #ff6600); }
     .user-details { display: flex; flex-direction: column; gap: 4px; }
-    .user-name { font-weight: 700; font-size: 16px; color: #fff; }
-    .user-meta { font-size: 12px; color: #666; }
+    .user-name { font-weight: 700; font-size: 15px; color: #fff; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .user-meta { font-size: 11px; color: #555; font-weight: 600; }
     .role-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
     .role-admin-tag { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
     .role-user-tag { background: #00ff88; color: #000; }
 
+    /* ===== Footer ===== */
+    .footer-brand { 
+        text-align: center; 
+        padding: 30px 20px; 
+        color: #333; 
+        font-size: 12px; 
+        margin-top: 40px;
+        font-weight: 600;
+    }
+    .footer-brand strong { 
+        background: linear-gradient(135deg, #00ff88, #aa44ff); 
+        -webkit-background-clip: text; 
+        -webkit-text-fill-color: transparent; 
+        background-clip: text; 
+        font-weight: 800; 
+    }
+
+    /* ===== Toast ===== */
     @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     @keyframes fadeOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(400px); } }
-    .toast { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 16px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4); z-index: 9999; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 90vw; }
+    .toast { 
+        position: fixed; 
+        bottom: 30px; 
+        right: 30px; 
+        background: linear-gradient(135deg, #00ff88, #00cc66); 
+        color: #000; 
+        padding: 16px 24px; 
+        border-radius: 12px; 
+        font-weight: 700; 
+        font-size: 14px; 
+        box-shadow: 0 10px 40px rgba(0, 255, 136, 0.5); 
+        z-index: 9999; 
+        display: flex; 
+        align-items: center; 
+        gap: 10px; 
+        animation: slideIn 0.3s ease; 
+        max-width: 90vw;
+    }
     .toast.hiding { animation: fadeOut 0.3s ease forwards; }
     .toast.error { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
 
+    /* ===== Login Page ===== */
+    .login-container { 
+        background: linear-gradient(135deg, #151515, #0a0a0a);
+        padding: 50px 40px; 
+        border-radius: 24px; 
+        border: 1px solid #1f1f1f; 
+        width: 420px; 
+        max-width: 100%; 
+        text-align: center; 
+        box-shadow: 0 30px 80px rgba(0,0,0,0.7);
+        position: relative;
+        overflow: hidden;
+    }
+    .login-container::before {
+        content: '';
+        position: absolute;
+        top: -50%; left: -50%;
+        width: 200%; height: 200%;
+        background: radial-gradient(circle, rgba(0,255,136,0.1) 0%, transparent 60%);
+        animation: pulse 4s ease-in-out infinite;
+        pointer-events: none;
+    }
+    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 0.8; } }
+    .login-container h1 { 
+        color: #00ff88; 
+        font-size: 28px; 
+        margin-bottom: 8px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        gap: 12px; 
+        font-weight: 800;
+        position: relative;
+        z-index: 1;
+    }
+    .login-container h1 small { 
+        display: block; 
+        font-size: 12px; 
+        color: #aa44ff; 
+        font-weight: 600; 
+        letter-spacing: 1px; 
+        margin-top: 4px;
+    }
+    .login-logo { width: 48px; height: 48px; filter: drop-shadow(0 0 15px rgba(0,255,136,0.6)); }
+    .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; position: relative; z-index: 1; }
+    .login-container input { margin-bottom: 15px; text-align: center; position: relative; z-index: 1; }
+    .login-container .btn { width: 100%; margin-top: 10px; position: relative; z-index: 1; }
+    .msg { margin-top: 15px; font-size: 13px; position: relative; z-index: 1; }
+    .error { color: #ff4444; }
+    .success { color: #00ff88; }
+    .link { color: #00ff88; text-decoration: none; display: block; margin-top: 20px; font-size: 14px; position: relative; z-index: 1; font-weight: 600; }
+    .link:hover { text-decoration: underline; }
+
+    /* ===== Mobile ===== */
     @media (max-width: 768px) {
         body { padding: 12px; }
-        .header { padding: 15px 18px; }
-        .header-title { font-size: 18px; }
-        .header-logo { width: 36px; height: 36px; }
+        .header { padding: 14px 18px; }
+        .header-title { font-size: 17px; }
+        .header-logo { width: 34px; height: 34px; }
         .form-row { grid-template-columns: 1fr; gap: 15px; }
-        .card { padding: 20px; }
-        .script-card { padding: 20px; }
-        .section-title { font-size: 18px; }
+        .card { padding: 22px; }
+        .script-card { padding: 18px; }
+        .section-title { font-size: 16px; }
         .btn { padding: 10px 16px; font-size: 13px; }
         .toast { bottom: 15px; right: 15px; left: 15px; padding: 14px 18px; font-size: 13px; }
-        .obf-textarea, .obf-output { min-height: 250px; font-size: 11px; }
-        .new-script-btn { padding: 16px 30px; font-size: 16px; }
+        .stats-grid { grid-template-columns: 1fr 1fr; }
+        .stat-value { font-size: 24px; }
     }
     @media (max-width: 480px) {
         body { padding: 8px; }
-        .header { padding: 12px 15px; }
-        .header-title { font-size: 16px; }
+        .header { padding: 12px 15px; border-radius: 12px; }
+        .header-title { font-size: 15px; }
+        .header-logo { width: 30px; height: 30px; }
+        .header-right { width: 100%; justify-content: space-between; }
+        .card { padding: 18px; border-radius: 12px; }
+        .script-card { padding: 16px; border-radius: 12px; }
+        .script-card-title { font-size: 15px; }
+        .section-title { font-size: 15px; }
+        .btn { padding: 9px 14px; font-size: 12px; }
         .actions .btn { flex: 1; min-width: calc(50% - 4px); }
-        .obf-actions-row .btn { flex: 1; }
+        input, textarea, select { padding: 12px 14px; font-size: 13px; }
+        textarea { min-height: 200px; }
+        .login-container { padding: 40px 25px; }
+        .login-container h1 { font-size: 22px; }
+        .login-logo { width: 38px; height: 38px; }
+        .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-card { padding: 15px; }
+        .stat-value { font-size: 22px; }
     }
-
-    .login-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 420px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
-    .login-container h1 { color: #00ff88; font-size: 30px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 800; }
-    .login-container h1 small { display: block; font-size: 12px; color: #aa44ff; font-weight: 600; letter-spacing: 1px; margin-top: 4px; }
-    .login-logo { width: 48px; height: 48px; }
-    .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
-    .login-container input { margin-bottom: 15px; text-align: center; }
-    .login-container .btn { width: 100%; margin-top: 10px; }
-    .msg { margin-top: 15px; font-size: 13px; }
-    .error { color: #ff4444; }
-    .success { color: #00ff88; }
-    .link { color: #00ff88; text-decoration: none; display: block; margin-top: 20px; font-size: 14px; font-weight: 600; }
-    .link:hover { text-decoration: underline; }
 `;
 
 // ==================== TOAST + UTILITIES ====================
@@ -301,7 +639,8 @@ const TOAST_SCRIPT = `
             if (btn) {
                 const original = btn.innerHTML;
                 btn.innerHTML = '✅ Copied!';
-                setTimeout(() => { btn.innerHTML = original; }, 1500);
+                btn.style.background = 'linear-gradient(135deg, #00cc66, #009944)';
+                setTimeout(() => { btn.innerHTML = original; btn.style.background = ''; }, 1500);
             }
             showToast('Copied!');
         }).catch(() => showToast('Failed to copy!', 'error'));
@@ -310,43 +649,6 @@ const TOAST_SCRIPT = `
         if (confirm('⚠️ Are you sure you want to delete "' + name + '"?')) {
             window.location.href = '/delete/' + token;
         }
-    }
-`;
-
-// ==================== SHARED OBFUSCATOR JS (ginagamit sa /create at /edit) ====================
-const OBFUSCATOR_JS = `
-    function b64EncodeUnicode(str) {
-        return btoa(unescape(encodeURIComponent(str)));
-    }
-
-    function generateObfuscation(code) {
-        if (!code.trim()) return '';
-        const b64 = b64EncodeUnicode(code);
-        const chunks = [];
-        for (let i = 0; i < b64.length; i += 50) {
-            chunks.push('"' + b64.substr(i, 50) + '"');
-        }
-        const chunkStr = chunks.join('..');
-        return 'local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"\\n' +
-               'local _d=' + chunkStr + '\\n' +
-               'local _o={}\\n' +
-               'for _c in _d:gmatch(".") do\\n' +
-               '    local _n=_b64:find(_c,1,true)\\n' +
-               '    if _n then _o[#_o+1]=_n-1 end\\n' +
-               'end\\n' +
-               'local _r=""\\n' +
-               'for _i=1,#_o,4 do\\n' +
-               '    local _a=_o[_i] or 0\\n' +
-               '    local _b=_o[_i+1] or 0\\n' +
-               '    local _c=_o[_i+2] or 0\\n' +
-               '    local _d2=_o[_i+3] or 0\\n' +
-               '    local _n=_a*262144+_b*4096+_c*64+_d2\\n' +
-               '    _r=_r..string.char(math.floor(_n/65536)%256)\\n' +
-               '    if _c then _r=_r..string.char(math.floor(_n/256)%256) end\\n' +
-               '    if _d2 then _r=_r..string.char(_n%256) end\\n' +
-               'end\\n' +
-               'local _f=loadstring(_r)\\n' +
-               'if _f then _f() end';
     }
 `;
 
@@ -361,7 +663,12 @@ function renderScriptCard(s, baseUrl) {
     const prettyUrl = `${baseUrl}/raw/${slug}/${version}/${s.token}`;
     return `
     <div class="script-card">
-        <h3>📄 ${s.name} <span class="version-badge">${version}</span></h3>
+        <div class="script-card-header">
+            <div class="script-card-title">
+                📄 ${s.name}
+                <span class="version-badge">${version}</span>
+            </div>
+        </div>
         <div class="script-meta">Created: ${new Date(s.created_at).toLocaleDateString()}</div>
         <div class="url-preview">${prettyUrl}</div>
         <div class="actions">
@@ -450,50 +757,82 @@ app.post('/register', async (req, res) => {
 // ==================== LOGOUT ====================
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/login'); });
 
-// ==================== DASHBOARD ====================
+// ==================== DASHBOARD (Fov.it Style) ====================
 app.get('/', requireLogin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC', [req.session.user.username]);
         const myScripts = result.rows;
         const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
         const isAdmin = req.session.user.role === 'ADMIN';
+        const roleClass = isAdmin ? 'role-admin' : 'role-user';
+        const roleName = isAdmin ? 'ADMIN' : 'USER';
         
         let html = `
         <!DOCTYPE html>
         <html lang="en">
         <head>${getHtmlHead('Dashboard')}<style>${SHARED_STYLES}</style></head>
         <body>
-            <div class="header">
-                <div class="header-brand">
-                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
-                    <div>
-                        <div class="header-title">${BRAND_SHORT}</div>
-                        <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
+            <div class="container">
+                <div class="header">
+                    <div class="header-brand">
+                        <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
+                        <div>
+                            <div class="header-title">${BRAND_SHORT}</div>
+                            <div class="header-subtitle">BY ZYROX-KIDO</div>
+                        </div>
+                    </div>
+                    <div class="header-right">
+                        <div class="user-pill">
+                            <div class="user-pill-avatar">${req.session.user.username.charAt(0).toUpperCase()}</div>
+                            ${req.session.user.username}
+                        </div>
+                        <span class="role-badge ${roleClass}">${roleName}</span>
+                        ${isAdmin ? '<a href="/admin" class="btn btn-purple">👑 Admin</a>' : ''}
+                        <a href="/logout" class="btn btn-red">Logout</a>
                     </div>
                 </div>
-                <div class="header-right">
-                    <span class="username">${req.session.user.username}</span>
-                    ${isAdmin ? '<span class="badge badge-admin">ADMIN</span>' : '<span class="badge">USER</span>'}
-                    ${isAdmin ? '<a href="/admin" class="btn btn-purple">👑 Admin</a>' : ''}
-                    <a href="/logout" class="btn btn-red">Logout</a>
+
+                <div class="welcome-banner">
+                    <div class="welcome-banner-icon">👋</div>
+                    <div class="welcome-banner-text">
+                        <div class="welcome-banner-title">Welcome back, ${req.session.user.username}!</div>
+                        <div class="welcome-banner-desc">Manage your Lua scripts and share them with the world.</div>
+                    </div>
+                    <a href="/create" class="btn">✨ + New Script</a>
                 </div>
-            </div>
 
-            <div class="new-script-btn-wrap">
-                <a href="/create" class="new-script-btn">✨ + New Script</a>
-            </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Scripts</div>
+                        <div class="stat-value">${myScripts.length}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Account Role</div>
+                        <div class="stat-value" style="font-size: 20px;">${roleName}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Username</div>
+                        <div class="stat-value" style="font-size: 20px;">${req.session.user.username}</div>
+                    </div>
+                </div>
 
-            <h2 class="section-title">📁 Your Scripts (${myScripts.length})</h2>
+                <h2 class="section-title">📁 Your Scripts (${myScripts.length})</h2>
         `;
         
         if (myScripts.length === 0) {
-            html += `<div class="card empty-state"><div class="empty-state-icon">📭</div><p>No scripts yet. Click "New Script" above!</p></div>`;
+            html += `
+            <div class="empty-state">
+                <div class="empty-state-icon">📭</div>
+                <div class="empty-state-title">No scripts yet</div>
+                <div class="empty-state-desc">Click the button below to create your first script!</div>
+                <a href="/create" class="btn">✨ Create First Script</a>
+            </div>`;
         } else {
             myScripts.forEach(s => {
                 html += renderScriptCard(s, baseUrl);
             });
         }
-        html += `${getFooter()}<script>${TOAST_SCRIPT}</script></body></html>`;
+        html += `${getFooter()}</div><script>${TOAST_SCRIPT}</script></body></html>`;
         res.send(html);
     } catch (e) { 
         console.error('DASHBOARD ERROR:', e.message); 
@@ -508,81 +847,44 @@ app.get('/create', requireLogin, (req, res) => {
     <html lang="en">
     <head>${getHtmlHead('Create Script')}<style>${SHARED_STYLES}</style></head>
     <body>
-        <div class="header">
-            <div class="header-brand">
-                <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
-                <div>
-                    <div class="header-title">✨ Create Script</div>
-                    <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
+        <div class="container">
+            <div class="header">
+                <div class="header-brand">
+                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
+                    <div>
+                        <div class="header-title">✨ Create Script</div>
+                        <div class="header-subtitle">BY ZYROX-KIDO</div>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <a href="/" class="btn btn-ghost">← Dashboard</a>
                 </div>
             </div>
-            <div class="header-right">
-                <a href="/" class="btn">← Dashboard</a>
+
+            <div class="card">
+                <form action="/create" method="POST">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">📝 Script Name</label>
+                            <input type="text" name="name" placeholder="e.g., God Mode" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">🏷️ Version</label>
+                            <select name="version" required>${versionDropdown('V1')}</select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">💻 Script Content (Lua Code)</label>
+                        <textarea name="content" placeholder="-- Paste your Lua script here..." required></textarea>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <button type="submit" class="btn">💾 Save Script</button>
+                        <a href="/" class="btn btn-ghost">Cancel</a>
+                    </div>
+                </form>
             </div>
+            ${getFooter()}
         </div>
-
-        <div class="card">
-            <form action="/create" method="POST">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">📝 Script Name</label>
-                        <input type="text" name="name" id="scriptName" placeholder="e.g., God Mode" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">🏷️ Version</label>
-                        <select name="version" required>${versionDropdown('V1')}</select>
-                    </div>
-                </div>
-
-                <div class="obfuscator-grid">
-                    <div class="obf-panel">
-                        <div class="obf-panel-title">
-                            <span>💻 Original Lua Code</span>
-                            <span class="badge-live">INPUT</span>
-                        </div>
-                        <textarea class="obf-textarea" name="content" id="scriptInput" placeholder="-- Paste your Lua script here..." required></textarea>
-                    </div>
-                    <div class="obf-panel">
-                        <div class="obf-panel-title">
-                            <span>🔒 Obfuscated By Zyrox-Kido</span>
-                            <span class="badge-live" style="background:#ffd700;">LIVE</span>
-                        </div>
-                        <div class="obf-output" id="obfOutput"></div>
-                        <div class="obf-actions-row">
-                            <button type="button" class="btn btn-gold" onclick="copyObfuscated(this)">📋 Copy Obfuscated</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 20px; display:flex; gap:10px; flex-wrap:wrap;">
-                    <button type="submit" class="btn">💾 Save Script</button>
-                    <a href="/" class="btn btn-red">Cancel</a>
-                </div>
-            </form>
-        </div>
-
-        <script>
-            ${TOAST_SCRIPT}
-            ${OBFUSCATOR_JS}
-            
-            const inputArea = document.getElementById('scriptInput');
-            const outputArea = document.getElementById('obfOutput');
-            let currentObfuscated = '';
-
-            function updateObfuscation() {
-                currentObfuscated = generateObfuscation(inputArea.value);
-                outputArea.innerText = currentObfuscated;
-            }
-
-            inputArea.addEventListener('input', updateObfuscation);
-            updateObfuscation();
-
-            function copyObfuscated(btn) {
-                if (!currentObfuscated) { showToast('Nothing to copy!', 'error'); return; }
-                copyText(currentObfuscated, btn);
-            }
-        </script>
-        ${getFooter()}
     </body>
     </html>
     `);
@@ -622,81 +924,44 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
         <html lang="en">
         <head>${getHtmlHead('Edit Script')}<style>${SHARED_STYLES}</style></head>
         <body>
-            <div class="header">
-                <div class="header-brand">
-                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
-                    <div>
-                        <div class="header-title">✏️ Edit Script</div>
-                        <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
+            <div class="container">
+                <div class="header">
+                    <div class="header-brand">
+                        <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
+                        <div>
+                            <div class="header-title">✏️ Edit Script</div>
+                            <div class="header-subtitle">BY ZYROX-KIDO</div>
+                        </div>
+                    </div>
+                    <div class="header-right">
+                        <a href="/" class="btn btn-ghost">← Dashboard</a>
                     </div>
                 </div>
-                <div class="header-right">
-                    <a href="/" class="btn">← Dashboard</a>
+
+                <div class="card">
+                    <form action="/edit/${script.token}" method="POST">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">📝 Script Name</label>
+                                <input type="text" name="name" value="${script.name}" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">🏷️ Version</label>
+                                <select name="version" required>${versionDropdown(script.version)}</select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">💻 Script Content (Lua Code)</label>
+                            <textarea name="content" required>${escaped}</textarea>
+                        </div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button type="submit" class="btn">💾 Save Changes</button>
+                            <a href="/" class="btn btn-ghost">Cancel</a>
+                        </div>
+                    </form>
                 </div>
+                ${getFooter()}
             </div>
-
-            <div class="card">
-                <form action="/edit/${script.token}" method="POST">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">📝 Script Name</label>
-                            <input type="text" name="name" id="scriptName" value="${script.name}" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">🏷️ Version</label>
-                            <select name="version" required>${versionDropdown(script.version)}</select>
-                        </div>
-                    </div>
-
-                    <div class="obfuscator-grid">
-                        <div class="obf-panel">
-                            <div class="obf-panel-title">
-                                <span>💻 Original Lua Code</span>
-                                <span class="badge-live">INPUT</span>
-                            </div>
-                            <textarea class="obf-textarea" name="content" id="scriptInput" required>${escaped}</textarea>
-                        </div>
-                        <div class="obf-panel">
-                            <div class="obf-panel-title">
-                                <span>🔒 Obfuscated By Zyrox-Kido</span>
-                                <span class="badge-live" style="background:#ffd700;">LIVE</span>
-                            </div>
-                            <div class="obf-output" id="obfOutput"></div>
-                            <div class="obf-actions-row">
-                                <button type="button" class="btn btn-gold" onclick="copyObfuscated(this)">📋 Copy Obfuscated</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="margin-top: 20px; display:flex; gap:10px; flex-wrap:wrap;">
-                        <button type="submit" class="btn">💾 Save Changes</button>
-                        <a href="/" class="btn btn-red">Cancel</a>
-                    </div>
-                </form>
-            </div>
-
-            <script>
-                ${TOAST_SCRIPT}
-                ${OBFUSCATOR_JS}
-                
-                const inputArea = document.getElementById('scriptInput');
-                const outputArea = document.getElementById('obfOutput');
-                let currentObfuscated = '';
-
-                function updateObfuscation() {
-                    currentObfuscated = generateObfuscation(inputArea.value);
-                    outputArea.innerText = currentObfuscated;
-                }
-
-                inputArea.addEventListener('input', updateObfuscation);
-                updateObfuscation();
-
-                function copyObfuscated(btn) {
-                    if (!currentObfuscated) { showToast('Nothing to copy!', 'error'); return; }
-                    copyText(currentObfuscated, btn);
-                }
-            </script>
-            ${getFooter()}
         </body>
         </html>
         `);
@@ -741,28 +1006,28 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
         <html lang="en">
         <head>${getHtmlHead(script.name)}<style>${SHARED_STYLES}
             body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-            .view-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 600px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
-            .view-container h1 { color: #00ff88; font-size: 30px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+            .view-container { background: linear-gradient(135deg, #151515, #0a0a0a); padding: 45px 35px; border-radius: 24px; border: 1px solid #1f1f1f; width: 600px; max-width: 100%; text-align: center; box-shadow: 0 30px 80px rgba(0,0,0,0.6); }
+            .view-container h1 { color: #00ff88; font-size: 28px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 800; }
             .view-container h1 small { display: block; font-size: 12px; color: #aa44ff; font-weight: 600; letter-spacing: 1px; margin-top: 4px; }
-            .view-logo { width: 40px; height: 40px; }
-            .protected-box { border: 2px solid #ff4444; padding: 25px; border-radius: 12px; margin: 25px 0; background: rgba(255, 68, 68, 0.05); }
-            .protected-box p { color: #ff4444; font-weight: 700; font-size: 16px; margin-bottom: 8px; }
+            .view-logo { width: 40px; height: 40px; filter: drop-shadow(0 0 15px rgba(0,255,136,0.6)); }
+            .protected-box { border: 2px solid #ff4444; padding: 22px; border-radius: 14px; margin: 22px 0; background: rgba(255, 68, 68, 0.05); }
+            .protected-box p { color: #ff4444; font-weight: 800; font-size: 15px; margin-bottom: 6px; }
             .protected-box small { color: #888; font-size: 12px; }
-            .loadstring-box { background: #0a0a0a; border: 2px solid #00ff88; padding: 18px; border-radius: 10px; font-family: 'Consolas', monospace; font-size: 12px; color: #00ff88; word-break: break-all; margin: 15px 0; line-height: 1.5; text-align: left; }
+            .loadstring-box { background: #0a0a0a; border: 2px solid #00ff88; padding: 18px; border-radius: 12px; font-family: 'Consolas', monospace; font-size: 12px; color: #00ff88; word-break: break-all; margin: 15px 0; line-height: 1.6; text-align: left; }
         </style></head>
         <body>
             <div class="view-container">
                 <h1><img src="/logo.svg" class="view-logo" alt="${BRAND_NAME}"> ${BRAND_SHORT}<small>By Zyrox-Kido</small></h1>
-                <p style="color:#666;margin-bottom:20px;">Script Protection System</p>
-                <h2 style="margin: 20px 0; color: #fff;">${script.name}</h2>
-                <div class="version-badge" style="display:inline-block; font-size: 14px; padding: 6px 16px;">${script.version}</div>
+                <p style="color:#666;margin-bottom:20px;font-size:13px;">Script Protection System</p>
+                <h2 style="margin: 20px 0; color: #fff; font-size: 22px;">${script.name}</h2>
+                <div class="version-badge" style="display:inline-block; font-size: 13px; padding: 5px 14px;">${script.version}</div>
                 <div class="protected-box">
                     <p>🔒 Protected Script</p>
                     <small>The real code is hidden. Use an executor to run it.</small>
                 </div>
                 <div class="loadstring-box" id="lsBox">${loadstring}</div>
-                <button class="btn btn-gold" onclick="copyText(document.getElementById('lsBox').innerText, this)" style="width:100%;padding:16px;font-size:15px;">📋 COPY LOADSTRING</button>
-                <p style="color:#444;font-size:12px;margin-top:25px;">Protected by ${BRAND_NAME}</p>
+                <button class="btn" onclick="copyText(document.getElementById('lsBox').innerText, this)" style="width:100%;padding:15px;font-size:15px;">📋 COPY LOADSTRING</button>
+                <p style="color:#333;font-size:11px;margin-top:20px;font-weight:700;">Protected by ${BRAND_NAME}</p>
             </div>
             <script>${TOAST_SCRIPT}</script>
         </body>
@@ -833,23 +1098,25 @@ app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
         <html lang="en">
         <head>${getHtmlHead('Admin Panel')}<style>${SHARED_STYLES}</style></head>
         <body>
-            <div class="header">
-                <div class="header-brand">
-                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
-                    <div>
-                        <div class="header-title">👑 Admin Panel</div>
-                        <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
+            <div class="container">
+                <div class="header">
+                    <div class="header-brand">
+                        <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
+                        <div>
+                            <div class="header-title">👑 Admin Panel</div>
+                            <div class="header-subtitle">BY ZYROX-KIDO</div>
+                        </div>
+                    </div>
+                    <div class="header-right">
+                        <a href="/" class="btn btn-ghost">← Dashboard</a>
+                        <a href="/logout" class="btn btn-red">Logout</a>
                     </div>
                 </div>
-                <div class="header-right">
-                    <a href="/" class="btn">← Dashboard</a>
-                    <a href="/logout" class="btn btn-red">Logout</a>
-                </div>
-            </div>
 
-            <h2 class="section-title">👥 All Users (${users.length})</h2>
-            ${userCards || '<div class="card empty-state"><div class="empty-state-icon">👥</div><p>No users found.</p></div>'}
-            ${getFooter()}
+                <h2 class="section-title">👥 All Users (${users.length})</h2>
+                ${userCards || '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-title">No users found</div></div>'}
+                ${getFooter()}
+            </div>
         </body>
         </html>
         `);
@@ -874,7 +1141,7 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) =>
         
         let scriptCards = '';
         if (userScripts.length === 0) {
-            scriptCards = `<div class="card empty-state"><div class="empty-state-icon">📭</div><p>This user has no scripts yet.</p></div>`;
+            scriptCards = `<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-title">No scripts yet</div><div class="empty-state-desc">This user hasn't created any scripts.</div></div>`;
         } else {
             userScripts.forEach(s => {
                 scriptCards += renderScriptCard(s, baseUrl);
@@ -886,34 +1153,36 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) =>
         <html lang="en">
         <head>${getHtmlHead(targetUser + "'s Scripts")}<style>${SHARED_STYLES}</style></head>
         <body>
-            <div class="header">
-                <div class="header-brand">
-                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
-                    <div>
-                        <div class="header-title">👤 ${targetUser}</div>
-                        <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
+            <div class="container">
+                <div class="header">
+                    <div class="header-brand">
+                        <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
+                        <div>
+                            <div class="header-title">👤 ${targetUser}</div>
+                            <div class="header-subtitle">BY ZYROX-KIDO</div>
+                        </div>
+                    </div>
+                    <div class="header-right">
+                        <a href="/admin" class="btn btn-purple">← All Users</a>
+                        <a href="/" class="btn btn-ghost">Dashboard</a>
                     </div>
                 </div>
-                <div class="header-right">
-                    <a href="/admin" class="btn btn-purple">← All Users</a>
-                    <a href="/" class="btn">Dashboard</a>
-                </div>
-            </div>
 
-            <div class="card">
-                <div class="user-info" style="padding: 10px 0;">
-                    <div class="${targetUserData.role === 'ADMIN' ? 'user-avatar user-avatar-admin' : 'user-avatar'}">${targetUser.charAt(0)}</div>
-                    <div class="user-details">
-                        <span class="user-name">${targetUser} <span class="role-tag ${targetUserData.role === 'ADMIN' ? 'role-admin-tag' : 'role-user-tag'}">${targetUserData.role}</span></span>
-                        <span class="user-meta">Joined: ${new Date(targetUserData.created_at).toLocaleDateString()}</span>
+                <div class="card">
+                    <div class="user-info" style="padding: 5px 0;">
+                        <div class="${targetUserData.role === 'ADMIN' ? 'user-avatar user-avatar-admin' : 'user-avatar'}">${targetUser.charAt(0)}</div>
+                        <div class="user-details">
+                            <span class="user-name">${targetUser} <span class="role-tag ${targetUserData.role === 'ADMIN' ? 'role-admin-tag' : 'role-user-tag'}">${targetUserData.role}</span></span>
+                            <span class="user-meta">Joined: ${new Date(targetUserData.created_at).toLocaleDateString()}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <h2 class="section-title">📁 Scripts (${userScripts.length})</h2>
-            ${scriptCards}
-            <script>${TOAST_SCRIPT}</script>
-            ${getFooter()}
+                <h2 class="section-title">📁 Scripts (${userScripts.length})</h2>
+                ${scriptCards}
+                <script>${TOAST_SCRIPT}</script>
+                ${getFooter()}
+            </div>
         </body>
         </html>
         `);
@@ -943,7 +1212,7 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v21.0 running on port ${PORT}`);
-    console.log(`🔒 Pure Obfuscation (walang print, walang warn)`);
+    console.log(`✅ ${BRAND_NAME} v22.0 running on port ${PORT}`);
+    console.log(`🎨 Fov.it-style UI enabled`);
     console.log(`👑 Admin Panel at /admin`);
 });
