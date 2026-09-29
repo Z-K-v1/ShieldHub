@@ -144,7 +144,7 @@ if _f then _f() end
 `;
 }
 
-// HEAVY OBFUSCATION - para sa Generate button
+// ==================== HEAVY OBFUSCATION (Generate Button) ====================
 function heavyObfuscate(code) {
     const b64 = Buffer.from(code, 'utf8').toString('base64');
     const chunks = [];
@@ -154,8 +154,13 @@ function heavyObfuscate(code) {
     const key = crypto.randomBytes(8).toString('hex');
     const chunkStr = chunks.map(c => `"${c}"`).join('..');
     const numKey = Array.from(Buffer.from(key, 'hex')).join(',');
+    const timestamp = new Date().toISOString();
     
-    return `-- ${BRAND_NAME} | Heavy Obfuscation | Key: ${key}
+    return `-- ═══════════════════════════════════════════
+-- 🔒 Obfuscated ${BRAND_NAME}
+-- Generated: ${timestamp}
+-- Do not redistribute without permission
+-- ═══════════════════════════════════════════
 local _k={${numKey}}
 local _p=function(_s)
     local _r=""
@@ -188,6 +193,7 @@ else
     local _f=loadstring(_p(_r))
     if _f then _f() end
 end
+-- 🔒 Protected by ${BRAND_NAME}
 `;
 }
 
@@ -226,13 +232,13 @@ const SHARED_STYLES = `
     .header-brand { display: flex; align-items: center; gap: 12px; }
     .header-logo { width: 42px; height: 42px; filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.4)); flex-shrink: 0; }
     .header-title { font-size: 22px; color: #00ff88; font-weight: 800; letter-spacing: -0.5px; text-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
-    .header-title small { display: block; font-size: 11px; color: #aa44ff; font-weight: 600; letter-spacing: 0.5px; text-shadow: 0 0 10px rgba(170, 68, 255, 0.5); margin-top: 2px; }
     .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .username { color: #ccc; font-weight: 600; font-size: 14px; }
     .badge { background: #00ff88; color: #000; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
     .badge-admin { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
     .btn { background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 11px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; transition: all 0.2s ease; font-family: inherit; white-space: nowrap; }
     .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 255, 136, 0.4); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     .btn-red { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
     .btn-red:hover { box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4); }
     .btn-orange { background: linear-gradient(135deg, #ffaa00, #ff8800); color: #000; }
@@ -241,8 +247,8 @@ const SHARED_STYLES = `
     .btn-blue:hover { box-shadow: 0 6px 20px rgba(0, 136, 255, 0.4); }
     .btn-purple { background: linear-gradient(135deg, #aa44ff, #8800cc); color: #fff; }
     .btn-purple:hover { box-shadow: 0 6px 20px rgba(170, 68, 255, 0.4); }
-    .btn-gold { background: linear-gradient(135deg, #ffd700, #ffaa00); color: #000; }
-    .btn-gold:hover { box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4); }
+    .btn-gold { background: linear-gradient(135deg, #ffd700, #ffaa00); color: #000; font-weight: 800; }
+    .btn-gold:hover { box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5); transform: translateY(-2px); }
     .card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 25px; border-radius: 16px; margin: 20px 0; border: 1px solid #222; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
     .form-group { margin-bottom: 20px; }
     .form-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.8px; }
@@ -261,6 +267,7 @@ const SHARED_STYLES = `
     .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
     .empty-state { text-align: center; padding: 50px 20px; color: #666; }
     .empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.4; }
+
     .user-card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px 25px; border-radius: 14px; margin: 12px 0; border: 1px solid #222; display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; transition: all 0.2s ease; text-decoration: none; color: inherit; }
     .user-card:hover { border-color: #aa44ff; transform: translateY(-2px); box-shadow: 0 10px 30px rgba(170, 68, 255, 0.15); }
     .user-info { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 200px; }
@@ -273,30 +280,22 @@ const SHARED_STYLES = `
     .role-admin-tag { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
     .role-user-tag { background: #00ff88; color: #000; }
 
-    /* Footer branding */
-    .footer-brand {
-        text-align: center;
-        padding: 20px;
-        color: #444;
-        font-size: 12px;
-        margin-top: 30px;
-    }
-    .footer-brand strong {
-        background: linear-gradient(135deg, #00ff88, #aa44ff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        font-weight: 800;
-    }
+    .footer-brand { text-align: center; padding: 20px; color: #444; font-size: 12px; margin-top: 30px; }
+    .footer-brand strong { background: linear-gradient(135deg, #00ff88, #aa44ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 800; }
 
-    .obf-box { background: #0a0a0a; border: 2px solid #ffd700; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: #ffd700; word-break: break-all; margin: 10px 0; max-height: 300px; overflow-y: auto; line-height: 1.4; }
-    .obf-label { color: #ffd700; font-weight: 700; font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    /* Obfuscated Output Box */
+    .obf-container { margin-top: 15px; padding: 15px; background: rgba(255, 215, 0, 0.05); border: 2px dashed #ffd700; border-radius: 12px; }
+    .obf-label { color: #ffd700; font-weight: 800; font-size: 13px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .obf-box { background: #0a0a0a; border: 1px solid #ffd700; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: #ffd700; word-break: break-all; margin: 10px 0; max-height: 300px; overflow-y: auto; line-height: 1.4; white-space: pre-wrap; }
+    .obf-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
 
     @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     @keyframes fadeOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(400px); } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .toast { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 16px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4); z-index: 9999; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 90vw; }
     .toast.hiding { animation: fadeOut 0.3s ease forwards; }
     .toast.error { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.3); border-top-color: #000; border-radius: 50%; animation: spin 0.8s linear infinite; }
 
     @media (max-width: 768px) {
         body { padding: 12px; }
@@ -328,6 +327,7 @@ const SHARED_STYLES = `
         .user-card { padding: 14px 15px; }
         .user-avatar { width: 42px; height: 42px; font-size: 18px; }
         .user-name { font-size: 14px; }
+        .obf-actions .btn { flex: 1; }
     }
 
     .login-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 420px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.6); position: relative; overflow: hidden; }
@@ -348,7 +348,7 @@ const SHARED_STYLES = `
     @media (max-width: 480px) { .login-container { padding: 40px 25px; border-radius: 16px; } .login-container h1 { font-size: 24px; } .login-logo { width: 40px; height: 40px; } }
 `;
 
-// ==================== TOAST SCRIPT ====================
+// ==================== TOAST + SCRIPT UTILITIES ====================
 const TOAST_SCRIPT = `
     function showToast(message, type = 'success') {
         const existing = document.querySelector('.toast');
@@ -376,7 +376,7 @@ const TOAST_SCRIPT = `
             if (btn) {
                 const original = btn.innerHTML;
                 btn.innerHTML = '✅ Copied!';
-                btn.style.background = 'linear-gradient(135deg, #ffd700, #ffaa00)';
+                btn.style.background = 'linear-gradient(135deg, #00cc66, #009944)';
                 setTimeout(() => { btn.innerHTML = original; btn.style.background = ''; }, 1800);
             }
             showToast('Obfuscated code copied!');
@@ -387,11 +387,68 @@ const TOAST_SCRIPT = `
             window.location.href = '/delete/' + token;
         }
     }
+    async function generateObfuscated(token, btn) {
+        const original = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner"></span> Generating...';
+        btn.disabled = true;
+        try {
+            const res = await fetch('/generate-obf/' + token, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                const container = document.getElementById('obf-container-' + token);
+                const box = document.getElementById('obf-box-' + token);
+                container.style.display = 'block';
+                box.innerText = data.code;
+                showToast('✅ Obfuscated By Zyrox-Kido!');
+                btn.innerHTML = '✅ Done!';
+                setTimeout(() => { btn.innerHTML = original; btn.disabled = false; }, 2000);
+                return;
+            } else {
+                showToast('Failed: ' + data.error, 'error');
+            }
+        } catch (e) {
+            showToast('Network error!', 'error');
+        }
+        btn.innerHTML = original;
+        btn.disabled = false;
+    }
 `;
 
 // ==================== FOOTER ====================
 function getFooter() {
     return `<div class="footer-brand">Made with 💚 by <strong>${BRAND_NAME}</strong></div>`;
+}
+
+// ==================== SCRIPT CARD RENDERER ====================
+function renderScriptCard(s, baseUrl, includeGenerate = true) {
+    const slug = s.slug || 'Script';
+    const version = s.version || 'V1';
+    const prettyUrl = `${baseUrl}/raw/${slug}/${version}/${s.token}`;
+    let btnGen = '';
+    if (includeGenerate) {
+        btnGen = `<button class="btn btn-gold" onclick="generateObfuscated('${s.token}', this)">🔒 Generate Obfuscated By Zyrox-Kido</button>`;
+    }
+    return `
+    <div class="script-card">
+        <h3>📄 ${s.name} <span class="version-badge">${version}</span></h3>
+        <div class="script-meta">Created: ${new Date(s.created_at).toLocaleDateString()}</div>
+        <div class="url-preview">${prettyUrl}</div>
+        <div class="actions">
+            <button class="btn" onclick="copyLoadstring('${prettyUrl}', this)">📋 Copy Loadstring</button>
+            <a href="/edit/${s.token}" class="btn btn-orange">✏️ Edit</a>
+            <a href="/view/${slug}/${version}/${s.token}" class="btn btn-blue" target="_blank">👁️ View</a>
+            ${btnGen}
+            <button class="btn btn-red" onclick="confirmDelete('${s.token}', '${s.name}')">🗑️ Delete</button>
+        </div>
+        <div class="obf-container" id="obf-container-${s.token}" style="display:none;">
+            <div class="obf-label">🔒 Obfuscated By Zyrox-Kido</div>
+            <div class="obf-box" id="obf-box-${s.token}"></div>
+            <div class="obf-actions">
+                <button class="btn btn-gold" onclick="copyRaw(document.getElementById('obf-box-${s.token}').innerText, this)">📋 Copy Obfuscated Code</button>
+            </div>
+        </div>
+    </div>
+    `;
 }
 
 // ==================== LOGIN ====================
@@ -527,22 +584,7 @@ app.get('/', requireLogin, async (req, res) => {
             html += `<div class="card empty-state"><div class="empty-state-icon">📭</div><p>No scripts yet. Create your first script above!</p></div>`;
         } else {
             myScripts.forEach(s => {
-                const slug = s.slug || 'Script';
-                const version = s.version || 'V1';
-                const prettyUrl = `${baseUrl}/raw/${slug}/${version}/${s.token}`;
-                html += `
-                <div class="script-card">
-                    <h3>📄 ${s.name} <span class="version-badge">${version}</span></h3>
-                    <div class="script-meta">Created: ${new Date(s.created_at).toLocaleDateString()}</div>
-                    <div class="url-preview">${prettyUrl}</div>
-                    <div class="actions">
-                        <button class="btn" onclick="copyLoadstring('${prettyUrl}', this)">📋 Copy Loadstring</button>
-                        <a href="/edit/${s.token}" class="btn btn-orange">✏️ Edit</a>
-                        <a href="/view/${slug}/${version}/${s.token}" class="btn btn-blue" target="_blank">👁️ View</a>
-                        <button class="btn btn-red" onclick="confirmDelete('${s.token}', '${s.name}')">🗑️ Delete</button>
-                    </div>
-                </div>
-                `;
+                html += renderScriptCard(s, baseUrl, true);
             });
         }
         html += `${getFooter()}<script>${TOAST_SCRIPT}</script></body></html>`;
@@ -721,6 +763,35 @@ app.get('/raw/:slug/:version/:token', async (req, res) => {
     }
 });
 
+// ==================== GENERATE OBFUSCATED (By Zyrox-Kido) ====================
+app.post('/generate-obf/:token', requireLogin, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (result.rows.length === 0) return res.json({ success: false, error: 'Script not found' });
+        
+        const script = result.rows[0];
+        const isAdmin = req.session.user.role === 'ADMIN';
+        
+        // Permission check
+        if (script.owner !== req.session.user.username && !isAdmin) {
+            return res.json({ success: false, error: 'Access Denied' });
+        }
+        
+        // Generate heavy obfuscated code
+        const obfuscated = heavyObfuscate(script.real_content);
+        
+        // Save to public_content
+        await pool.query('UPDATE scripts SET public_content = $1 WHERE token = $2', [obfuscated, req.params.token]);
+        
+        console.log(`🔒 Obfuscated By Zyrox-Kido: ${script.name} (${script.owner})`);
+        
+        res.json({ success: true, code: obfuscated });
+    } catch (e) {
+        console.error('GENERATE OBF ERROR:', e.message);
+        res.json({ success: false, error: e.message });
+    }
+});
+
 // ==================== ADMIN PANEL ====================
 app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
     try {
@@ -801,28 +872,7 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) =>
             scriptCards = `<div class="card empty-state"><div class="empty-state-icon">📭</div><p>This user has no scripts yet.</p></div>`;
         } else {
             userScripts.forEach(s => {
-                const slug = s.slug || 'Script';
-                const version = s.version || 'V1';
-                const prettyUrl = `${baseUrl}/raw/${slug}/${version}/${s.token}`;
-                scriptCards += `
-                    <div class="script-card">
-                        <h3>📄 ${s.name} <span class="version-badge">${version}</span></h3>
-                        <div class="script-meta">Created: ${new Date(s.created_at).toLocaleDateString()}</div>
-                        <div class="url-preview">${prettyUrl}</div>
-                        <div class="actions">
-                            <button class="btn" onclick="copyLoadstring('${prettyUrl}', this)">📋 Copy Loadstring</button>
-                            <a href="/edit/${s.token}" class="btn btn-orange">✏️ Edit</a>
-                            <a href="/view/${slug}/${version}/${s.token}" class="btn btn-blue" target="_blank">👁️ View</a>
-                            <button class="btn btn-gold" onclick="generateObf('${s.token}', this)">🔒 Generate</button>
-                            <button class="btn btn-red" onclick="confirmDelete('${s.token}', '${s.name}')">🗑️ Delete</button>
-                        </div>
-                        <div id="obf-${s.token}" style="display:none;">
-                            <div class="obf-label">🔒 Obfuscated Code (Heavy):</div>
-                            <div class="obf-box" id="obf-box-${s.token}"></div>
-                            <button class="btn btn-gold" onclick="copyRaw(document.getElementById('obf-box-${s.token}').innerText, this)">📋 Copy Obfuscated</button>
-                        </div>
-                    </div>
-                `;
+                scriptCards += renderScriptCard(s, baseUrl, true);
             });
         }
         
@@ -857,29 +907,7 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) =>
 
             <h2 class="section-title">📁 Scripts (${userScripts.length})</h2>
             ${scriptCards}
-            <script>
-                ${TOAST_SCRIPT}
-                async function generateObf(token, btn) {
-                    const original = btn.innerHTML;
-                    btn.innerHTML = '⏳ Generating...';
-                    btn.disabled = true;
-                    try {
-                        const res = await fetch('/admin/obfuscate/' + token, { method: 'POST' });
-                        const data = await res.json();
-                        if (data.success) {
-                            document.getElementById('obf-' + token).style.display = 'block';
-                            document.getElementById('obf-box-' + token).innerText = data.code;
-                            showToast('✅ Obfuscation complete!');
-                        } else {
-                            showToast('Failed: ' + data.error, 'error');
-                        }
-                    } catch (e) {
-                        showToast('Network error', 'error');
-                    }
-                    btn.innerHTML = original;
-                    btn.disabled = false;
-                }
-            </script>
+            <script>${TOAST_SCRIPT}</script>
             ${getFooter()}
         </body>
         </html>
@@ -887,25 +915,6 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) =>
     } catch (e) {
         console.error('ADMIN USER ERROR:', e.message);
         res.status(500).send('Server error: ' + e.message);
-    }
-});
-
-// ==================== ADMIN: OBFUSCATE ====================
-app.post('/admin/obfuscate/:token', requireLogin, requireAdmin, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
-        if (result.rows.length === 0) return res.json({ success: false, error: 'Script not found' });
-        
-        const script = result.rows[0];
-        const obfuscated = heavyObfuscate(script.real_content);
-        
-        // Save the obfuscated version to public_content
-        await pool.query('UPDATE scripts SET public_content = $1 WHERE token = $2', [obfuscated, req.params.token]);
-        
-        res.json({ success: true, code: obfuscated });
-    } catch (e) {
-        console.error('OBFUSCATE ERROR:', e.message);
-        res.json({ success: false, error: e.message });
     }
 });
 
@@ -929,8 +938,7 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v14.1 running on port ${PORT}`);
-    console.log(`🎨 Branding: ${BRAND_NAME}`);
-    console.log(`🔒 Heavy Obfuscation enabled`);
+    console.log(`✅ ${BRAND_NAME} v15.0 running on port ${PORT}`);
+    console.log(`🔒 Generate Obfuscated By Zyrox-Kido enabled`);
     console.log(`👑 Admin Panel at /admin`);
 });
