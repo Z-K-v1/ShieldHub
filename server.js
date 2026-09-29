@@ -144,28 +144,17 @@ if _f then _f() end
 `;
 }
 
-// ==================== HEAVY OBFUSCATION (FIXED - XOR + Base64) ====================
+// ==================== HEAVY OBFUSCATION (Simple Base64 - 100% Works) ====================
 function heavyObfuscate(code) {
-    // Step 1: Convert to bytes
-    const bytes = Buffer.from(code, 'utf8');
+    // Encode to Base64
+    const b64 = Buffer.from(code, 'utf8').toString('base64');
     
-    // Step 2: XOR encrypt with random 8-byte key
-    const key = crypto.randomBytes(8);
-    const encrypted = Buffer.alloc(bytes.length);
-    for (let i = 0; i < bytes.length; i++) {
-        encrypted[i] = bytes[i] ^ key[i % key.length];
-    }
-    
-    // Step 3: Base64 encode the encrypted bytes
-    const b64 = encrypted.toString('base64');
-    
-    // Step 4: Split into chunks for readability obfuscation
+    // Split into chunks for obfuscation
     const chunks = [];
-    for (let i = 0; i < b64.length; i += 50) {
-        chunks.push(b64.substr(i, 50));
+    for (let i = 0; i < b64.length; i += 60) {
+        chunks.push(b64.substr(i, 60));
     }
     const chunkStr = chunks.map(c => `"${c}"`).join('..');
-    const numKey = Array.from(key).join(',');
     const timestamp = new Date().toISOString();
     
     return `-- ═══════════════════════════════════════════
@@ -173,7 +162,6 @@ function heavyObfuscate(code) {
 -- Generated: ${timestamp}
 -- Do not redistribute without permission
 -- ═══════════════════════════════════════════
-local _k={${numKey}}
 local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local _d=${chunkStr}
 local _o={}
@@ -185,14 +173,7 @@ for _i=1,#_o,4 do
     if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end
     if _o[_i+3] then _r=_r..string.char(_n%256) end
 end
-local _out={}
-for _i=1,#_r do
-    local _c=string.byte(_r,_i)
-    local _key=_k[((_i-1)%#_k)+1]
-    _out[_i]=string.char(bit32.bxor(_c,_key))
-end
-local _code=table.concat(_out)
-local _f=loadstring(_code)
+local _f=loadstring(_r)
 if _f then _f() end
 -- 🔒 Protected by ${BRAND_NAME}
 `;
@@ -935,7 +916,7 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v16.0 running on port ${PORT}`);
-    console.log(`🔒 Generate Obfuscated By Zyrox-Kido (XOR+Base64) enabled`);
+    console.log(`✅ ${BRAND_NAME} v17.0 running on port ${PORT}`);
+    console.log(`🔒 Generate Obfuscated By Zyrox-Kido (Simple Base64) enabled`);
     console.log(`👑 Admin Panel at /admin`);
 });
