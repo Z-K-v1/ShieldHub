@@ -44,6 +44,17 @@ async function initDB() {
                 created_at TIMESTAMP DEFAULT NOW()
             );
         `);
+        // HWID Keys table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS hwid_keys (
+                id SERIAL PRIMARY KEY,
+                script_token VARCHAR(64) NOT NULL,
+                key_value VARCHAR(128) UNIQUE NOT NULL,
+                hwid VARCHAR(256),
+                used BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+        `);
         await pool.query(`
             CREATE TABLE IF NOT EXISTS "session" (
                 "sid" VARCHAR NOT NULL COLLATE "default",
@@ -123,7 +134,7 @@ app.get('/favicon.ico', (req, res) => {
     res.send(FAVICON_SVG_CONTENT);
 });
 
-// ==================== OBFUSCATION (Basic for Create) ====================
+// ==================== OBFUSCATION ====================
 function obfuscateScript(code) {
     const encoded = Buffer.from(code, 'utf8').toString('base64');
     return `
@@ -144,36 +155,60 @@ if _f then _f() end
 `;
 }
 
-// ==================== HEAVY OBFUSCATION (Simple Base64 - 100% Works) ====================
-function heavyObfuscate(code) {
-    // Encode to Base64
-    const b64 = Buffer.from(code, 'utf8').toString('base64');
-    
-    // Split into chunks for obfuscation
-    const chunks = [];
-    for (let i = 0; i < b64.length; i += 60) {
-        chunks.push(b64.substr(i, 60));
-    }
-    const chunkStr = chunks.map(c => `"${c}"`).join('..');
-    const timestamp = new Date().toISOString();
-    
+// ==================== HWID-LOCKED OBFUSCATION ====================
+function buildProtectedLoader(scriptToken, baseUrl) {
+    // Generate HWID-locked Lua loader
     return `-- ═══════════════════════════════════════════
--- 🔒 Obfuscated ${BRAND_NAME}
--- Generated: ${timestamp}
--- Do not redistribute without permission
+-- 🔒 HWID-Locked Loader ${BRAND_NAME}
 -- ═══════════════════════════════════════════
-local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local _d=${chunkStr}
-local _o={}
-_d:gsub(".",function(_c)local _n=_b64:find(_c,1,true)if _n then _o[#_o+1]=_n-1 end end)
-local _r=""
-for _i=1,#_o,4 do
-    local _n=_o[_i]*262144+(_o[_i+1] or 0)*4096+(_o[_i+2] or 0)*64+(_o[_i+3] or 0)
-    _r=_r..string.char(math.floor(_n/65536)%256)
-    if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end
-    if _o[_i+3] then _r=_r..string.char(_n%256) end
+-- DO NOT SHARE THIS KEY!
+-- It is locked to YOUR device only.
+
+local _hwid = "UNKNOWN"
+pcall(function()
+    if gethwid then _hwid = gethwid()
+    elseif game and game.GetService then
+        local _svc = game:GetService("RbxAnalyticsService")
+        if _svc and _svc.GetClientId then _hwid = _svc:GetClientId() end
+    end
+end)
+
+if _hwid == "UNKNOWN" or _hwid == "" then
+    warn("[${BRAND_SHORT}] ❌ Cannot detect HWID. Executor not supported.")
+    return
 end
-local _f=loadstring(_r)
+
+local _key = nil
+if writefile and readfile then
+    pcall(function() _key = readfile("${BRAND_SHORT}_key.txt") end)
+end
+
+if not _key and getgenv then
+    _key = getgenv().ZyroxKidoKey
+end
+
+if not _key or _key == "" then
+    warn("[${BRAND_SHORT}] ❌ No key found!")
+    warn("[${BRAND_SHORT}] Set your key with: getgenv().ZyroxKidoKey = 'YOUR-KEY'")
+    return
+end
+
+local _http = game:GetService("HttpService")
+local _url = "${baseUrl}/validate/${scriptToken}?key=" .. _http:UrlEncode(_key) .. "&hwid=" .. _http:UrlEncode(_hwid)
+
+local _ok, _res = pcall(function() return _http:GetAsync(_url) end)
+if not _ok then
+    warn("[${BRAND_SHORT}] ❌ Server error: " .. tostring(_res))
+    return
+end
+
+local _data = _http:JSONDecode(_res)
+if not _data.valid then
+    warn("[${BRAND_SHORT}] ❌ " .. (_data.error or "Invalid key"))
+    return
+end
+
+local _f = loadstring(_data.payload)
 if _f then _f() end
 -- 🔒 Protected by ${BRAND_NAME}
 `;
@@ -181,6 +216,10 @@ if _f then _f() end
 
 function makeSlug(name) {
     return name.toString().trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 50) || 'Script';
+}
+
+function generateKey() {
+    return 'ZK-' + crypto.randomBytes(16).toString('hex').toUpperCase();
 }
 
 function versionDropdown(selectedValue) {
@@ -265,6 +304,14 @@ const SHARED_STYLES = `
     .footer-brand { text-align: center; padding: 20px; color: #444; font-size: 12px; margin-top: 30px; }
     .footer-brand strong { background: linear-gradient(135deg, #00ff88, #aa44ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 800; }
 
+    /* KEY STYLES */
+    .key-box { background: #0a0a0a; border: 2px solid #ffd700; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; color: #ffd700; word-break: break-all; margin: 10px 0; line-height: 1.5; letter-spacing: 1px; }
+    .key-used { border-color: #ff4444; color: #ff4444; }
+    .key-available { border-color: #00ff88; color: #00ff88; }
+    .key-card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px; border-radius: 14px; margin: 12px 0; border: 1px solid #222; }
+    .key-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .hwid-info { color: #666; font-size: 11px; font-family: monospace; }
+
     .obf-container { margin-top: 15px; padding: 15px; background: rgba(255, 215, 0, 0.05); border: 2px dashed #ffd700; border-radius: 12px; }
     .obf-label { color: #ffd700; font-weight: 800; font-size: 13px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
     .obf-box { background: #0a0a0a; border: 1px solid #ffd700; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: #ffd700; word-break: break-all; margin: 10px 0; max-height: 300px; overflow-y: auto; line-height: 1.4; white-space: pre-wrap; }
@@ -340,19 +387,7 @@ const TOAST_SCRIPT = `
         document.body.appendChild(toast);
         setTimeout(() => { toast.classList.add('hiding'); setTimeout(() => toast.remove(), 300); }, 2500);
     }
-    function copyLoadstring(url, btn) {
-        const loadstring = 'loadstring(game:HttpGet("' + url + '"))()';
-        navigator.clipboard.writeText(loadstring).then(() => {
-            if (btn) {
-                const original = btn.innerHTML;
-                btn.innerHTML = '✅ Copied!';
-                btn.style.background = 'linear-gradient(135deg, #00cc66, #009944)';
-                setTimeout(() => { btn.innerHTML = original; btn.style.background = ''; }, 1800);
-            }
-            showToast('Loadstring copied!');
-        }).catch(() => showToast('Failed to copy!', 'error'));
-    }
-    function copyRaw(text, btn) {
+    function copyText(text, btn) {
         navigator.clipboard.writeText(text).then(() => {
             if (btn) {
                 const original = btn.innerHTML;
@@ -360,38 +395,20 @@ const TOAST_SCRIPT = `
                 btn.style.background = 'linear-gradient(135deg, #00cc66, #009944)';
                 setTimeout(() => { btn.innerHTML = original; btn.style.background = ''; }, 1800);
             }
-            showToast('Obfuscated code copied!');
+            showToast('Copied!');
         }).catch(() => showToast('Failed to copy!', 'error'));
+    }
+    function copyLoadstring(url, btn) {
+        const loadstring = 'loadstring(game:HttpGet("' + url + '"))()';
+        copyText(loadstring, btn);
+    }
+    function copyRaw(text, btn) {
+        copyText(text, btn);
     }
     function confirmDelete(token, name) {
         if (confirm('⚠️ Are you sure you want to delete "' + name + '"?')) {
             window.location.href = '/delete/' + token;
         }
-    }
-    async function generateObfuscated(token, btn) {
-        const original = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner"></span> Generating...';
-        btn.disabled = true;
-        try {
-            const res = await fetch('/generate-obf/' + token, { method: 'POST' });
-            const data = await res.json();
-            if (data.success) {
-                const container = document.getElementById('obf-container-' + token);
-                const box = document.getElementById('obf-box-' + token);
-                container.style.display = 'block';
-                box.innerText = data.code;
-                showToast('✅ Obfuscated By Zyrox-Kido!');
-                btn.innerHTML = '✅ Done!';
-                setTimeout(() => { btn.innerHTML = original; btn.disabled = false; }, 2000);
-                return;
-            } else {
-                showToast('Failed: ' + data.error, 'error');
-            }
-        } catch (e) {
-            showToast('Network error!', 'error');
-        }
-        btn.innerHTML = original;
-        btn.disabled = false;
     }
 `;
 
@@ -405,28 +422,16 @@ function renderScriptCard(s, baseUrl, includeGenerate = true) {
     const slug = s.slug || 'Script';
     const version = s.version || 'V1';
     const prettyUrl = `${baseUrl}/raw/${slug}/${version}/${s.token}`;
-    let btnGen = '';
-    if (includeGenerate) {
-        btnGen = `<button class="btn btn-gold" onclick="generateObfuscated('${s.token}', this)">🔒 Generate Obfuscated By Zyrox-Kido</button>`;
-    }
     return `
     <div class="script-card">
         <h3>📄 ${s.name} <span class="version-badge">${version}</span></h3>
         <div class="script-meta">Created: ${new Date(s.created_at).toLocaleDateString()}</div>
         <div class="url-preview">${prettyUrl}</div>
         <div class="actions">
-            <button class="btn" onclick="copyLoadstring('${prettyUrl}', this)">📋 Copy Loadstring</button>
+            <a href="/keys/${s.token}" class="btn btn-gold">🔑 Manage HWID Keys</a>
             <a href="/edit/${s.token}" class="btn btn-orange">✏️ Edit</a>
             <a href="/view/${slug}/${version}/${s.token}" class="btn btn-blue" target="_blank">👁️ View</a>
-            ${btnGen}
             <button class="btn btn-red" onclick="confirmDelete('${s.token}', '${s.name}')">🗑️ Delete</button>
-        </div>
-        <div class="obf-container" id="obf-container-${s.token}" style="display:none;">
-            <div class="obf-label">🔒 Obfuscated By Zyrox-Kido</div>
-            <div class="obf-box" id="obf-box-${s.token}"></div>
-            <div class="obf-actions">
-                <button class="btn btn-gold" onclick="copyRaw(document.getElementById('obf-box-${s.token}').innerText, this)">📋 Copy Obfuscated Code</button>
-            </div>
         </div>
     </div>
     `;
@@ -668,6 +673,119 @@ app.post('/edit/:token', requireLogin, async (req, res) => {
     }
 });
 
+// ==================== KEY MANAGEMENT ====================
+app.get('/keys/:token', requireLogin, async (req, res) => {
+    try {
+        const scriptResult = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (scriptResult.rows.length === 0) return res.status(404).send("Script not found");
+        const script = scriptResult.rows[0];
+        const isAdmin = req.session.user.role === 'ADMIN';
+        if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
+
+        const keysResult = await pool.query('SELECT * FROM hwid_keys WHERE script_token = $1 ORDER BY created_at DESC', [req.params.token]);
+        const keys = keysResult.rows;
+        const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+
+        let keyCards = '';
+        if (keys.length === 0) {
+            keyCards = `<div class="card empty-state"><div class="empty-state-icon">🔑</div><p>No keys generated yet. Click "Generate New Key" above.</p></div>`;
+        } else {
+            keys.forEach(k => {
+                const statusClass = k.used ? 'key-used' : 'key-available';
+                const statusText = k.used ? '🔒 LOCKED to HWID' : '✨ AVAILABLE';
+                keyCards += `
+                <div class="key-card">
+                    <div class="key-box ${statusClass}">${k.key_value}</div>
+                    <div class="key-row">
+                        <div class="hwid-info">
+                            <div><strong>Status:</strong> ${statusText}</div>
+                            ${k.hwid ? `<div><strong>HWID:</strong> ${k.hwid.substring(0, 32)}...</div>` : ''}
+                            <div><strong>Created:</strong> ${new Date(k.created_at).toLocaleString()}</div>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="btn" onclick="copyText('${k.key_value}', this)">📋 Copy</button>
+                            <a href="/keys/delete/${k.id}" class="btn btn-red" onclick="return confirm('Delete this key?')">🗑️</a>
+                        </div>
+                    </div>
+                </div>
+                `;
+            });
+        }
+
+        res.send(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>${getHtmlHead('HWID Keys - ' + script.name)}<style>${SHARED_STYLES}</style></head>
+        <body>
+            <div class="header">
+                <div class="header-brand">
+                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
+                    <div>
+                        <div class="header-title">🔑 HWID Keys</div>
+                        <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <a href="/" class="btn">← Back</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 style="color:#fff; margin-bottom:10px;">📄 ${script.name} <span class="version-badge">${script.version}</span></h3>
+                <p style="color:#888; font-size:13px; margin-bottom:15px;">Each key can only be used on ONE device (HWID-locked). This prevents sharing/leaking.</p>
+                <form action="/keys/${script.token}/generate" method="POST">
+                    <button type="submit" class="btn btn-gold">🔑 Generate New HWID Key</button>
+                </form>
+            </div>
+
+            <h2 class="section-title">🔑 Keys (${keys.length})</h2>
+            ${keyCards}
+            <script>${TOAST_SCRIPT}</script>
+            ${getFooter()}
+        </body>
+        </html>
+        `);
+    } catch (e) {
+        console.error('KEYS ERROR:', e.message);
+        res.status(500).send('Server error: ' + e.message);
+    }
+});
+
+app.post('/keys/:token/generate', requireLogin, async (req, res) => {
+    try {
+        const scriptResult = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (scriptResult.rows.length === 0) return res.status(404).send("Script not found");
+        const script = scriptResult.rows[0];
+        const isAdmin = req.session.user.role === 'ADMIN';
+        if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
+
+        const newKey = generateKey();
+        await pool.query(
+            'INSERT INTO hwid_keys (script_token, key_value) VALUES ($1, $2)',
+            [req.params.token, newKey]
+        );
+        res.redirect('/keys/' + req.params.token);
+    } catch (e) { 
+        console.error('KEY GEN ERROR:', e.message); 
+        res.status(500).send('Server error: ' + e.message); 
+    }
+});
+
+app.get('/keys/delete/:id', requireLogin, async (req, res) => {
+    try {
+        const keyResult = await pool.query('SELECT * FROM hwid_keys WHERE id = $1', [req.params.id]);
+        if (keyResult.rows.length === 0) return res.redirect('/');
+        const key = keyResult.rows[0];
+        const scriptResult = await pool.query('SELECT * FROM scripts WHERE token = $1', [key.script_token]);
+        const script = scriptResult.rows[0];
+        const isAdmin = req.session.user.role === 'ADMIN';
+        if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
+
+        await pool.query('DELETE FROM hwid_keys WHERE id = $1', [req.params.id]);
+        res.redirect('/keys/' + key.script_token);
+    } catch (e) { console.error(e); res.status(500).send('Server error'); }
+});
+
 // ==================== VIEW ====================
 app.get('/view/:slug/:version/:token', async (req, res) => {
     try {
@@ -675,8 +793,7 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
         if (result.rows.length === 0) return res.status(404).send("Script not found");
         const script = result.rows[0];
         const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-        const prettyUrl = `${baseUrl}/raw/${script.slug}/${script.version}/${script.token}`;
-        const loadstring = `loadstring(game:HttpGet("${prettyUrl}"))()`;
+        const loader = buildProtectedLoader(script.token, baseUrl);
         res.send(`
         <!DOCTYPE html>
         <html lang="en">
@@ -684,15 +801,18 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
             <style>
                 ${SHARED_STYLES}
                 body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-                .view-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 500px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+                .view-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 600px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
                 .view-container h1 { color: #00ff88; font-size: 30px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
                 .view-container h1 small { display: block; font-size: 12px; color: #aa44ff; font-weight: 600; letter-spacing: 1px; margin-top: 4px; }
                 .view-logo { width: 40px; height: 40px; filter: drop-shadow(0 0 15px rgba(0, 255, 136, 0.6)); }
                 .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
-                .protected-box { border: 2px solid #ff4444; padding: 25px; border-radius: 12px; margin: 25px 0; background: rgba(255, 68, 68, 0.05); }
-                .protected-box p { color: #ff4444; font-weight: 700; font-size: 16px; margin-bottom: 8px; }
-                .protected-box small { color: #888; font-size: 12px; }
-                .view-container .btn { width: 100%; padding: 16px; font-size: 15px; }
+                .protected-box { border: 2px solid #ffd700; padding: 25px; border-radius: 12px; margin: 25px 0; background: rgba(255, 215, 0, 0.05); text-align:left; }
+                .protected-box p { color: #ffd700; font-weight: 700; font-size: 16px; margin-bottom: 12px; text-align:center; }
+                .protected-box small { color: #888; font-size: 12px; display:block; text-align:center; margin-bottom: 15px; }
+                .step-box { background: #0a0a0a; border: 1px solid #333; padding: 15px; border-radius: 10px; margin: 10px 0; }
+                .step-num { display:inline-block; background: #00ff88; color: #000; width: 24px; height: 24px; border-radius: 50%; text-align: center; line-height: 24px; font-weight: 800; font-size: 12px; margin-right: 8px; }
+                .step-box code { display:block; margin-top: 10px; background: #000; padding: 12px; border-radius: 8px; font-family: 'Consolas', monospace; font-size: 11px; color: #00ff88; word-break: break-all; }
+                .view-container .btn { width: 100%; padding: 16px; font-size: 15px; margin: 5px 0; }
                 .footer-text { color: #444; font-size: 12px; margin-top: 25px; }
                 @media (max-width: 480px) { .view-container { padding: 35px 25px; } .view-container h1 { font-size: 24px; } }
             </style>
@@ -700,73 +820,105 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
         <body>
             <div class="view-container">
                 <h1><img src="/logo.svg" class="view-logo" alt="${BRAND_NAME}"> ${BRAND_SHORT}<small>By Zyrox-Kido</small></h1>
-                <p class="subtitle">Script Protection System</p>
+                <p class="subtitle">🔒 HWID-Locked Script Protection</p>
                 <h2 style="margin: 20px 0; color: #fff;">${script.name}</h2>
                 <div class="version-badge" style="display:inline-block; font-size: 14px; padding: 6px 16px;">${script.version}</div>
+
                 <div class="protected-box">
                     <p>🔒 Protected Script</p>
-                    <small>The real code is hidden. Use an executor to run it.</small>
+                    <small>This script is HWID-Locked. Only ONE device can run it.</small>
+
+                    <div class="step-box">
+                        <span class="step-num">1</span><strong>Get your key</strong>
+                        <code>You need a key from the owner</code>
+                    </div>
+
+                    <div class="step-box">
+                        <span class="step-num">2</span><strong>Set your key in executor</strong>
+                        <code>getgenv().ZyroxKidoKey = "YOUR-KEY-HERE"</code>
+                    </div>
+
+                    <div class="step-box">
+                        <span class="step-num">3</span><strong>Run this loader</strong>
+                        <code id="loader-code">${loader.replace(/</g, '&lt;').replace(/>/g, '&gt;').substring(0, 200)}...</code>
+                    </div>
                 </div>
-                <button class="btn" onclick="copyLoadstring('${prettyUrl}', this)">📋 COPY LOADSTRING</button>
+
+                <button class="btn btn-gold" onclick="copyLoader()">📋 COPY FULL LOADER</button>
                 <p class="footer-text">Protected by ${BRAND_NAME}</p>
             </div>
-            <script>${TOAST_SCRIPT}</script>
+            <script>
+                ${TOAST_SCRIPT}
+                const FULL_LOADER = ${JSON.stringify(loader)};
+                function copyLoader() {
+                    copyText(FULL_LOADER);
+                }
+            </script>
         </body>
         </html>
         `);
     } catch (e) { console.error(e); res.status(500).send('Server error'); }
 });
 
-// ==================== RAW ====================
+// ==================== RAW (DISABLED - HWID PROTECTED) ====================
 app.get('/raw/:slug/:version/:token', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
-        if (result.rows.length === 0) return res.status(403).send("-- Access Denied --");
-        
-        const script = result.rows[0];
-        if (script.slug !== req.params.slug || script.version !== req.params.version) {
-            return res.status(403).send("-- Access Denied --");
-        }
-        
-        const ua = req.headers['user-agent'] || '';
-        const blocked = ['Mozilla', 'Chrome', 'Safari', 'Firefox', 'Edge', 'curl', 'wget', 'Postman'];
-        for (const b of blocked) {
-            if (ua.includes(b)) {
-                return res.status(403).send(`-- ${BRAND_NAME} Protected -- Direct browser access denied. Use an executor. --`);
-            }
-        }
-        
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.send(script.public_content);
-    } catch (e) {
-        console.error(e);
-        res.status(500).send("-- Server Error --");
-    }
+    // Always return fake code - no real script
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.status(403).send(`-- ═══════════════════════════════════════════
+-- 🔒 ${BRAND_NAME} | HWID-LOCKED
+-- ═══════════════════════════════════════════
+-- This script is protected by HWID-Lock.
+-- Direct access is NOT allowed.
+-- 
+-- To use this script, you need:
+-- 1. A valid HWID key (from owner)
+-- 2. Set: getgenv().ZyroxKidoKey = "YOUR-KEY"
+-- 3. Use the loader from the /view page
+-- ═══════════════════════════════════════════
+warn("[${BRAND_SHORT}] ❌ Protected. Use the loader.")`);
 });
 
-// ==================== GENERATE OBFUSCATED (By Zyrox-Kido) ====================
-app.post('/generate-obf/:token', requireLogin, async (req, res) => {
+// ==================== VALIDATE KEY (HWID-Locked) ====================
+app.get('/validate/:token', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
-        if (result.rows.length === 0) return res.json({ success: false, error: 'Script not found' });
+        const { key, hwid } = req.query;
         
-        const script = result.rows[0];
-        const isAdmin = req.session.user.role === 'ADMIN';
-        
-        if (script.owner !== req.session.user.username && !isAdmin) {
-            return res.json({ success: false, error: 'Access Denied' });
+        if (!key || !hwid) {
+            return res.json({ valid: false, error: 'Missing key or HWID' });
         }
-        
-        const obfuscated = heavyObfuscate(script.real_content);
-        
-        await pool.query('UPDATE scripts SET public_content = $1 WHERE token = $2', [obfuscated, req.params.token]);
-        
-        console.log(`🔒 Obfuscated By Zyrox-Kido: ${script.name} (${script.owner})`);
-        
-        res.json({ success: true, code: obfuscated });
+
+        const scriptResult = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (scriptResult.rows.length === 0) {
+            return res.json({ valid: false, error: 'Script not found' });
+        }
+        const script = scriptResult.rows[0];
+
+        // Check if key exists
+        const keyResult = await pool.query('SELECT * FROM hwid_keys WHERE key_value = $1 AND script_token = $2', [key, req.params.token]);
+        if (keyResult.rows.length === 0) {
+            return res.json({ valid: false, error: 'Invalid key' });
+        }
+        const keyData = keyResult.rows[0];
+
+        // Check HWID lock
+        if (keyData.hwid && keyData.hwid !== hwid) {
+            return res.json({ valid: false, error: '❌ Key locked to another device' });
+        }
+
+        // If HWID is empty, bind it now (first use)
+        if (!keyData.hwid) {
+            await pool.query('UPDATE hwid_keys SET hwid = $1, used = TRUE WHERE id = $2', [hwid, keyData.id]);
+            console.log(`🔒 Key ${key} locked to HWID: ${hwid.substring(0, 16)}...`);
+        }
+
+        // Return the obfuscated payload
+        res.json({
+            valid: true,
+            payload: script.public_content
+        });
     } catch (e) {
-        console.error('GENERATE OBF ERROR:', e.message);
-        res.json({ success: false, error: e.message });
+        console.error('VALIDATE ERROR:', e.message);
+        res.json({ valid: false, error: 'Server error' });
     }
 });
 
@@ -905,6 +1057,8 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
         const isAdmin = req.session.user.role === 'ADMIN';
         if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
 
+        // Delete HWID keys first
+        await pool.query('DELETE FROM hwid_keys WHERE script_token = $1', [req.params.token]);
         await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]);
         
         if (isAdmin && script.owner !== req.session.user.username) {
@@ -916,7 +1070,8 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v17.0 running on port ${PORT}`);
-    console.log(`🔒 Generate Obfuscated By Zyrox-Kido (Simple Base64) enabled`);
+    console.log(`✅ ${BRAND_NAME} v18.0 running on port ${PORT}`);
+    console.log(`🔒 HWID-Locked Protection enabled`);
+    console.log(`🔑 Key Management: /keys/:token`);
     console.log(`👑 Admin Panel at /admin`);
 });
