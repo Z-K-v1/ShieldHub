@@ -44,10 +44,6 @@ async function initDB() {
                 created_at TIMESTAMP DEFAULT NOW()
             );
         `);
-        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS slug VARCHAR(100) DEFAULT 'Script';`);
-        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS version VARCHAR(50) DEFAULT 'V1';`);
-        await pool.query(`UPDATE scripts SET slug = LOWER(REPLACE(name, ' ', '_')) WHERE slug = 'Script' OR slug IS NULL;`);
-        await pool.query(`UPDATE scripts SET version = 'V1' WHERE version IS NULL;`);
         await pool.query(`
             CREATE TABLE IF NOT EXISTS "session" (
                 "sid" VARCHAR NOT NULL COLLATE "default",
@@ -56,6 +52,10 @@ async function initDB() {
                 CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
             );
         `);
+        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS slug VARCHAR(100) DEFAULT 'Script';`);
+        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS version VARCHAR(50) DEFAULT 'V1';`);
+        await pool.query(`UPDATE scripts SET slug = LOWER(REPLACE(name, ' ', '_')) WHERE slug = 'Script' OR slug IS NULL;`);
+        await pool.query(`UPDATE scripts SET version = 'V1' WHERE version IS NULL;`);
         console.log('✅ Tables created/verified');
 
         const adminPass = process.env.ADMIN_PASSWORD;
@@ -142,36 +142,6 @@ local _f=loadstring(_r)
 if _f then _f() end`;
 }
 
-// Heavy obfuscation with extra layers
-function heavyObfuscate(code) {
-    const b64 = Buffer.from(code, 'utf8').toString('base64');
-    const chunks = [];
-    for (let i = 0; i < b64.length; i += 50) {
-        chunks.push(b64.substr(i, 50));
-    }
-    const chunkStr = chunks.map(c => `"${c}"`).join('..');
-    const timestamp = new Date().toISOString();
-    
-    return `-- ═══════════════════════════════════════════
--- 🔒 Obfuscated ${BRAND_NAME}
--- Generated: ${timestamp}
--- ═══════════════════════════════════════════
-local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local _d=${chunkStr}
-local _o={}
-_d:gsub(".",function(_c)local _n=_b64:find(_c,1,true)if _n then _o[#_o+1]=_n-1 end end)
-local _r=""
-for _i=1,#_o,4 do
-    local _n=_o[_i]*262144+(_o[_i+1] or 0)*4096+(_o[_i+2] or 0)*64+(_o[_i+3] or 0)
-    _r=_r..string.char(math.floor(_n/65536)%256)
-    if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end
-    if _o[_i+3] then _r=_r..string.char(_n%256) end
-end
-local _f=loadstring(_r)
-if _f then _f() end
--- 🔒 Protected by ${BRAND_NAME}`;
-}
-
 function makeSlug(name) {
     return name.toString().trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 50) || 'Script';
 }
@@ -218,6 +188,7 @@ const SHARED_STYLES = `
     .btn-blue { background: linear-gradient(135deg, #0088ff, #0066cc); color: #fff; }
     .btn-purple { background: linear-gradient(135deg, #aa44ff, #8800cc); color: #fff; }
     .btn-gold { background: linear-gradient(135deg, #ffd700, #ffaa00); color: #000; font-weight: 800; }
+    .btn-gold:hover { box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5); transform: translateY(-2px); }
     .card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 25px; border-radius: 16px; margin: 20px 0; border: 1px solid #222; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
     .form-group { margin-bottom: 20px; }
     .form-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.8px; }
@@ -237,6 +208,28 @@ const SHARED_STYLES = `
     .empty-state { text-align: center; padding: 50px 20px; color: #666; }
     .empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.4; }
 
+    /* Big New Script Button */
+    .new-script-btn-wrap { display: flex; justify-content: center; margin: 30px 0; }
+    .new-script-btn { 
+        background: linear-gradient(135deg, #00ff88, #00cc66); 
+        color: #000; 
+        padding: 20px 50px; 
+        border-radius: 16px; 
+        font-size: 18px; 
+        font-weight: 800; 
+        text-decoration: none; 
+        display: inline-flex; 
+        align-items: center; 
+        gap: 12px; 
+        box-shadow: 0 10px 40px rgba(0, 255, 136, 0.4);
+        transition: all 0.3s ease;
+        letter-spacing: 0.5px;
+    }
+    .new-script-btn:hover { 
+        transform: translateY(-4px) scale(1.03); 
+        box-shadow: 0 15px 50px rgba(0, 255, 136, 0.6);
+    }
+
     /* 2-Column Obfuscator Layout */
     .obfuscator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
     @media (max-width: 900px) { .obfuscator-grid { grid-template-columns: 1fr; } }
@@ -247,9 +240,6 @@ const SHARED_STYLES = `
     .obf-textarea:focus { border-color: #00ff88; box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1); }
     .obf-output { width: 100%; min-height: 400px; padding: 15px; background: #0a0a0a; border: 1px solid #ffd700; color: #ffd700; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; line-height: 1.4; overflow-y: auto; word-break: break-all; white-space: pre-wrap; }
     .obf-actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
-
-    /* Loadstring box */
-    .loadstring-box { background: #0a0a0a; border: 1px solid #00ff88; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; color: #00ff88; word-break: break-all; margin: 10px 0; line-height: 1.5; }
 
     .footer-brand { text-align: center; padding: 20px; color: #444; font-size: 12px; margin-top: 30px; }
     .footer-brand strong { background: linear-gradient(135deg, #00ff88, #aa44ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 800; }
@@ -272,7 +262,6 @@ const SHARED_STYLES = `
     .toast { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 16px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4); z-index: 9999; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 90vw; }
     .toast.hiding { animation: fadeOut 0.3s ease forwards; }
     .toast.error { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
-    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.3); border-top-color: #000; border-radius: 50%; animation: spin 0.8s linear infinite; }
 
     @media (max-width: 768px) {
         body { padding: 12px; }
@@ -286,6 +275,7 @@ const SHARED_STYLES = `
         .btn { padding: 10px 16px; font-size: 13px; }
         .toast { bottom: 15px; right: 15px; left: 15px; padding: 14px 18px; font-size: 13px; }
         .obf-textarea, .obf-output { min-height: 250px; font-size: 11px; }
+        .new-script-btn { padding: 16px 30px; font-size: 16px; }
     }
     @media (max-width: 480px) {
         body { padding: 8px; }
@@ -298,7 +288,7 @@ const SHARED_STYLES = `
     .login-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 420px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
     .login-container h1 { color: #00ff88; font-size: 30px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 800; }
     .login-container h1 small { display: block; font-size: 12px; color: #aa44ff; font-weight: 600; letter-spacing: 1px; margin-top: 4px; }
-    .login-logo { width: 48px; height: 48px; filter: drop-shadow(0 0 15px rgba(0, 255, 136, 0.6)); }
+    .login-logo { width: 48px; height: 48px; }
     .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
     .login-container input { margin-bottom: 15px; text-align: center; }
     .login-container .btn { width: 100%; margin-top: 10px; }
@@ -466,11 +456,15 @@ app.get('/', requireLogin, async (req, res) => {
                 </div>
             </div>
 
+            <div class="new-script-btn-wrap">
+                <a href="/create" class="new-script-btn">✨ + New Script</a>
+            </div>
+
             <h2 class="section-title">📁 Your Scripts (${myScripts.length})</h2>
         `;
         
         if (myScripts.length === 0) {
-            html += `<div class="card empty-state"><div class="empty-state-icon">📭</div><p>No scripts yet. Create your first script!</p></div>`;
+            html += `<div class="card empty-state"><div class="empty-state-icon">📭</div><p>No scripts yet. Click "New Script" above!</p></div>`;
         } else {
             myScripts.forEach(s => {
                 html += renderScriptCard(s, baseUrl);
@@ -484,9 +478,8 @@ app.get('/', requireLogin, async (req, res) => {
     }
 });
 
-// ==================== CREATE PAGE (LuaU-Style 2-Column) ====================
+// ==================== CREATE PAGE (2-Column LuaU-style) ====================
 app.get('/create', requireLogin, (req, res) => {
-    const isAdmin = req.session.user.role === 'ADMIN';
     res.send(`
     <!DOCTYPE html>
     <html lang="en">
@@ -506,11 +499,11 @@ app.get('/create', requireLogin, (req, res) => {
         </div>
 
         <div class="card">
-            <form action="/create" method="POST" id="createForm">
+            <form action="/create" method="POST">
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">📝 Script Name</label>
-                        <input type="text" name="name" id="scriptName" placeholder="e.g., Zyrox Hub" required>
+                        <input type="text" name="name" id="scriptName" placeholder="e.g., God Mode" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">🏷️ Version</label>
@@ -519,25 +512,21 @@ app.get('/create', requireLogin, (req, res) => {
                 </div>
 
                 <div class="obfuscator-grid">
-                    <!-- LEFT: INPUT -->
                     <div class="obf-panel">
                         <div class="obf-panel-title">
                             <span>💻 Original Lua Code</span>
                             <span class="badge-live">INPUT</span>
                         </div>
-                        <textarea class="obf-textarea" name="content" id="scriptInput" placeholder="-- Paste your Lua script here...&#10;print('Hello World!')" required></textarea>
+                        <textarea class="obf-textarea" name="content" id="scriptInput" placeholder="-- Paste your Lua script here..." required></textarea>
                     </div>
-
-                    <!-- RIGHT: OBFUSCATED OUTPUT (LIVE) -->
                     <div class="obf-panel">
                         <div class="obf-panel-title">
                             <span>🔒 Obfuscated By Zyrox-Kido</span>
                             <span class="badge-live" style="background:#ffd700;">LIVE</span>
                         </div>
-                        <div class="obf-output" id="obfOutput">-- Obfuscated code will appear here...&#10;-- Start typing on the left →</div>
+                        <div class="obf-output" id="obfOutput">-- Obfuscated code will appear here...\n-- Start typing on the left →</div>
                         <div class="obf-actions-row">
                             <button type="button" class="btn btn-gold" onclick="copyObfuscated(this)">📋 Copy Obfuscated</button>
-                            <button type="button" class="btn btn-purple" onclick="copyLoadstring(this)">🔗 Copy Loadstring</button>
                         </div>
                     </div>
                 </div>
@@ -555,7 +544,6 @@ app.get('/create', requireLogin, (req, res) => {
             const outputArea = document.getElementById('obfOutput');
             let currentObfuscated = '';
 
-            // Simple client-side Base64 encode for live preview
             function b64EncodeUnicode(str) {
                 return btoa(unescape(encodeURIComponent(str)));
             }
@@ -563,16 +551,15 @@ app.get('/create', requireLogin, (req, res) => {
             function generateObfuscation(code) {
                 if (!code.trim()) return '-- Obfuscated code will appear here...\\n-- Start typing on the left →';
                 const b64 = b64EncodeUnicode(code);
-                // Split into chunks of 50
                 const chunks = [];
                 for (let i = 0; i < b64.length; i += 50) {
                     chunks.push('"' + b64.substr(i, 50) + '"');
                 }
                 const chunkStr = chunks.join('..');
-                const timestamp = new Date().toISOString();
+                const ts = new Date().toISOString();
                 return '-- ═══════════════════════════════════════════\\n' +
                        '-- 🔒 Obfuscated ${BRAND_NAME}\\n' +
-                       '-- Generated: ' + timestamp + '\\n' +
+                       '-- Generated: ' + ts + '\\n' +
                        '-- ═══════════════════════════════════════════\\n' +
                        'local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"\\n' +
                        'local _d=' + chunkStr + '\\n' +
@@ -595,26 +582,12 @@ app.get('/create', requireLogin, (req, res) => {
                 outputArea.innerText = currentObfuscated;
             }
 
-            // Live update on typing
             inputArea.addEventListener('input', updateObfuscation);
-            
-            // Initialize
             updateObfuscation();
 
             function copyObfuscated(btn) {
                 if (!currentObfuscated) { showToast('Nothing to copy!', 'error'); return; }
                 copyText(currentObfuscated, btn);
-            }
-
-            function copyLoadstring(btn) {
-                const name = document.getElementById('scriptName').value || 'Script';
-                const slug = name.trim().replace(/\\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '') || 'Script';
-                const baseUrl = window.location.origin;
-                // We don't know the token yet (created after save), so show placeholder
-                const url = baseUrl + '/raw/' + slug + '/V1/YOUR-TOKEN-HERE';
-                const loadstring = 'loadstring(game:HttpGet("' + url + '"))()';
-                copyText(loadstring, btn);
-                showToast('⚠️ Save first to get real token!', 'error');
             }
         </script>
         ${getFooter()}
@@ -641,7 +614,7 @@ app.post('/create', requireLogin, async (req, res) => {
     }
 });
 
-// ==================== EDIT PAGE (2-Column) ====================
+// ==================== EDIT (2-Column) ====================
 app.get('/edit/:token', requireLogin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
@@ -650,8 +623,7 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
         const isAdmin = req.session.user.role === 'ADMIN';
         if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
 
-        // Escape for textarea
-        const escapedContent = script.real_content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const escaped = script.real_content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
         res.send(`
         <!DOCTYPE html>
@@ -690,7 +662,7 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
                                 <span>💻 Original Lua Code</span>
                                 <span class="badge-live">INPUT</span>
                             </div>
-                            <textarea class="obf-textarea" name="content" id="scriptInput" required>${escapedContent}</textarea>
+                            <textarea class="obf-textarea" name="content" id="scriptInput" required>${escaped}</textarea>
                         </div>
                         <div class="obf-panel">
                             <div class="obf-panel-title">
@@ -729,10 +701,10 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
                         chunks.push('"' + b64.substr(i, 50) + '"');
                     }
                     const chunkStr = chunks.join('..');
-                    const timestamp = new Date().toISOString();
+                    const ts = new Date().toISOString();
                     return '-- ═══════════════════════════════════════════\\n' +
                            '-- 🔒 Obfuscated ${BRAND_NAME}\\n' +
-                           '-- Generated: ' + timestamp + '\\n' +
+                           '-- Generated: ' + ts + '\\n' +
                            '-- ═══════════════════════════════════════════\\n' +
                            'local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"\\n' +
                            'local _d=' + chunkStr + '\\n' +
@@ -1010,7 +982,7 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v19.0 running on port ${PORT}`);
-    console.log(`🎨 LuaU-Style UI with Live Obfuscation`);
+    console.log(`✅ ${BRAND_NAME} v20.0 running on port ${PORT}`);
+    console.log(`🎨 2-Column Obfuscator UI enabled`);
     console.log(`👑 Admin Panel at /admin`);
 });
