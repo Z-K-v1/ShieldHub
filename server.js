@@ -80,7 +80,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(session({
     store: new pgSession({ pool: pool, tableName: 'session' }),
-    secret: process.env.SESSION_SECRET || 'shieldhub-secret-key',
+    secret: process.env.SESSION_SECRET || 'zyrox-kido-secret-key',
     resave: false,
     saveUninitialized: false,
     cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 }
@@ -96,39 +96,21 @@ function requireAdmin(req, res, next) {
     else res.status(403).send('Access Denied: Admin only');
 }
 
-// ==================== FAVICON & LOGO ROUTES (Serve as separate files) ====================
-const LOGO_SVG_CONTENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-<defs>
-<linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-<stop offset="0%" style="stop-color:#00ff88;stop-opacity:1" />
-<stop offset="100%" style="stop-color:#00aa55;stop-opacity:1" />
-</linearGradient>
-</defs>
-<path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(#grad)" stroke="#006633" stroke-width="2"/>
-<path d="M50 30 L65 40 L60 55 C58 62 54 67 50 70 C46 67 42 62 40 55 L35 40 Z" fill="#0a0a0a"/>
-<circle cx="50" cy="48" r="5" fill="#00ff88"/>
-</svg>`;
+// ==================== BRANDING ====================
+const BRAND_NAME = 'By Zyrox-Kido';
+const BRAND_SHORT = 'Zyrox-Kido';
 
-const FAVICON_SVG_CONTENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-<defs>
-<linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-<stop offset="0%" style="stop-color:#00ff88;stop-opacity:1" />
-<stop offset="100%" style="stop-color:#00aa55;stop-opacity:1" />
-</linearGradient>
-</defs>
-<path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(#grad)"/>
-<circle cx="50" cy="48" r="14" fill="#0a0a0a"/>
-<path d="M42 38 L58 44 L54 56 C52 61 49 64 47 66 L42 56 Z" fill="#00ff88"/>
-</svg>`;
+// ==================== LOGO & FAVICON ====================
+const LOGO_SVG_CONTENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00ff88;stop-opacity:1" /><stop offset="100%" style="stop-color:#00aa55;stop-opacity:1" /></linearGradient><linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#aa44ff;stop-opacity:1" /><stop offset="100%" style="stop-color:#6600cc;stop-opacity:1" /></linearGradient></defs><circle cx="50" cy="50" r="45" fill="url(#grad2)" opacity="0.3"/><path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(#grad)" stroke="#006633" stroke-width="2"/><text x="50" y="60" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#0a0a0a" text-anchor="middle">ZK</text></svg>`;
 
-// Serve logo as PNG-like image
+const FAVICON_SVG_CONTENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00ff88;stop-opacity:1" /><stop offset="100%" style="stop-color:#00aa55;stop-opacity:1" /></linearGradient></defs><circle cx="50" cy="50" r="48" fill="#0a0a0a"/><path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(#grad)"/><text x="50" y="62" font-family="Arial, sans-serif" font-size="34" font-weight="bold" fill="#0a0a0a" text-anchor="middle">ZK</text></svg>`;
+
 app.get('/logo.svg', (req, res) => {
     res.setHeader('Content-Type', 'image/svg+xml');
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.send(LOGO_SVG_CONTENT);
 });
 
-// Serve favicon
 app.get('/favicon.svg', (req, res) => {
     res.setHeader('Content-Type', 'image/svg+xml');
     res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -145,7 +127,7 @@ app.get('/favicon.ico', (req, res) => {
 function obfuscateScript(code) {
     const encoded = Buffer.from(code, 'utf8').toString('base64');
     return `
--- ShieldHub Protected v13.0
+-- ${BRAND_NAME} | Protected
 local _b="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local _d="${encoded}"
 local _o={}
@@ -159,6 +141,53 @@ for _i=1,#_o,4 do
 end
 local _f=loadstring(_r)
 if _f then _f() end
+`;
+}
+
+// HEAVY OBFUSCATION - para sa Generate button
+function heavyObfuscate(code) {
+    const b64 = Buffer.from(code, 'utf8').toString('base64');
+    const chunks = [];
+    for (let i = 0; i < b64.length; i += 50) {
+        chunks.push(b64.substr(i, 50));
+    }
+    const key = crypto.randomBytes(8).toString('hex');
+    const chunkStr = chunks.map(c => `"${c}"`).join('..');
+    const numKey = Array.from(Buffer.from(key, 'hex')).join(',');
+    
+    return `-- ${BRAND_NAME} | Heavy Obfuscation | Key: ${key}
+local _k={${numKey}}
+local _p=function(_s)
+    local _r=""
+    for _i=1,#_s do
+        local _c=string.byte(_s,_i)
+        local _key=_k[((_i-1)%#_k)+1]
+        _r=_r..string.char(bit32.bxor(_c,_key))
+    end
+    return _r
+end
+local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local _d=${chunkStr}
+local _o={}
+_d:gsub(".",function(_c)local _n=_b64:find(_c,1,true)if _n then _o[#_o+1]=_n-1 end end)
+local _r=""
+for _i=1,#_o,4 do
+    local _n=_o[_i]*262144+(_o[_i+1] or 0)*4096+(_o[_i+2] or 0)*64+(_o[_i+3] or 0)
+    _r=_r..string.char(math.floor(_n/65536)%256)
+    if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end
+    if _o[_i+3] then _r=_r..string.char(_n%256) end
+end
+local _dbg=debug and debug.getinfo
+if _dbg then
+    local _info=_dbg(1,"S")
+    if _info and _info.what=="main" then
+        local _f=loadstring(_p(_r))
+        if _f then _f() end
+    end
+else
+    local _f=loadstring(_p(_r))
+    if _f then _f() end
+end
 `;
 }
 
@@ -176,20 +205,15 @@ function versionDropdown(selectedValue) {
     return options;
 }
 
-// HTML head generator para sa lahat ng pages
 function getHtmlHead(title) {
     return `
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>${title}</title>
+    <title>${title} | ${BRAND_NAME}</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="alternate icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="apple-touch-icon" href="/favicon.svg">
     <meta name="theme-color" content="#00ff88">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="ShieldHub">
-    <meta name="application-name" content="ShieldHub">
+    <meta name="author" content="${BRAND_NAME}">
     `;
 }
 
@@ -197,17 +221,12 @@ function getHtmlHead(title) {
 const SHARED_STYLES = `
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     html { font-size: 16px; }
-    body { 
-        background: #0a0a0a; color: #e0e0e0; 
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-        padding: 20px; min-height: 100vh;
-        background: radial-gradient(circle at top left, #0f1f15 0%, #0a0a0a 40%);
-        overflow-x: hidden;
-    }
+    body { background: #0a0a0a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; min-height: 100vh; background: radial-gradient(circle at top left, #0f1f15 0%, #0a0a0a 40%); overflow-x: hidden; }
     .header { display: flex; justify-content: space-between; align-items: center; background: rgba(17,17,17,0.85); backdrop-filter: blur(10px); padding: 18px 25px; border-radius: 16px; border: 1px solid #222; flex-wrap: wrap; gap: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-bottom: 20px; }
     .header-brand { display: flex; align-items: center; gap: 12px; }
     .header-logo { width: 42px; height: 42px; filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.4)); flex-shrink: 0; }
     .header-title { font-size: 22px; color: #00ff88; font-weight: 800; letter-spacing: -0.5px; text-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
+    .header-title small { display: block; font-size: 11px; color: #aa44ff; font-weight: 600; letter-spacing: 0.5px; text-shadow: 0 0 10px rgba(170, 68, 255, 0.5); margin-top: 2px; }
     .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .username { color: #ccc; font-weight: 600; font-size: 14px; }
     .badge { background: #00ff88; color: #000; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; }
@@ -222,6 +241,8 @@ const SHARED_STYLES = `
     .btn-blue:hover { box-shadow: 0 6px 20px rgba(0, 136, 255, 0.4); }
     .btn-purple { background: linear-gradient(135deg, #aa44ff, #8800cc); color: #fff; }
     .btn-purple:hover { box-shadow: 0 6px 20px rgba(170, 68, 255, 0.4); }
+    .btn-gold { background: linear-gradient(135deg, #ffd700, #ffaa00); color: #000; }
+    .btn-gold:hover { box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4); }
     .card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 25px; border-radius: 16px; margin: 20px 0; border: 1px solid #222; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
     .form-group { margin-bottom: 20px; }
     .form-label { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 0.8px; }
@@ -240,7 +261,6 @@ const SHARED_STYLES = `
     .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px; }
     .empty-state { text-align: center; padding: 50px 20px; color: #666; }
     .empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.4; }
-
     .user-card { background: linear-gradient(135deg, #1a1a1a 0%, #151515 100%); padding: 20px 25px; border-radius: 14px; margin: 12px 0; border: 1px solid #222; display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; transition: all 0.2s ease; text-decoration: none; color: inherit; }
     .user-card:hover { border-color: #aa44ff; transform: translateY(-2px); box-shadow: 0 10px 30px rgba(170, 68, 255, 0.15); }
     .user-info { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 200px; }
@@ -253,10 +273,30 @@ const SHARED_STYLES = `
     .role-admin-tag { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
     .role-user-tag { background: #00ff88; color: #000; }
 
+    /* Footer branding */
+    .footer-brand {
+        text-align: center;
+        padding: 20px;
+        color: #444;
+        font-size: 12px;
+        margin-top: 30px;
+    }
+    .footer-brand strong {
+        background: linear-gradient(135deg, #00ff88, #aa44ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 800;
+    }
+
+    .obf-box { background: #0a0a0a; border: 2px solid #ffd700; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: #ffd700; word-break: break-all; margin: 10px 0; max-height: 300px; overflow-y: auto; line-height: 1.4; }
+    .obf-label { color: #ffd700; font-weight: 700; font-size: 13px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+
     @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     @keyframes fadeOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(400px); } }
     .toast { position: fixed; bottom: 30px; right: 30px; background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; padding: 16px 24px; border-radius: 12px; font-weight: 700; font-size: 14px; box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4); z-index: 9999; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 90vw; }
     .toast.hiding { animation: fadeOut 0.3s ease forwards; }
+    .toast.error { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
 
     @media (max-width: 768px) {
         body { padding: 12px; }
@@ -293,7 +333,8 @@ const SHARED_STYLES = `
     .login-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 420px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.6); position: relative; overflow: hidden; }
     .login-container::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(0,255,136,0.08) 0%, transparent 70%); animation: pulse 4s ease-in-out infinite; pointer-events: none; }
     @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 0.8; } }
-    .login-container h1 { color: #00ff88; font-size: 32px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 12px; position: relative; z-index: 1; font-weight: 800; letter-spacing: -1px; text-shadow: 0 0 30px rgba(0, 255, 136, 0.4); }
+    .login-container h1 { color: #00ff88; font-size: 30px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 12px; position: relative; z-index: 1; font-weight: 800; letter-spacing: -1px; text-shadow: 0 0 30px rgba(0, 255, 136, 0.4); }
+    .login-container h1 small { display: block; font-size: 12px; color: #aa44ff; font-weight: 600; letter-spacing: 1px; text-shadow: 0 0 10px rgba(170, 68, 255, 0.5); margin-top: 4px; }
     .login-logo { width: 48px; height: 48px; filter: drop-shadow(0 0 15px rgba(0, 255, 136, 0.6)); animation: float 3s ease-in-out infinite; }
     @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
     .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; position: relative; z-index: 1; }
@@ -304,7 +345,7 @@ const SHARED_STYLES = `
     .success { color: #00ff88; }
     .link { color: #00ff88; text-decoration: none; display: block; margin-top: 20px; font-size: 14px; position: relative; z-index: 1; font-weight: 600; }
     .link:hover { text-decoration: underline; }
-    @media (max-width: 480px) { .login-container { padding: 40px 25px; border-radius: 16px; } .login-container h1 { font-size: 26px; } .login-logo { width: 40px; height: 40px; } }
+    @media (max-width: 480px) { .login-container { padding: 40px 25px; border-radius: 16px; } .login-container h1 { font-size: 24px; } .login-logo { width: 40px; height: 40px; } }
 `;
 
 // ==================== TOAST SCRIPT ====================
@@ -313,12 +354,8 @@ const TOAST_SCRIPT = `
         const existing = document.querySelector('.toast');
         if (existing) existing.remove();
         const toast = document.createElement('div');
-        toast.className = 'toast';
+        toast.className = 'toast' + (type === 'error' ? ' error' : '');
         toast.innerHTML = '<span>' + (type === 'success' ? '✅' : '❌') + '</span><span>' + message + '</span>';
-        if (type === 'error') {
-            toast.style.background = 'linear-gradient(135deg, #ff4444, #cc0000)';
-            toast.style.color = '#fff';
-        }
         document.body.appendChild(toast);
         setTimeout(() => { toast.classList.add('hiding'); setTimeout(() => toast.remove(), 300); }, 2500);
     }
@@ -334,6 +371,17 @@ const TOAST_SCRIPT = `
             showToast('Loadstring copied!');
         }).catch(() => showToast('Failed to copy!', 'error'));
     }
+    function copyRaw(text, btn) {
+        navigator.clipboard.writeText(text).then(() => {
+            if (btn) {
+                const original = btn.innerHTML;
+                btn.innerHTML = '✅ Copied!';
+                btn.style.background = 'linear-gradient(135deg, #ffd700, #ffaa00)';
+                setTimeout(() => { btn.innerHTML = original; btn.style.background = ''; }, 1800);
+            }
+            showToast('Obfuscated code copied!');
+        }).catch(() => showToast('Failed to copy!', 'error'));
+    }
     function confirmDelete(token, name) {
         if (confirm('⚠️ Are you sure you want to delete "' + name + '"?')) {
             window.location.href = '/delete/' + token;
@@ -341,18 +389,20 @@ const TOAST_SCRIPT = `
     }
 `;
 
+// ==================== FOOTER ====================
+function getFooter() {
+    return `<div class="footer-brand">Made with 💚 by <strong>${BRAND_NAME}</strong></div>`;
+}
+
 // ==================== LOGIN ====================
 app.get('/login', (req, res) => {
     res.send(`
     <!DOCTYPE html>
     <html lang="en">
-    <head>
-        ${getHtmlHead('ShieldHub - Login')}
-        <style>${SHARED_STYLES} body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }</style>
-    </head>
+    <head>${getHtmlHead('Login')}<style>${SHARED_STYLES} body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }</style></head>
     <body>
         <div class="login-container">
-            <h1><img src="/logo.svg" class="login-logo" alt="ShieldHub"> ShieldHub</h1>
+            <h1><img src="/logo.svg" class="login-logo" alt="${BRAND_NAME}"> ${BRAND_SHORT}<small>By Zyrox-Kido</small></h1>
             <p class="subtitle">Login to your dashboard</p>
             <form action="/login" method="POST">
                 <input type="text" name="username" placeholder="Username" required autocomplete="username">
@@ -385,13 +435,10 @@ app.get('/register', (req, res) => {
     res.send(`
     <!DOCTYPE html>
     <html lang="en">
-    <head>
-        ${getHtmlHead('ShieldHub - Register')}
-        <style>${SHARED_STYLES} body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }</style>
-    </head>
+    <head>${getHtmlHead('Register')}<style>${SHARED_STYLES} body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }</style></head>
     <body>
         <div class="login-container">
-            <h1><img src="/logo.svg" class="login-logo" alt="ShieldHub"> ShieldHub</h1>
+            <h1><img src="/logo.svg" class="login-logo" alt="${BRAND_NAME}"> ${BRAND_SHORT}<small>By Zyrox-Kido</small></h1>
             <p class="subtitle">Create your account</p>
             <form action="/register" method="POST">
                 <input type="text" name="username" placeholder="Username" required>
@@ -434,20 +481,20 @@ app.get('/', requireLogin, async (req, res) => {
         let html = `
         <!DOCTYPE html>
         <html lang="en">
-        <head>
-            ${getHtmlHead('ShieldHub - Dashboard')}
-            <style>${SHARED_STYLES}</style>
-        </head>
+        <head>${getHtmlHead('Dashboard')}<style>${SHARED_STYLES}</style></head>
         <body>
             <div class="header">
                 <div class="header-brand">
-                    <img src="/logo.svg" class="header-logo" alt="ShieldHub">
-                    <span class="header-title">ShieldHub</span>
+                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
+                    <div>
+                        <div class="header-title">${BRAND_SHORT}</div>
+                        <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
+                    </div>
                 </div>
                 <div class="header-right">
                     <span class="username">${req.session.user.username}</span>
                     ${isAdmin ? '<span class="badge badge-admin">ADMIN</span>' : '<span class="badge">USER</span>'}
-                    ${isAdmin ? '<a href="/admin" class="btn btn-purple">👑 Admin Panel</a>' : ''}
+                    ${isAdmin ? '<a href="/admin" class="btn btn-purple">👑 Admin</a>' : ''}
                     <a href="/logout" class="btn btn-red">Logout</a>
                 </div>
             </div>
@@ -498,7 +545,7 @@ app.get('/', requireLogin, async (req, res) => {
                 `;
             });
         }
-        html += `<script>${TOAST_SCRIPT}</script></body></html>`;
+        html += `${getFooter()}<script>${TOAST_SCRIPT}</script></body></html>`;
         res.send(html);
     } catch (e) { 
         console.error('DASHBOARD ERROR:', e.message); 
@@ -536,15 +583,15 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
         res.send(`
         <!DOCTYPE html>
         <html lang="en">
-        <head>
-            ${getHtmlHead('Edit Script - ShieldHub')}
-            <style>${SHARED_STYLES}</style>
-        </head>
+        <head>${getHtmlHead('Edit Script')}<style>${SHARED_STYLES}</style></head>
         <body>
             <div class="header">
                 <div class="header-brand">
-                    <img src="/logo.svg" class="header-logo" alt="ShieldHub">
-                    <span class="header-title">Edit Script</span>
+                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
+                    <div>
+                        <div class="header-title">Edit Script</div>
+                        <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
+                    </div>
                 </div>
                 <a href="/" class="btn">← Back</a>
             </div>
@@ -567,6 +614,7 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
                     <button type="submit" class="btn">💾 Save Changes</button>
                 </form>
             </div>
+            ${getFooter()}
         </body>
         </html>
         `);
@@ -609,13 +657,13 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
         res.send(`
         <!DOCTYPE html>
         <html lang="en">
-        <head>
-            ${getHtmlHead('ShieldHub - ' + script.name)}
+        <head>${getHtmlHead(script.name)}
             <style>
                 ${SHARED_STYLES}
                 body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
                 .view-container { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 40px; border-radius: 20px; border: 1px solid #222; width: 500px; max-width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
-                .view-container h1 { color: #00ff88; font-size: 32px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+                .view-container h1 { color: #00ff88; font-size: 30px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+                .view-container h1 small { display: block; font-size: 12px; color: #aa44ff; font-weight: 600; letter-spacing: 1px; margin-top: 4px; }
                 .view-logo { width: 40px; height: 40px; filter: drop-shadow(0 0 15px rgba(0, 255, 136, 0.6)); }
                 .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; }
                 .protected-box { border: 2px solid #ff4444; padding: 25px; border-radius: 12px; margin: 25px 0; background: rgba(255, 68, 68, 0.05); }
@@ -623,12 +671,12 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
                 .protected-box small { color: #888; font-size: 12px; }
                 .view-container .btn { width: 100%; padding: 16px; font-size: 15px; }
                 .footer-text { color: #444; font-size: 12px; margin-top: 25px; }
-                @media (max-width: 480px) { .view-container { padding: 35px 25px; } .view-container h1 { font-size: 26px; } }
+                @media (max-width: 480px) { .view-container { padding: 35px 25px; } .view-container h1 { font-size: 24px; } }
             </style>
         </head>
         <body>
             <div class="view-container">
-                <h1><img src="/logo.svg" class="view-logo" alt="ShieldHub"> ShieldHub</h1>
+                <h1><img src="/logo.svg" class="view-logo" alt="${BRAND_NAME}"> ${BRAND_SHORT}<small>By Zyrox-Kido</small></h1>
                 <p class="subtitle">Script Protection System</p>
                 <h2 style="margin: 20px 0; color: #fff;">${script.name}</h2>
                 <div class="version-badge" style="display:inline-block; font-size: 14px; padding: 6px 16px;">${script.version}</div>
@@ -637,7 +685,7 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
                     <small>The real code is hidden. Use an executor to run it.</small>
                 </div>
                 <button class="btn" onclick="copyLoadstring('${prettyUrl}', this)">📋 COPY LOADSTRING</button>
-                <p class="footer-text">Protected by ShieldHub</p>
+                <p class="footer-text">Protected by ${BRAND_NAME}</p>
             </div>
             <script>${TOAST_SCRIPT}</script>
         </body>
@@ -661,7 +709,7 @@ app.get('/raw/:slug/:version/:token', async (req, res) => {
         const blocked = ['Mozilla', 'Chrome', 'Safari', 'Firefox', 'Edge', 'curl', 'wget', 'Postman'];
         for (const b of blocked) {
             if (ua.includes(b)) {
-                return res.status(403).send("-- ShieldHub Protected -- Direct browser access denied. Use an executor. --");
+                return res.status(403).send(`-- ${BRAND_NAME} Protected -- Direct browser access denied. Use an executor. --`);
             }
         }
         
@@ -706,15 +754,15 @@ app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
         res.send(`
         <!DOCTYPE html>
         <html lang="en">
-        <head>
-            ${getHtmlHead('Admin Panel - ShieldHub')}
-            <style>${SHARED_STYLES}</style>
-        </head>
+        <head>${getHtmlHead('Admin Panel')}<style>${SHARED_STYLES}</style></head>
         <body>
             <div class="header">
                 <div class="header-brand">
-                    <img src="/logo.svg" class="header-logo" alt="ShieldHub">
-                    <span class="header-title">👑 Admin Panel</span>
+                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
+                    <div>
+                        <div class="header-title">👑 Admin Panel</div>
+                        <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
+                    </div>
                 </div>
                 <div class="header-right">
                     <a href="/" class="btn">← Dashboard</a>
@@ -725,6 +773,7 @@ app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
             <h2 class="section-title">👥 All Users (${users.length})</h2>
             <p style="color: #666; font-size: 13px; margin-bottom: 15px;">Click on a user to view their scripts.</p>
             ${userCards || '<div class="card empty-state"><div class="empty-state-icon">👥</div><p>No users found.</p></div>'}
+            ${getFooter()}
         </body>
         </html>
         `);
@@ -764,7 +813,13 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) =>
                             <button class="btn" onclick="copyLoadstring('${prettyUrl}', this)">📋 Copy Loadstring</button>
                             <a href="/edit/${s.token}" class="btn btn-orange">✏️ Edit</a>
                             <a href="/view/${slug}/${version}/${s.token}" class="btn btn-blue" target="_blank">👁️ View</a>
+                            <button class="btn btn-gold" onclick="generateObf('${s.token}', this)">🔒 Generate</button>
                             <button class="btn btn-red" onclick="confirmDelete('${s.token}', '${s.name}')">🗑️ Delete</button>
+                        </div>
+                        <div id="obf-${s.token}" style="display:none;">
+                            <div class="obf-label">🔒 Obfuscated Code (Heavy):</div>
+                            <div class="obf-box" id="obf-box-${s.token}"></div>
+                            <button class="btn btn-gold" onclick="copyRaw(document.getElementById('obf-box-${s.token}').innerText, this)">📋 Copy Obfuscated</button>
                         </div>
                     </div>
                 `;
@@ -774,15 +829,15 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) =>
         res.send(`
         <!DOCTYPE html>
         <html lang="en">
-        <head>
-            ${getHtmlHead(targetUser + "'s Scripts - Admin")}
-            <style>${SHARED_STYLES}</style>
-        </head>
+        <head>${getHtmlHead(targetUser + "'s Scripts")}<style>${SHARED_STYLES}</style></head>
         <body>
             <div class="header">
                 <div class="header-brand">
-                    <img src="/logo.svg" class="header-logo" alt="ShieldHub">
-                    <span class="header-title">👤 ${targetUser}</span>
+                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
+                    <div>
+                        <div class="header-title">👤 ${targetUser}</div>
+                        <small style="font-size: 11px; color: #aa44ff; font-weight: 600;">By Zyrox-Kido</small>
+                    </div>
                 </div>
                 <div class="header-right">
                     <a href="/admin" class="btn btn-purple">← All Users</a>
@@ -802,13 +857,55 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) =>
 
             <h2 class="section-title">📁 Scripts (${userScripts.length})</h2>
             ${scriptCards}
-            <script>${TOAST_SCRIPT}</script>
+            <script>
+                ${TOAST_SCRIPT}
+                async function generateObf(token, btn) {
+                    const original = btn.innerHTML;
+                    btn.innerHTML = '⏳ Generating...';
+                    btn.disabled = true;
+                    try {
+                        const res = await fetch('/admin/obfuscate/' + token, { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            document.getElementById('obf-' + token).style.display = 'block';
+                            document.getElementById('obf-box-' + token).innerText = data.code;
+                            showToast('✅ Obfuscation complete!');
+                        } else {
+                            showToast('Failed: ' + data.error, 'error');
+                        }
+                    } catch (e) {
+                        showToast('Network error', 'error');
+                    }
+                    btn.innerHTML = original;
+                    btn.disabled = false;
+                }
+            </script>
+            ${getFooter()}
         </body>
         </html>
         `);
     } catch (e) {
         console.error('ADMIN USER ERROR:', e.message);
         res.status(500).send('Server error: ' + e.message);
+    }
+});
+
+// ==================== ADMIN: OBFUSCATE ====================
+app.post('/admin/obfuscate/:token', requireLogin, requireAdmin, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (result.rows.length === 0) return res.json({ success: false, error: 'Script not found' });
+        
+        const script = result.rows[0];
+        const obfuscated = heavyObfuscate(script.real_content);
+        
+        // Save the obfuscated version to public_content
+        await pool.query('UPDATE scripts SET public_content = $1 WHERE token = $2', [obfuscated, req.params.token]);
+        
+        res.json({ success: true, code: obfuscated });
+    } catch (e) {
+        console.error('OBFUSCATE ERROR:', e.message);
+        res.json({ success: false, error: e.message });
     }
 });
 
@@ -832,8 +929,8 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ShieldHub v13.0 running on port ${PORT}`);
-    console.log(`🎨 Logo served at /logo.svg`);
-    console.log(`⭐ Favicon served at /favicon.svg`);
+    console.log(`✅ ${BRAND_NAME} v14.1 running on port ${PORT}`);
+    console.log(`🎨 Branding: ${BRAND_NAME}`);
+    console.log(`🔒 Heavy Obfuscation enabled`);
     console.log(`👑 Admin Panel at /admin`);
 });
