@@ -6,7 +6,6 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ==================== POSTGRES CONNECTION ====================
 const DATABASE_URL = process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
@@ -62,10 +61,7 @@ async function initDB() {
         if (adminPass) {
             const existing = await pool.query('SELECT * FROM users WHERE username = $1', ['Z-K']);
             if (existing.rows.length === 0) {
-                await pool.query(
-                    'INSERT INTO users (username, password, role) VALUES ($1, $2, $3)',
-                    ['Z-K', adminPass, 'ADMIN']
-                );
+                await pool.query('INSERT INTO users (username, password, role) VALUES ($1, $2, $3)', ['Z-K', adminPass, 'ADMIN']);
                 console.log('👑 Admin account "Z-K" created.');
             }
         }
@@ -80,7 +76,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(session({
     store: new pgSession({ pool: pool, tableName: 'session' }),
-    secret: process.env.SESSION_SECRET || 'zyrox-kido-secret-key',
+    secret: process.env.SESSION_SECRET || 'zyrox-kido-secret',
     resave: false,
     saveUninitialized: false,
     cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 }
@@ -90,10 +86,9 @@ function requireLogin(req, res, next) {
     if (req.session.user) next();
     else res.redirect('/login');
 }
-
 function requireAdmin(req, res, next) {
     if (req.session.user && req.session.user.role === 'ADMIN') next();
-    else res.status(403).send('Access Denied: Admin only');
+    else res.status(403).send('Access Denied');
 }
 
 // ==================== BRANDING ====================
@@ -101,9 +96,9 @@ const BRAND_NAME = 'By Zyrox-Kido';
 const BRAND_SHORT = 'Zyrox-Kido';
 
 // ==================== LOGO & FAVICON ====================
-const LOGO_SVG_CONTENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00ff88;stop-opacity:1" /><stop offset="100%" style="stop-color:#00aa55;stop-opacity:1" /></linearGradient><linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#aa44ff;stop-opacity:1" /><stop offset="100%" style="stop-color:#6600cc;stop-opacity:1" /></linearGradient></defs><circle cx="50" cy="50" r="45" fill="url(#grad2)" opacity="0.3"/><path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(#grad)" stroke="#006633" stroke-width="2"/><text x="50" y="60" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#0a0a0a" text-anchor="middle">ZK</text></svg>`;
+const LOGO_SVG_CONTENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00ff88"/><stop offset="100%" style="stop-color:#00aa55"/></linearGradient></defs><path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(#g)" stroke="#006633" stroke-width="2"/><text x="50" y="62" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#0a0a0a" text-anchor="middle">ZK</text></svg>`;
 
-const FAVICON_SVG_CONTENT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00ff88;stop-opacity:1" /><stop offset="100%" style="stop-color:#00aa55;stop-opacity:1" /></linearGradient></defs><circle cx="50" cy="50" r="48" fill="#0a0a0a"/><path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(#grad)"/><text x="50" y="62" font-family="Arial, sans-serif" font-size="34" font-weight="bold" fill="#0a0a0a" text-anchor="middle">ZK</text></svg>`;
+const FAVICON_SVG_CONTENT = LOGO_SVG_CONTENT;
 
 app.get('/logo.svg', (req, res) => {
     res.setHeader('Content-Type', 'image/svg+xml');
@@ -123,7 +118,7 @@ app.get('/favicon.ico', (req, res) => {
     res.send(FAVICON_SVG_CONTENT);
 });
 
-// ==================== OBFUSCATION (Simple Base64) ====================
+// ==================== OBFUSCATION ====================
 function obfuscateScript(code) {
     const encoded = Buffer.from(code, 'utf8').toString('base64');
     return `local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -151,13 +146,11 @@ if _f then _f() end`;
 function makeSlug(name) {
     return name.toString().trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '').substring(0, 50) || 'Script';
 }
-
 function versionDropdown(selectedValue) {
     let options = '';
     for (let i = 1; i <= 1000; i++) {
         const v = 'V' + i;
-        const selected = (v === selectedValue) ? 'selected' : '';
-        options += `<option value="${v}" ${selected}>${v}</option>`;
+        options += `<option value="${v}" ${v === selectedValue ? 'selected' : ''}>${v}</option>`;
     }
     return options;
 }
@@ -165,517 +158,663 @@ function versionDropdown(selectedValue) {
 function getHtmlHead(title) {
     return `
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>${title} | ${BRAND_NAME}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title} · ${BRAND_SHORT}</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <link rel="apple-touch-icon" href="/favicon.svg">
-    <meta name="theme-color" content="#00ff88">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     `;
 }
 
-// ==================== SHARED STYLES (Fov.it style) ====================
-const SHARED_STYLES = `
+// ==================== LAYOUT STYLES ====================
+const LAYOUT_STYLES = `
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-    html { font-size: 16px; }
-    body { 
-        background: #0a0a0a; 
-        color: #e0e0e0; 
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-        padding: 20px;
-        min-height: 100vh;
-        background: radial-gradient(ellipse at top, #1a3d2a 0%, #0a0a0a 50%);
+    html, body { height: 100%; }
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: #09090b;
+        color: #e4e4e7;
+        font-size: 14px;
         overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+        line-height: 1.5;
     }
-    .container { max-width: 1200px; margin: 0 auto; }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; }
 
-    /* ===== Header ===== */
-    .header { 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        background: rgba(15,15,15,0.9); 
-        backdrop-filter: blur(20px);
-        padding: 16px 24px; 
-        border-radius: 16px; 
-        border: 1px solid #1f1f1f;
-        flex-wrap: wrap; 
-        gap: 15px;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-        margin-bottom: 30px;
-    }
-    .header-brand { display: flex; align-items: center; gap: 12px; }
-    .header-logo { width: 40px; height: 40px; filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.4)); }
-    .header-title { font-size: 20px; color: #00ff88; font-weight: 800; letter-spacing: -0.5px; }
-    .header-subtitle { font-size: 11px; color: #aa44ff; font-weight: 600; letter-spacing: 0.5px; margin-top: 2px; }
-    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .user-pill {
-        display: flex; align-items: center; gap: 8px;
-        background: linear-gradient(135deg, #1a1a1a, #111);
-        border: 1px solid #2a2a2a;
-        padding: 8px 14px;
-        border-radius: 12px;
-        font-size: 13px;
-        font-weight: 700;
-        color: #fff;
-    }
-    .user-pill-avatar {
-        width: 24px; height: 24px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #00ff88, #00cc66);
-        color: #000;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 11px; font-weight: 800;
-    }
-    .role-badge {
-        padding: 6px 14px;
-        border-radius: 20px;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-    }
-    .role-owner { background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; }
-    .role-admin { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
-    .role-user { background: linear-gradient(135deg, #0088ff, #0066cc); color: #fff; }
+    /* ===== Layout ===== */
+    .layout { display: flex; min-height: 100vh; }
 
-    /* ===== Buttons ===== */
-    .btn { 
-        background: linear-gradient(135deg, #00ff88, #00cc66); 
-        color: #000; 
-        padding: 11px 20px; 
-        border: none; 
-        border-radius: 10px; 
-        cursor: pointer; 
-        font-weight: 700; 
-        text-decoration: none; 
-        display: inline-flex; 
-        align-items: center; 
-        justify-content: center; 
-        gap: 8px; 
-        font-size: 14px; 
-        transition: all 0.2s ease; 
-        font-family: inherit; 
-        white-space: nowrap;
+    /* ===== Sidebar ===== */
+    .sidebar {
+        width: 260px;
+        background: #0c0c0e;
+        border-right: 1px solid #1c1c1f;
+        padding: 20px 16px;
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        z-index: 50;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 255, 136, 0.4); }
-    .btn:active { transform: translateY(0); }
-    .btn-red { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
-    .btn-red:hover { box-shadow: 0 6px 20px rgba(255, 68, 68, 0.4); }
-    .btn-orange { background: linear-gradient(135deg, #ffaa00, #ff8800); color: #000; }
-    .btn-orange:hover { box-shadow: 0 6px 20px rgba(255, 170, 0, 0.4); }
-    .btn-blue { background: linear-gradient(135deg, #0088ff, #0066cc); color: #fff; }
-    .btn-blue:hover { box-shadow: 0 6px 20px rgba(0, 136, 255, 0.4); }
-    .btn-purple { background: linear-gradient(135deg, #aa44ff, #8800cc); color: #fff; }
-    .btn-purple:hover { box-shadow: 0 6px 20px rgba(170, 68, 255, 0.4); }
-    .btn-ghost {
-        background: transparent;
-        border: 2px solid #2a2a2a;
-        color: #aaa;
-    }
-    .btn-ghost:hover { border-color: #00ff88; color: #00ff88; box-shadow: 0 0 20px rgba(0, 255, 136, 0.2); }
-
-    /* ===== Welcome Banner ===== */
-    .welcome-banner {
-        background: linear-gradient(135deg, rgba(0,255,136,0.1), rgba(170,68,255,0.05));
-        border: 1px solid rgba(0,255,136,0.2);
-        border-radius: 16px;
-        padding: 20px 25px;
-        margin-bottom: 25px;
+    .sidebar-brand {
         display: flex;
         align-items: center;
-        gap: 15px;
-        flex-wrap: wrap;
+        gap: 12px;
+        padding: 8px 8px 20px 8px;
+        border-bottom: 1px solid #1c1c1f;
+        margin-bottom: 20px;
     }
-    .welcome-banner-icon { font-size: 32px; }
-    .welcome-banner-text { flex: 1; min-width: 200px; }
-    .welcome-banner-title { font-size: 16px; font-weight: 800; color: #fff; margin-bottom: 4px; }
-    .welcome-banner-desc { font-size: 13px; color: #888; }
-
-    /* ===== Stats Grid ===== */
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 15px;
-        margin-bottom: 30px;
+    .sidebar-logo {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #00ff88, #00aa55);
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 900; font-size: 14px; color: #000;
+        box-shadow: 0 4px 20px rgba(0,255,136,0.3);
+        flex-shrink: 0;
     }
-    .stat-card {
-        background: linear-gradient(135deg, #151515, #0f0f0f);
-        border: 1px solid #1f1f1f;
-        border-radius: 16px;
-        padding: 20px;
-        transition: all 0.2s ease;
-    }
-    .stat-card:hover { border-color: #00ff88; transform: translateY(-3px); }
-    .stat-label { font-size: 11px; font-weight: 800; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
-    .stat-value { font-size: 32px; font-weight: 800; color: #00ff88; text-shadow: 0 0 20px rgba(0,255,136,0.4); }
-
-    /* ===== Section Title ===== */
-    .section-title { 
-        font-size: 18px; 
-        font-weight: 800; 
-        color: #fff; 
-        margin: 30px 0 15px 0; 
-        display: flex; 
-        align-items: center; 
-        gap: 10px;
+    .sidebar-brand-text { display: flex; flex-direction: column; min-width: 0; }
+    .sidebar-brand-name {
+        font-weight: 800; font-size: 15px; color: #fff;
         letter-spacing: -0.3px;
     }
+    .sidebar-brand-sub {
+        font-size: 10px; color: #71717a; font-weight: 600;
+        letter-spacing: 0.5px; text-transform: uppercase;
+        margin-top: 1px;
+    }
 
-    /* ===== Script Card (Fov.it style) ===== */
-    .script-card {
-        background: linear-gradient(135deg, #151515, #0f0f0f);
-        padding: 22px;
-        border-radius: 16px;
-        margin: 12px 0;
-        border: 1px solid #1f1f1f;
-        transition: all 0.25s ease;
-        position: relative;
-        overflow: hidden;
+    .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .nav-section-label {
+        font-size: 10px; font-weight: 700; color: #52525b;
+        text-transform: uppercase; letter-spacing: 1px;
+        padding: 16px 10px 6px 10px;
     }
-    .script-card::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0;
-        width: 4px;
-        height: 100%;
-        background: linear-gradient(180deg, #00ff88, #00cc66);
-        opacity: 0;
-        transition: opacity 0.25s ease;
+    .nav-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 12px;
+        border-radius: 8px;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #a1a1aa;
+        transition: all 0.15s ease;
+        cursor: pointer;
     }
-    .script-card:hover { 
-        border-color: #00ff88; 
-        transform: translateY(-3px);
-        box-shadow: 0 15px 40px rgba(0,255,136,0.15);
+    .nav-item:hover { background: #18181b; color: #e4e4e7; }
+    .nav-item.active {
+        background: rgba(0,255,136,0.08);
+        color: #00ff88;
     }
-    .script-card:hover::before { opacity: 1; }
+    .nav-item .nav-icon {
+        width: 18px; height: 18px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px;
+        flex-shrink: 0;
+    }
 
-    .script-card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 15px;
-        flex-wrap: wrap;
-        margin-bottom: 15px;
+    .sidebar-footer {
+        padding-top: 16px;
+        border-top: 1px solid #1c1c1f;
     }
-    .script-card-title {
-        font-size: 17px;
-        color: #fff;
-        font-weight: 700;
+    .user-card {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px;
+        border-radius: 10px;
+        background: #18181b;
+        transition: background 0.15s ease;
+    }
+    .user-card:hover { background: #1f1f23; }
+    .user-avatar {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #00ff88, #00aa55);
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 800; font-size: 13px; color: #000;
+        flex-shrink: 0;
+    }
+    .user-avatar-admin { background: linear-gradient(135deg, #ffaa00, #ff6600); }
+    .user-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+    .user-name {
+        font-size: 13px; font-weight: 700; color: #fff;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .user-role {
+        font-size: 10px; font-weight: 700; color: #71717a;
+        text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* ===== Main Content ===== */
+    .main { flex: 1; margin-left: 260px; min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* ===== Topbar ===== */
+    .topbar {
+        height: 64px;
+        background: rgba(9,9,11,0.8);
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        border-bottom: 1px solid #1c1c1f;
+        padding: 0 28px;
         display: flex;
         align-items: center;
-        gap: 8px;
+        justify-content: space-between;
+        gap: 20px;
+        position: sticky;
+        top: 0;
+        z-index: 40;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 16px; min-width: 0; flex: 1; }
+    .topbar-title {
+        font-size: 15px; font-weight: 800; color: #fff;
+        letter-spacing: -0.3px;
+    }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+    .icon-btn {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        background: #18181b;
+        border: 1px solid #27272a;
+        display: flex; align-items: center; justify-content: center;
+        color: #a1a1aa;
+        font-size: 15px;
+        transition: all 0.15s ease;
+    }
+    .icon-btn:hover { background: #27272a; color: #fff; border-color: #3f3f46; }
+
+    /* ===== Content ===== */
+    .content { padding: 28px; flex: 1; max-width: 1400px; width: 100%; }
+
+    /* ===== Page Header ===== */
+    .page-header {
+        display: flex; justify-content: space-between; align-items: flex-end;
+        gap: 20px; flex-wrap: wrap;
+        margin-bottom: 28px;
+    }
+    .page-title {
+        font-size: 26px; font-weight: 800; color: #fff;
+        letter-spacing: -0.8px;
+        margin-bottom: 4px;
+    }
+    .page-subtitle {
+        font-size: 13px; color: #71717a; font-weight: 500;
+    }
+
+    /* ===== Buttons ===== */
+    .btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 13px;
+        border: none;
+        transition: all 0.15s ease;
+        cursor: pointer;
+        white-space: nowrap;
+        text-decoration: none;
+        font-family: inherit;
+    }
+    .btn-primary {
+        background: #00ff88;
+        color: #000;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,255,136,0.2);
+    }
+    .btn-primary:hover {
+        background: #00e67a;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(0,255,136,0.35), 0 0 0 1px rgba(0,255,136,0.3);
+    }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-secondary {
+        background: #18181b;
+        color: #e4e4e7;
+        border: 1px solid #27272a;
+    }
+    .btn-secondary:hover { background: #27272a; border-color: #3f3f46; }
+
+    .btn-danger {
+        background: transparent;
+        color: #f87171;
+        border: 1px solid #3f1f1f;
+    }
+    .btn-danger:hover { background: rgba(248,113,113,0.1); border-color: #f87171; }
+
+    .btn-ghost {
+        background: transparent;
+        color: #a1a1aa;
+        border: 1px solid #27272a;
+    }
+    .btn-ghost:hover { background: #18181b; color: #fff; }
+
+    .btn-sm { padding: 7px 12px; font-size: 12px; border-radius: 8px; }
+
+    /* ===== Stats ===== */
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+        margin-bottom: 28px;
+    }
+    .stat {
+        background: #0c0c0e;
+        border: 1px solid #1c1c1f;
+        border-radius: 14px;
+        padding: 18px 20px;
+        transition: border-color 0.15s ease;
+    }
+    .stat:hover { border-color: #27272a; }
+    .stat-icon {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        background: rgba(0,255,136,0.1);
+        color: #00ff88;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 16px;
+        margin-bottom: 14px;
+    }
+    .stat-icon.blue { background: rgba(59,130,246,0.1); color: #60a5fa; }
+    .stat-icon.purple { background: rgba(168,85,247,0.1); color: #c084fc; }
+    .stat-label {
+        font-size: 12px; font-weight: 600; color: #71717a;
+        margin-bottom: 4px;
+    }
+    .stat-value {
+        font-size: 26px; font-weight: 800; color: #fff;
+        letter-spacing: -0.8px;
+        line-height: 1.1;
+    }
+
+    /* ===== Script Grid ===== */
+    .scripts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 14px;
+    }
+    .script-card {
+        background: #0c0c0e;
+        border: 1px solid #1c1c1f;
+        border-radius: 14px;
+        padding: 20px;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+    .script-card:hover {
+        border-color: #27272a;
+        background: #101013;
+        transform: translateY(-2px);
+    }
+    .script-card-header {
+        display: flex; justify-content: space-between; align-items: flex-start;
+        gap: 10px;
+    }
+    .script-card-icon {
+        width: 40px; height: 40px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #00ff88, #00aa55);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+    .script-card-info { flex: 1; min-width: 0; }
+    .script-card-name {
+        font-size: 15px; font-weight: 700; color: #fff;
+        letter-spacing: -0.3px;
+        margin-bottom: 3px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .script-card-meta {
+        font-size: 11.5px; color: #71717a; font-weight: 500;
+        display: flex; align-items: center; gap: 8px;
         flex-wrap: wrap;
     }
-    .version-badge { 
-        background: linear-gradient(135deg, #aa44ff, #8800cc); 
-        color: #fff; 
-        padding: 3px 10px; 
-        border-radius: 8px; 
-        font-size: 10px; 
-        font-weight: 800;
-        letter-spacing: 0.5px;
+    .badge {
+        display: inline-flex; align-items: center;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 10px; font-weight: 700;
+        letter-spacing: 0.3px;
     }
-    .script-meta { color: #555; font-size: 11px; margin-bottom: 12px; font-weight: 600; }
+    .badge-version { background: rgba(168,85,247,0.15); color: #c084fc; }
+    .badge-admin { background: rgba(251,146,60,0.15); color: #fb923c; }
+    .badge-user { background: rgba(0,255,136,0.15); color: #00ff88; }
 
-    .url-preview { 
-        background: #0a0a0a; 
-        border: 1px solid #1f1f1f; 
-        padding: 12px 14px; 
-        border-radius: 10px; 
-        font-family: 'Consolas', 'Monaco', monospace; 
-        font-size: 11px; 
-        color: #00ff88; 
+    .script-card-url {
+        background: #09090b;
+        border: 1px solid #1c1c1f;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-family: 'JetBrains Mono', 'Consolas', monospace;
+        font-size: 10.5px;
+        color: #00ff88;
         word-break: break-all;
         line-height: 1.5;
     }
-
-    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 15px; }
+    .script-card-actions {
+        display: flex; gap: 6px; flex-wrap: wrap;
+        padding-top: 4px;
+    }
+    .script-card-actions .btn { flex: 1; min-width: calc(50% - 3px); justify-content: center; }
 
     /* ===== Empty State ===== */
-    .empty-state {
-        background: linear-gradient(135deg, #151515, #0f0f0f);
-        border: 1px dashed #2a2a2a;
-        border-radius: 16px;
+    .empty {
+        background: #0c0c0e;
+        border: 1px dashed #27272a;
+        border-radius: 14px;
         padding: 60px 30px;
         text-align: center;
-        margin-top: 20px;
     }
-    .empty-state-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.3; }
-    .empty-state-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 8px; }
-    .empty-state-desc { color: #666; font-size: 13px; margin-bottom: 20px; }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+    .empty-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    .empty-desc { font-size: 13px; color: #71717a; margin-bottom: 20px; }
 
-    /* ===== Form Styles ===== */
-    .card { 
-        background: linear-gradient(135deg, #151515, #0f0f0f);
-        padding: 30px; 
-        border-radius: 16px; 
-        margin: 20px 0; 
-        border: 1px solid #1f1f1f;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    /* ===== Form ===== */
+    .card {
+        background: #0c0c0e;
+        border: 1px solid #1c1c1f;
+        border-radius: 14px;
+        padding: 28px;
     }
-    .form-group { margin-bottom: 20px; }
-    .form-label { 
-        display: block; 
-        margin-bottom: 8px; 
-        font-size: 12px; 
-        font-weight: 800; 
-        color: #aaa; 
-        text-transform: uppercase; 
-        letter-spacing: 0.8px; 
+    .form-group { margin-bottom: 18px; }
+    .form-label {
+        display: block;
+        font-size: 12px; font-weight: 700; color: #a1a1aa;
+        margin-bottom: 8px;
+        letter-spacing: 0.3px;
     }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-    input, textarea, select { 
-        width: 100%; 
-        padding: 14px 16px; 
-        background: #0a0a0a; 
-        border: 2px solid #1f1f1f; 
-        color: #fff; 
-        border-radius: 10px; 
-        font-size: 14px; 
-        font-family: inherit; 
-        transition: all 0.2s ease; 
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+    input, textarea, select {
+        width: 100%;
+        padding: 12px 14px;
+        background: #09090b;
+        border: 1px solid #1c1c1f;
+        border-radius: 10px;
+        color: #fff;
+        font-size: 14px;
+        font-family: inherit;
+        transition: all 0.15s ease;
         outline: none;
     }
-    input:focus, textarea:focus, select:focus { 
-        border-color: #00ff88; 
-        box-shadow: 0 0 0 4px rgba(0, 255, 136, 0.1); 
+    input:focus, textarea:focus, select:focus {
+        border-color: #00ff88;
+        box-shadow: 0 0 0 3px rgba(0,255,136,0.1);
     }
-    textarea { 
-        font-family: 'Consolas', 'Monaco', monospace; 
-        resize: vertical; 
-        min-height: 300px; 
-        line-height: 1.5;
+    input::placeholder, textarea::placeholder { color: #52525b; }
+    textarea {
+        font-family: 'JetBrains Mono', 'Consolas', monospace;
+        font-size: 12.5px;
+        line-height: 1.6;
+        resize: vertical;
+        min-height: 320px;
     }
-    select { 
-        cursor: pointer; 
-        appearance: none; 
-        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2300ff88' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e"); 
-        background-repeat: no-repeat; 
-        background-position: right 15px center; 
-        background-size: 20px; 
-        padding-right: 45px; 
-    }
+    select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 12px center; background-size: 18px; padding-right: 40px; }
 
-    /* ===== User Cards (Admin) ===== */
-    .user-card { 
-        background: linear-gradient(135deg, #151515, #0f0f0f);
-        padding: 18px 22px; 
-        border-radius: 14px; 
-        margin: 10px 0; 
-        border: 1px solid #1f1f1f; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        gap: 15px; 
-        flex-wrap: wrap; 
-        transition: all 0.2s ease; 
-        text-decoration: none; 
-        color: inherit;
+    /* ===== User List (Admin) ===== */
+    .user-row {
+        background: #0c0c0e;
+        border: 1px solid #1c1c1f;
+        border-radius: 12px;
+        padding: 16px 18px;
+        display: flex; align-items: center; gap: 14px;
+        margin-bottom: 8px;
+        transition: all 0.15s ease;
     }
-    .user-card:hover { border-color: #aa44ff; transform: translateY(-2px); box-shadow: 0 10px 30px rgba(170, 68, 255, 0.15); }
-    .user-info { display: flex; align-items: center; gap: 15px; flex: 1; min-width: 200px; }
-    .user-avatar { 
-        width: 46px; height: 46px; 
-        border-radius: 50%; 
-        background: linear-gradient(135deg, #00ff88, #00cc66); 
-        display: flex; align-items: center; justify-content: center; 
-        font-weight: 800; font-size: 18px; color: #000; 
-        flex-shrink: 0; 
-        text-transform: uppercase;
+    .user-row:hover { border-color: #27272a; background: #101013; }
+    .user-row .user-avatar { width: 40px; height: 40px; border-radius: 10px; font-size: 15px; }
+    .user-row-info { flex: 1; min-width: 0; }
+    .user-row-name {
+        font-size: 14px; font-weight: 700; color: #fff;
+        display: flex; align-items: center; gap: 8px;
+        margin-bottom: 2px;
     }
-    .user-avatar-admin { background: linear-gradient(135deg, #ffaa00, #ff6600); }
-    .user-details { display: flex; flex-direction: column; gap: 4px; }
-    .user-name { font-weight: 700; font-size: 15px; color: #fff; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .user-meta { font-size: 11px; color: #555; font-weight: 600; }
-    .role-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
-    .role-admin-tag { background: linear-gradient(135deg, #ffaa00, #ff6600); color: #000; }
-    .role-user-tag { background: #00ff88; color: #000; }
-
-    /* ===== Footer ===== */
-    .footer-brand { 
-        text-align: center; 
-        padding: 30px 20px; 
-        color: #333; 
-        font-size: 12px; 
-        margin-top: 40px;
-        font-weight: 600;
-    }
-    .footer-brand strong { 
-        background: linear-gradient(135deg, #00ff88, #aa44ff); 
-        -webkit-background-clip: text; 
-        -webkit-text-fill-color: transparent; 
-        background-clip: text; 
-        font-weight: 800; 
-    }
+    .user-row-meta { font-size: 12px; color: #71717a; }
 
     /* ===== Toast ===== */
     @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    @keyframes fadeOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(400px); } }
-    .toast { 
-        position: fixed; 
-        bottom: 30px; 
-        right: 30px; 
-        background: linear-gradient(135deg, #00ff88, #00cc66); 
-        color: #000; 
-        padding: 16px 24px; 
-        border-radius: 12px; 
-        font-weight: 700; 
-        font-size: 14px; 
-        box-shadow: 0 10px 40px rgba(0, 255, 136, 0.5); 
-        z-index: 9999; 
-        display: flex; 
-        align-items: center; 
-        gap: 10px; 
-        animation: slideIn 0.3s ease; 
+    @keyframes slideOut { to { transform: translateX(400px); opacity: 0; } }
+    .toast {
+        position: fixed; bottom: 24px; right: 24px;
+        background: #18181b;
+        border: 1px solid #27272a;
+        color: #fff;
+        padding: 14px 18px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 13px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        z-index: 9999;
+        display: flex; align-items: center; gap: 10px;
+        animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         max-width: 90vw;
     }
-    .toast.hiding { animation: fadeOut 0.3s ease forwards; }
-    .toast.error { background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; }
+    .toast.hiding { animation: slideOut 0.3s ease forwards; }
+    .toast.success { border-color: rgba(0,255,136,0.3); }
+    .toast.success::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #00ff88; box-shadow: 0 0 12px #00ff88; }
+    .toast.error { border-color: rgba(248,113,113,0.3); }
+    .toast.error::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #f87171; box-shadow: 0 0 12px #f87171; }
 
-    /* ===== Login Page ===== */
-    .login-container { 
-        background: linear-gradient(135deg, #151515, #0a0a0a);
-        padding: 50px 40px; 
-        border-radius: 24px; 
-        border: 1px solid #1f1f1f; 
-        width: 420px; 
-        max-width: 100%; 
-        text-align: center; 
-        box-shadow: 0 30px 80px rgba(0,0,0,0.7);
-        position: relative;
-        overflow: hidden;
+    /* ===== Login ===== */
+    .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .login-card {
+        background: #0c0c0e;
+        border: 1px solid #1c1c1f;
+        border-radius: 20px;
+        padding: 40px 36px;
+        width: 400px;
+        max-width: 100%;
+        box-shadow: 0 40px 100px rgba(0,0,0,0.6);
     }
-    .login-container::before {
-        content: '';
-        position: absolute;
-        top: -50%; left: -50%;
-        width: 200%; height: 200%;
-        background: radial-gradient(circle, rgba(0,255,136,0.1) 0%, transparent 60%);
-        animation: pulse 4s ease-in-out infinite;
-        pointer-events: none;
+    .login-brand {
+        display: flex; flex-direction: column; align-items: center;
+        margin-bottom: 32px;
+        text-align: center;
     }
-    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 0.8; } }
-    .login-container h1 { 
-        color: #00ff88; 
-        font-size: 28px; 
-        margin-bottom: 8px; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        gap: 12px; 
-        font-weight: 800;
-        position: relative;
-        z-index: 1;
+    .login-logo {
+        width: 64px; height: 64px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #00ff88, #00aa55);
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 900; font-size: 24px; color: #000;
+        margin-bottom: 16px;
+        box-shadow: 0 10px 40px rgba(0,255,136,0.4);
     }
-    .login-container h1 small { 
-        display: block; 
-        font-size: 12px; 
-        color: #aa44ff; 
-        font-weight: 600; 
-        letter-spacing: 1px; 
-        margin-top: 4px;
+    .login-title { font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.5px; margin-bottom: 4px; }
+    .login-sub { font-size: 13px; color: #71717a; font-weight: 500; }
+    .login-card input { margin-bottom: 12px; padding: 13px 14px; }
+    .login-card .btn-primary { width: 100%; padding: 13px; font-size: 14px; margin-top: 8px; }
+    .login-msg { margin-top: 14px; text-align: center; font-size: 12.5px; font-weight: 600; }
+    .login-msg.error { color: #f87171; }
+    .login-msg.success { color: #00ff88; }
+    .login-link { display: block; text-align: center; margin-top: 20px; font-size: 13px; color: #00ff88; font-weight: 600; }
+    .login-link:hover { text-decoration: underline; }
+
+    /* ===== Mobile Menu Button ===== */
+    .menu-btn {
+        display: none;
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        background: #18181b;
+        border: 1px solid #27272a;
+        align-items: center; justify-content: center;
+        color: #a1a1aa;
+        font-size: 18px;
+        cursor: pointer;
     }
-    .login-logo { width: 48px; height: 48px; filter: drop-shadow(0 0 15px rgba(0,255,136,0.6)); }
-    .subtitle { color: #666; margin-bottom: 30px; font-size: 14px; position: relative; z-index: 1; }
-    .login-container input { margin-bottom: 15px; text-align: center; position: relative; z-index: 1; }
-    .login-container .btn { width: 100%; margin-top: 10px; position: relative; z-index: 1; }
-    .msg { margin-top: 15px; font-size: 13px; position: relative; z-index: 1; }
-    .error { color: #ff4444; }
-    .success { color: #00ff88; }
-    .link { color: #00ff88; text-decoration: none; display: block; margin-top: 20px; font-size: 14px; position: relative; z-index: 1; font-weight: 600; }
-    .link:hover { text-decoration: underline; }
 
     /* ===== Mobile ===== */
-    @media (max-width: 768px) {
-        body { padding: 12px; }
-        .header { padding: 14px 18px; }
-        .header-title { font-size: 17px; }
-        .header-logo { width: 34px; height: 34px; }
-        .form-row { grid-template-columns: 1fr; gap: 15px; }
-        .card { padding: 22px; }
-        .script-card { padding: 18px; }
-        .section-title { font-size: 16px; }
-        .btn { padding: 10px 16px; font-size: 13px; }
-        .toast { bottom: 15px; right: 15px; left: 15px; padding: 14px 18px; font-size: 13px; }
-        .stats-grid { grid-template-columns: 1fr 1fr; }
-        .stat-value { font-size: 24px; }
-    }
-    @media (max-width: 480px) {
-        body { padding: 8px; }
-        .header { padding: 12px 15px; border-radius: 12px; }
-        .header-title { font-size: 15px; }
-        .header-logo { width: 30px; height: 30px; }
-        .header-right { width: 100%; justify-content: space-between; }
-        .card { padding: 18px; border-radius: 12px; }
-        .script-card { padding: 16px; border-radius: 12px; }
-        .script-card-title { font-size: 15px; }
-        .section-title { font-size: 15px; }
-        .btn { padding: 9px 14px; font-size: 12px; }
-        .actions .btn { flex: 1; min-width: calc(50% - 4px); }
-        input, textarea, select { padding: 12px 14px; font-size: 13px; }
-        textarea { min-height: 200px; }
-        .login-container { padding: 40px 25px; }
-        .login-container h1 { font-size: 22px; }
-        .login-logo { width: 38px; height: 38px; }
-        .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-        .stat-card { padding: 15px; }
+    @media (max-width: 900px) {
+        .sidebar { transform: translateX(-100%); }
+        .sidebar.open { transform: translateX(0); }
+        .main { margin-left: 0; }
+        .menu-btn { display: flex; }
+        .content { padding: 20px; }
+        .topbar { padding: 0 20px; }
+        .page-title { font-size: 22px; }
+        .scripts-grid { grid-template-columns: 1fr; }
+        .form-row { grid-template-columns: 1fr; }
+        .card { padding: 20px; }
+        .stats-row { grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat { padding: 14px 16px; }
         .stat-value { font-size: 22px; }
     }
+    @media (max-width: 480px) {
+        .content { padding: 16px; }
+        .topbar { padding: 0 16px; height: 58px; }
+        .page-title { font-size: 20px; }
+        .page-header { margin-bottom: 20px; }
+        .card { padding: 18px; }
+        .stats-row { grid-template-columns: 1fr 1fr; }
+        .stat-value { font-size: 20px; }
+        .script-card { padding: 16px; }
+        .login-card { padding: 32px 24px; }
+    }
+
+    /* Overlay for mobile sidebar */
+    .overlay {
+        display: none;
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.6);
+        z-index: 45;
+    }
+    .overlay.active { display: block; }
+
+    /* ===== Scrollbar ===== */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: #09090b; }
+    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 5px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
 `;
 
-// ==================== TOAST + UTILITIES ====================
+// ==================== SCRIPTS ====================
 const TOAST_SCRIPT = `
     function showToast(message, type = 'success') {
         const existing = document.querySelector('.toast');
         if (existing) existing.remove();
         const toast = document.createElement('div');
-        toast.className = 'toast' + (type === 'error' ? ' error' : '');
-        toast.innerHTML = '<span>' + (type === 'success' ? '✅' : '❌') + '</span><span>' + message + '</span>';
+        toast.className = 'toast ' + type;
+        toast.innerHTML = '<span>' + message + '</span>';
         document.body.appendChild(toast);
         setTimeout(() => { toast.classList.add('hiding'); setTimeout(() => toast.remove(), 300); }, 2500);
     }
     function copyText(text, btn) {
         navigator.clipboard.writeText(text).then(() => {
             if (btn) {
-                const original = btn.innerHTML;
-                btn.innerHTML = '✅ Copied!';
-                btn.style.background = 'linear-gradient(135deg, #00cc66, #009944)';
-                setTimeout(() => { btn.innerHTML = original; btn.style.background = ''; }, 1500);
+                const orig = btn.innerHTML;
+                btn.innerHTML = '✓ Copied';
+                setTimeout(() => { btn.innerHTML = orig; }, 1400);
             }
-            showToast('Copied!');
-        }).catch(() => showToast('Failed to copy!', 'error'));
+            showToast('Copied to clipboard!', 'success');
+        }).catch(() => showToast('Failed to copy', 'error'));
     }
     function confirmDelete(token, name) {
-        if (confirm('⚠️ Are you sure you want to delete "' + name + '"?')) {
-            window.location.href = '/delete/' + token;
-        }
+        if (confirm('Delete "' + name + '"?')) window.location.href = '/delete/' + token;
+    }
+    function toggleSidebar() {
+        document.querySelector('.sidebar').classList.toggle('open');
+        document.querySelector('.overlay').classList.toggle('active');
     }
 `;
 
-function getFooter() {
-    return `<div class="footer-brand">Made with 💚 by <strong>${BRAND_NAME}</strong></div>`;
+// ==================== LAYOUT COMPONENTS ====================
+function renderLayout({ title, pageTitle, pageSubtitle, content, user, activeNav, actions }) {
+    const isAdmin = user.role === 'ADMIN';
+    return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>${getHtmlHead(title)}<style>${LAYOUT_STYLES}</style></head>
+    <body>
+        <div class="layout">
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-brand">
+                    <div class="sidebar-logo">ZK</div>
+                    <div class="sidebar-brand-text">
+                        <div class="sidebar-brand-name">${BRAND_SHORT}</div>
+                        <div class="sidebar-brand-sub">By Zyrox-Kido</div>
+                    </div>
+                </div>
+                <nav class="sidebar-nav">
+                    <div class="nav-section-label">Menu</div>
+                    <a href="/" class="nav-item ${activeNav === 'dashboard' ? 'active' : ''}">
+                        <span class="nav-icon">📊</span> Dashboard
+                    </a>
+                    <a href="/create" class="nav-item ${activeNav === 'create' ? 'active' : ''}">
+                        <span class="nav-icon">✨</span> Create Script
+                    </a>
+                    ${isAdmin ? `
+                    <div class="nav-section-label">Admin</div>
+                    <a href="/admin" class="nav-item ${activeNav === 'admin' ? 'active' : ''}">
+                        <span class="nav-icon">👑</span> Admin Panel
+                    </a>
+                    ` : ''}
+                </nav>
+                <div class="sidebar-footer">
+                    <a href="/logout" class="user-card">
+                        <div class="user-avatar ${isAdmin ? 'user-avatar-admin' : ''}">${user.username.charAt(0).toUpperCase()}</div>
+                        <div class="user-meta">
+                            <div class="user-name">${user.username}</div>
+                            <div class="user-role">${isAdmin ? '👑 Admin' : 'User'}</div>
+                        </div>
+                    </a>
+                </div>
+            </aside>
+            <div class="overlay" onclick="toggleSidebar()"></div>
+            <div class="main">
+                <header class="topbar">
+                    <div class="topbar-left">
+                        <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+                        <div class="topbar-title">${pageTitle}</div>
+                    </div>
+                    <div class="topbar-right">
+                        <a href="/logout" class="icon-btn" title="Logout">⏻</a>
+                    </div>
+                </header>
+                <div class="content">
+                    <div class="page-header">
+                        <div>
+                            <div class="page-title">${pageTitle}</div>
+                            ${pageSubtitle ? `<div class="page-subtitle">${pageSubtitle}</div>` : ''}
+                        </div>
+                        ${actions || ''}
+                    </div>
+                    ${content}
+                </div>
+            </div>
+        </div>
+        <script>${TOAST_SCRIPT}</script>
+    </body>
+    </html>
+    `;
 }
 
-// ==================== SCRIPT CARD RENDERER ====================
-function renderScriptCard(s, baseUrl) {
+// ==================== SCRIPT CARD ====================
+function renderScriptCard(s) {
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
     const slug = s.slug || 'Script';
     const version = s.version || 'V1';
     const prettyUrl = `${baseUrl}/raw/${slug}/${version}/${s.token}`;
     return `
     <div class="script-card">
         <div class="script-card-header">
-            <div class="script-card-title">
-                📄 ${s.name}
-                <span class="version-badge">${version}</span>
+            <div class="script-card-icon">📄</div>
+            <div class="script-card-info">
+                <div class="script-card-name">${s.name}</div>
+                <div class="script-card-meta">
+                    <span class="badge badge-version">${version}</span>
+                    <span>${new Date(s.created_at).toLocaleDateString()}</span>
+                </div>
             </div>
         </div>
-        <div class="script-meta">Created: ${new Date(s.created_at).toLocaleDateString()}</div>
-        <div class="url-preview">${prettyUrl}</div>
-        <div class="actions">
-            <button class="btn" onclick="copyText('loadstring(game:HttpGet(\\'${prettyUrl}\\'))()', this)">📋 Copy Loadstring</button>
-            <a href="/edit/${s.token}" class="btn btn-orange">✏️ Edit</a>
-            <a href="/view/${slug}/${version}/${s.token}" class="btn btn-blue" target="_blank">👁️ View</a>
-            <button class="btn btn-red" onclick="confirmDelete('${s.token}', '${s.name}')">🗑️ Delete</button>
+        <div class="script-card-url">${prettyUrl}</div>
+        <div class="script-card-actions">
+            <button class="btn btn-primary btn-sm" onclick="copyText('loadstring(game:HttpGet(\\'${prettyUrl}\\'))()', this)">📋 Copy</button>
+            <a href="/view/${slug}/${version}/${s.token}" target="_blank" class="btn btn-secondary btn-sm">👁️ View</a>
+            <a href="/edit/${s.token}" class="btn btn-ghost btn-sm">✏️ Edit</a>
+            <button class="btn btn-danger btn-sm" onclick="confirmDelete('${s.token}', '${s.name}')">🗑️ Delete</button>
         </div>
     </div>
     `;
@@ -686,19 +825,24 @@ app.get('/login', (req, res) => {
     res.send(`
     <!DOCTYPE html>
     <html lang="en">
-    <head>${getHtmlHead('Login')}<style>${SHARED_STYLES} body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }</style></head>
+    <head>${getHtmlHead('Login')}<style>${LAYOUT_STYLES}</style></head>
     <body>
-        <div class="login-container">
-            <h1><img src="/logo.svg" class="login-logo" alt="${BRAND_NAME}"> ${BRAND_SHORT}<small>By Zyrox-Kido</small></h1>
-            <p class="subtitle">Login to your dashboard</p>
-            <form action="/login" method="POST">
-                <input type="text" name="username" placeholder="Username" required>
-                <input type="password" name="password" placeholder="Password" required>
-                <button type="submit" class="btn">🔓 Login</button>
-            </form>
-            <p class="msg error">${req.query.error ? '❌ Invalid name or password!' : ''}</p>
-            <p class="msg success">${req.query.registered ? '✅ Account created! Please login.' : ''}</p>
-            <a href="/register" class="link">Create new account →</a>
+        <div class="login-wrap">
+            <div class="login-card">
+                <div class="login-brand">
+                    <div class="login-logo">ZK</div>
+                    <div class="login-title">${BRAND_SHORT}</div>
+                    <div class="login-sub">By Zyrox-Kido</div>
+                </div>
+                <form action="/login" method="POST">
+                    <input type="text" name="username" placeholder="Username" required>
+                    <input type="password" name="password" placeholder="Password" required>
+                    <button type="submit" class="btn btn-primary">Sign In</button>
+                </form>
+                <div class="login-msg error">${req.query.error ? 'Invalid credentials' : ''}</div>
+                <div class="login-msg success">${req.query.registered ? 'Account created! Please sign in.' : ''}</div>
+                <a href="/register" class="login-link">Create account →</a>
+            </div>
         </div>
     </body>
     </html>
@@ -714,7 +858,7 @@ app.post('/login', async (req, res) => {
         if (user.password !== password) return res.redirect('/login?error=1');
         req.session.user = { username: user.username, role: user.role };
         res.redirect('/');
-    } catch (e) { console.error(e); res.redirect('/login?error=1'); }
+    } catch (e) { res.redirect('/login?error=1'); }
 });
 
 // ==================== REGISTER ====================
@@ -722,19 +866,24 @@ app.get('/register', (req, res) => {
     res.send(`
     <!DOCTYPE html>
     <html lang="en">
-    <head>${getHtmlHead('Register')}<style>${SHARED_STYLES} body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }</style></head>
+    <head>${getHtmlHead('Register')}<style>${LAYOUT_STYLES}</style></head>
     <body>
-        <div class="login-container">
-            <h1><img src="/logo.svg" class="login-logo" alt="${BRAND_NAME}"> ${BRAND_SHORT}<small>By Zyrox-Kido</small></h1>
-            <p class="subtitle">Create your account</p>
-            <form action="/register" method="POST">
-                <input type="text" name="username" placeholder="Username" required>
-                <input type="password" name="password" placeholder="Password" required>
-                <input type="password" name="confirmPassword" placeholder="Confirm Password" required>
-                <button type="submit" class="btn">✨ Register</button>
-            </form>
-            <p class="msg error">${req.query.error || ''}</p>
-            <a href="/login" class="link">← Back to login</a>
+        <div class="login-wrap">
+            <div class="login-card">
+                <div class="login-brand">
+                    <div class="login-logo">ZK</div>
+                    <div class="login-title">Create Account</div>
+                    <div class="login-sub">Join ${BRAND_SHORT}</div>
+                </div>
+                <form action="/register" method="POST">
+                    <input type="text" name="username" placeholder="Username" required>
+                    <input type="password" name="password" placeholder="Password" required>
+                    <input type="password" name="confirmPassword" placeholder="Confirm Password" required>
+                    <button type="submit" class="btn btn-primary">Create Account</button>
+                </form>
+                <div class="login-msg error">${req.query.error || ''}</div>
+                <a href="/login" class="login-link">← Back to login</a>
+            </div>
         </div>
     </body>
     </html>
@@ -744,153 +893,111 @@ app.get('/register', (req, res) => {
 app.post('/register', async (req, res) => {
     try {
         const { username, password, confirmPassword } = req.body;
-        if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match!');
-        if (username.length < 2 || password.length < 4) return res.redirect('/register?error=Name min 2 chars, Password min 4 chars');
+        if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match');
+        if (username.length < 2 || password.length < 4) return res.redirect('/register?error=Min 2 chars name, 4 chars password');
         const existing = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]);
-        if (existing.rows.length > 0) return res.redirect('/register?error=Name already taken!');
+        if (existing.rows.length > 0) return res.redirect('/register?error=Username taken');
         const role = username === 'Z-K' ? 'ADMIN' : 'USER';
         await pool.query('INSERT INTO users (username, password, role) VALUES ($1, $2, $3)', [username, password, role]);
         res.redirect('/login?registered=1');
-    } catch (e) { console.error(e); res.redirect('/register?error=Server error'); }
+    } catch (e) { res.redirect('/register?error=Server error'); }
 });
 
-// ==================== LOGOUT ====================
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/login'); });
 
-// ==================== DASHBOARD (Fov.it Style) ====================
+// ==================== DASHBOARD ====================
 app.get('/', requireLogin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC', [req.session.user.username]);
         const myScripts = result.rows;
-        const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
         const isAdmin = req.session.user.role === 'ADMIN';
-        const roleClass = isAdmin ? 'role-admin' : 'role-user';
-        const roleName = isAdmin ? 'ADMIN' : 'USER';
         
-        let html = `
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>${getHtmlHead('Dashboard')}<style>${SHARED_STYLES}</style></head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div class="header-brand">
-                        <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
-                        <div>
-                            <div class="header-title">${BRAND_SHORT}</div>
-                            <div class="header-subtitle">BY ZYROX-KIDO</div>
-                        </div>
-                    </div>
-                    <div class="header-right">
-                        <div class="user-pill">
-                            <div class="user-pill-avatar">${req.session.user.username.charAt(0).toUpperCase()}</div>
-                            ${req.session.user.username}
-                        </div>
-                        <span class="role-badge ${roleClass}">${roleName}</span>
-                        ${isAdmin ? '<a href="/admin" class="btn btn-purple">👑 Admin</a>' : ''}
-                        <a href="/logout" class="btn btn-red">Logout</a>
-                    </div>
+        const statsHtml = `
+            <div class="stats-row">
+                <div class="stat">
+                    <div class="stat-icon">📄</div>
+                    <div class="stat-label">Total Scripts</div>
+                    <div class="stat-value">${myScripts.length}</div>
                 </div>
-
-                <div class="welcome-banner">
-                    <div class="welcome-banner-icon">👋</div>
-                    <div class="welcome-banner-text">
-                        <div class="welcome-banner-title">Welcome back, ${req.session.user.username}!</div>
-                        <div class="welcome-banner-desc">Manage your Lua scripts and share them with the world.</div>
-                    </div>
-                    <a href="/create" class="btn">✨ + New Script</a>
+                <div class="stat">
+                    <div class="stat-icon blue">👤</div>
+                    <div class="stat-label">Role</div>
+                    <div class="stat-value" style="font-size:20px;color:${isAdmin ? '#fb923c' : '#00ff88'}">${isAdmin ? 'ADMIN' : 'USER'}</div>
                 </div>
-
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">Total Scripts</div>
-                        <div class="stat-value">${myScripts.length}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Account Role</div>
-                        <div class="stat-value" style="font-size: 20px;">${roleName}</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Username</div>
-                        <div class="stat-value" style="font-size: 20px;">${req.session.user.username}</div>
-                    </div>
+                <div class="stat">
+                    <div class="stat-icon purple">🎯</div>
+                    <div class="stat-label">Username</div>
+                    <div class="stat-value" style="font-size:20px">${req.session.user.username}</div>
                 </div>
-
-                <h2 class="section-title">📁 Your Scripts (${myScripts.length})</h2>
+            </div>
         `;
         
+        let scriptsHtml = '';
         if (myScripts.length === 0) {
-            html += `
-            <div class="empty-state">
-                <div class="empty-state-icon">📭</div>
-                <div class="empty-state-title">No scripts yet</div>
-                <div class="empty-state-desc">Click the button below to create your first script!</div>
-                <a href="/create" class="btn">✨ Create First Script</a>
+            scriptsHtml = `
+            <div class="empty">
+                <div class="empty-icon">📭</div>
+                <div class="empty-title">No scripts yet</div>
+                <div class="empty-desc">Create your first script to get started</div>
+                <a href="/create" class="btn btn-primary">✨ Create Script</a>
             </div>`;
         } else {
-            myScripts.forEach(s => {
-                html += renderScriptCard(s, baseUrl);
-            });
+            scriptsHtml = `<div class="scripts-grid">${myScripts.map(renderScriptCard).join('')}</div>`;
         }
-        html += `${getFooter()}</div><script>${TOAST_SCRIPT}</script></body></html>`;
-        res.send(html);
-    } catch (e) { 
-        console.error('DASHBOARD ERROR:', e.message); 
-        res.status(500).send('Server error: ' + e.message); 
+        
+        const actions = `<a href="/create" class="btn btn-primary">✨ New Script</a>`;
+        
+        res.send(renderLayout({
+            title: 'Dashboard',
+            pageTitle: 'Dashboard',
+            pageSubtitle: 'Manage and organize your scripts',
+            content: statsHtml + scriptsHtml,
+            user: req.session.user,
+            activeNav: 'dashboard',
+            actions
+        }));
+    } catch (e) {
+        console.error(e);
+        res.status(500).send('Server error');
     }
 });
 
-// ==================== CREATE PAGE ====================
+// ==================== CREATE ====================
 app.get('/create', requireLogin, (req, res) => {
-    res.send(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>${getHtmlHead('Create Script')}<style>${SHARED_STYLES}</style></head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <div class="header-brand">
-                    <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
-                    <div>
-                        <div class="header-title">✨ Create Script</div>
-                        <div class="header-subtitle">BY ZYROX-KIDO</div>
-                    </div>
-                </div>
-                <div class="header-right">
-                    <a href="/" class="btn btn-ghost">← Dashboard</a>
-                </div>
-            </div>
-
-            <div class="card">
-                <form action="/create" method="POST">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">📝 Script Name</label>
-                            <input type="text" name="name" placeholder="e.g., God Mode" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">🏷️ Version</label>
-                            <select name="version" required>${versionDropdown('V1')}</select>
-                        </div>
+    const formHtml = `
+        <div class="card" style="max-width:900px">
+            <form action="/create" method="POST">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Script Name</label>
+                        <input type="text" name="name" placeholder="e.g., God Mode" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">💻 Script Content (Lua Code)</label>
-                        <textarea name="content" placeholder="-- Paste your Lua script here..." required></textarea>
+                        <label class="form-label">Version</label>
+                        <select name="version" required>${versionDropdown('V1')}</select>
                     </div>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                        <button type="submit" class="btn">💾 Save Script</button>
-                        <a href="/" class="btn btn-ghost">Cancel</a>
-                    </div>
-                </form>
-            </div>
-            ${getFooter()}
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Lua Code</label>
+                    <textarea name="content" placeholder="-- Paste your Lua script here..." required></textarea>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <button type="submit" class="btn btn-primary">💾 Save Script</button>
+                    <a href="/" class="btn btn-ghost">Cancel</a>
+                </div>
+            </form>
         </div>
-    </body>
-    </html>
-    `);
+    `;
+    res.send(renderLayout({
+        title: 'Create Script',
+        pageTitle: 'Create Script',
+        pageSubtitle: 'Add a new Lua script to your collection',
+        content: formHtml,
+        user: req.session.user,
+        activeNav: 'create'
+    }));
 });
 
-// ==================== CREATE (POST) ====================
 app.post('/create', requireLogin, async (req, res) => {
     try {
         const { name, version, content } = req.body;
@@ -902,13 +1009,10 @@ app.post('/create', requireLogin, async (req, res) => {
             [name, slug, ver, content, obfuscateScript(content), token, req.session.user.username]
         );
         res.redirect('/');
-    } catch (e) { 
-        console.error('CREATE ERROR:', e.message); 
-        res.status(500).send('Error creating script: ' + e.message); 
-    }
+    } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
 });
 
-// ==================== EDIT PAGE ====================
+// ==================== EDIT ====================
 app.get('/edit/:token', requireLogin, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
@@ -918,57 +1022,40 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
         if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
 
         const escaped = script.real_content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-        res.send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>${getHtmlHead('Edit Script')}<style>${SHARED_STYLES}</style></head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div class="header-brand">
-                        <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
-                        <div>
-                            <div class="header-title">✏️ Edit Script</div>
-                            <div class="header-subtitle">BY ZYROX-KIDO</div>
-                        </div>
-                    </div>
-                    <div class="header-right">
-                        <a href="/" class="btn btn-ghost">← Dashboard</a>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <form action="/edit/${script.token}" method="POST">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">📝 Script Name</label>
-                                <input type="text" name="name" value="${script.name}" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">🏷️ Version</label>
-                                <select name="version" required>${versionDropdown(script.version)}</select>
-                            </div>
+        
+        const formHtml = `
+            <div class="card" style="max-width:900px">
+                <form action="/edit/${script.token}" method="POST">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Script Name</label>
+                            <input type="text" name="name" value="${script.name}" required>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">💻 Script Content (Lua Code)</label>
-                            <textarea name="content" required>${escaped}</textarea>
+                            <label class="form-label">Version</label>
+                            <select name="version" required>${versionDropdown(script.version)}</select>
                         </div>
-                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                            <button type="submit" class="btn">💾 Save Changes</button>
-                            <a href="/" class="btn btn-ghost">Cancel</a>
-                        </div>
-                    </form>
-                </div>
-                ${getFooter()}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Lua Code</label>
+                        <textarea name="content" required>${escaped}</textarea>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+                        <a href="/" class="btn btn-ghost">Cancel</a>
+                    </div>
+                </form>
             </div>
-        </body>
-        </html>
-        `);
-    } catch (e) { 
-        console.error('EDIT ERROR:', e.message); 
-        res.status(500).send('Server error: ' + e.message); 
-    }
+        `;
+        res.send(renderLayout({
+            title: 'Edit Script',
+            pageTitle: `Edit: ${script.name}`,
+            pageSubtitle: 'Update your script details',
+            content: formHtml,
+            user: req.session.user,
+            activeNav: 'dashboard'
+        }));
+    } catch (e) { console.error(e); res.status(500).send('Error'); }
 });
 
 app.post('/edit/:token', requireLogin, async (req, res) => {
@@ -986,10 +1073,7 @@ app.post('/edit/:token', requireLogin, async (req, res) => {
             [req.body.name, slug, ver, req.body.content, obfuscateScript(req.body.content), req.params.token]
         );
         res.redirect('/');
-    } catch (e) { 
-        console.error('EDIT SAVE ERROR:', e.message); 
-        res.status(500).send('Server error: ' + e.message); 
-    }
+    } catch (e) { console.error(e); res.status(500).send('Error'); }
 });
 
 // ==================== VIEW ====================
@@ -1004,36 +1088,28 @@ app.get('/view/:slug/:version/:token', async (req, res) => {
         res.send(`
         <!DOCTYPE html>
         <html lang="en">
-        <head>${getHtmlHead(script.name)}<style>${SHARED_STYLES}
-            body { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-            .view-container { background: linear-gradient(135deg, #151515, #0a0a0a); padding: 45px 35px; border-radius: 24px; border: 1px solid #1f1f1f; width: 600px; max-width: 100%; text-align: center; box-shadow: 0 30px 80px rgba(0,0,0,0.6); }
-            .view-container h1 { color: #00ff88; font-size: 28px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 800; }
-            .view-container h1 small { display: block; font-size: 12px; color: #aa44ff; font-weight: 600; letter-spacing: 1px; margin-top: 4px; }
-            .view-logo { width: 40px; height: 40px; filter: drop-shadow(0 0 15px rgba(0,255,136,0.6)); }
-            .protected-box { border: 2px solid #ff4444; padding: 22px; border-radius: 14px; margin: 22px 0; background: rgba(255, 68, 68, 0.05); }
-            .protected-box p { color: #ff4444; font-weight: 800; font-size: 15px; margin-bottom: 6px; }
-            .protected-box small { color: #888; font-size: 12px; }
-            .loadstring-box { background: #0a0a0a; border: 2px solid #00ff88; padding: 18px; border-radius: 12px; font-family: 'Consolas', monospace; font-size: 12px; color: #00ff88; word-break: break-all; margin: 15px 0; line-height: 1.6; text-align: left; }
-        </style></head>
+        <head>${getHtmlHead(script.name)}<style>${LAYOUT_STYLES}</style></head>
         <body>
-            <div class="view-container">
-                <h1><img src="/logo.svg" class="view-logo" alt="${BRAND_NAME}"> ${BRAND_SHORT}<small>By Zyrox-Kido</small></h1>
-                <p style="color:#666;margin-bottom:20px;font-size:13px;">Script Protection System</p>
-                <h2 style="margin: 20px 0; color: #fff; font-size: 22px;">${script.name}</h2>
-                <div class="version-badge" style="display:inline-block; font-size: 13px; padding: 5px 14px;">${script.version}</div>
-                <div class="protected-box">
-                    <p>🔒 Protected Script</p>
-                    <small>The real code is hidden. Use an executor to run it.</small>
+            <div class="login-wrap">
+                <div class="login-card" style="width:600px;text-align:center;">
+                    <div class="login-brand">
+                        <div class="login-logo">ZK</div>
+                        <div class="login-title">${script.name}</div>
+                        <div class="login-sub">${script.version} · Protected Script</div>
+                    </div>
+                    <div style="background:#09090b;border:1px solid #1c1c1f;border-radius:12px;padding:16px;margin-bottom:16px;">
+                        <div style="font-size:11px;font-weight:700;color:#71717a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Loadstring</div>
+                        <div id="lsBox" style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#00ff88;word-break:break-all;line-height:1.6;text-align:left;">${loadstring}</div>
+                    </div>
+                    <button class="btn btn-primary" style="width:100%;padding:13px;" onclick="copyText(document.getElementById('lsBox').innerText, this)">📋 Copy Loadstring</button>
+                    <div style="margin-top:20px;font-size:11px;color:#52525b;font-weight:600;">Protected by ${BRAND_NAME}</div>
                 </div>
-                <div class="loadstring-box" id="lsBox">${loadstring}</div>
-                <button class="btn" onclick="copyText(document.getElementById('lsBox').innerText, this)" style="width:100%;padding:15px;font-size:15px;">📋 COPY LOADSTRING</button>
-                <p style="color:#333;font-size:11px;margin-top:20px;font-weight:700;">Protected by ${BRAND_NAME}</p>
             </div>
             <script>${TOAST_SCRIPT}</script>
         </body>
         </html>
         `);
-    } catch (e) { console.error(e); res.status(500).send('Server error'); }
+    } catch (e) { res.status(500).send('Error'); }
 });
 
 // ==================== RAW ====================
@@ -1041,155 +1117,95 @@ app.get('/raw/:slug/:version/:token', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
         if (result.rows.length === 0) return res.status(403).send("-- Access Denied --");
-        
         const script = result.rows[0];
-        if (script.slug !== req.params.slug || script.version !== req.params.version) {
-            return res.status(403).send("-- Access Denied --");
-        }
-        
+        if (script.slug !== req.params.slug || script.version !== req.params.version) return res.status(403).send("-- Access Denied --");
         const ua = req.headers['user-agent'] || '';
         const blocked = ['Mozilla', 'Chrome', 'Safari', 'Firefox', 'Edge', 'curl', 'wget', 'Postman'];
-        for (const b of blocked) {
-            if (ua.includes(b)) {
-                return res.status(403).send(`-- ${BRAND_NAME} Protected -- Direct browser access denied. --`);
-            }
-        }
-        
+        for (const b of blocked) if (ua.includes(b)) return res.status(403).send("-- Protected --");
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.send(script.public_content);
-    } catch (e) {
-        console.error(e);
-        res.status(500).send("-- Server Error --");
-    }
+    } catch (e) { res.status(500).send("-- Server Error --"); }
 });
 
-// ==================== ADMIN PANEL ====================
+// ==================== ADMIN ====================
 app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
     try {
         const usersResult = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
         const users = usersResult.rows;
-        
         const scriptsCountResult = await pool.query('SELECT owner, COUNT(*) as count FROM scripts GROUP BY owner');
         const scriptsCount = {};
         scriptsCountResult.rows.forEach(r => { scriptsCount[r.owner] = r.count; });
         
-        let userCards = '';
+        let userRows = '';
         users.forEach(u => {
             const count = scriptsCount[u.username] || 0;
             const isUserAdmin = u.role === 'ADMIN';
-            const avatarClass = isUserAdmin ? 'user-avatar user-avatar-admin' : 'user-avatar';
-            const roleTag = isUserAdmin ? 'role-admin-tag' : 'role-user-tag';
-            userCards += `
-                <a href="/admin/user/${encodeURIComponent(u.username)}" class="user-card">
-                    <div class="user-info">
-                        <div class="${avatarClass}">${u.username.charAt(0)}</div>
-                        <div class="user-details">
-                            <span class="user-name">${u.username} <span class="role-tag ${roleTag}">${u.role}</span></span>
-                            <span class="user-meta">Joined: ${new Date(u.created_at).toLocaleDateString()} • ${count} script${count !== 1 ? 's' : ''}</span>
+            userRows += `
+                <a href="/admin/user/${encodeURIComponent(u.username)}" class="user-row">
+                    <div class="user-avatar ${isUserAdmin ? 'user-avatar-admin' : ''}">${u.username.charAt(0)}</div>
+                    <div class="user-row-info">
+                        <div class="user-row-name">
+                            ${u.username}
+                            <span class="badge ${isUserAdmin ? 'badge-admin' : 'badge-user'}">${u.role}</span>
                         </div>
+                        <div class="user-row-meta">Joined ${new Date(u.created_at).toLocaleDateString()} · ${count} script${count !== 1 ? 's' : ''}</div>
                     </div>
-                    <span class="btn btn-purple">View →</span>
+                    <span class="btn btn-ghost btn-sm">View →</span>
                 </a>
             `;
         });
         
-        res.send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>${getHtmlHead('Admin Panel')}<style>${SHARED_STYLES}</style></head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div class="header-brand">
-                        <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
-                        <div>
-                            <div class="header-title">👑 Admin Panel</div>
-                            <div class="header-subtitle">BY ZYROX-KIDO</div>
-                        </div>
-                    </div>
-                    <div class="header-right">
-                        <a href="/" class="btn btn-ghost">← Dashboard</a>
-                        <a href="/logout" class="btn btn-red">Logout</a>
-                    </div>
-                </div>
-
-                <h2 class="section-title">👥 All Users (${users.length})</h2>
-                ${userCards || '<div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-title">No users found</div></div>'}
-                ${getFooter()}
-            </div>
-        </body>
-        </html>
-        `);
-    } catch (e) {
-        console.error('ADMIN ERROR:', e.message);
-        res.status(500).send('Server error: ' + e.message);
-    }
+        const content = userRows || `<div class="empty"><div class="empty-icon">👥</div><div class="empty-title">No users yet</div></div>`;
+        
+        res.send(renderLayout({
+            title: 'Admin Panel',
+            pageTitle: 'Admin Panel',
+            pageSubtitle: `Managing ${users.length} user${users.length !== 1 ? 's' : ''}`,
+            content,
+            user: req.session.user,
+            activeNav: 'admin'
+        }));
+    } catch (e) { console.error(e); res.status(500).send('Error'); }
 });
 
-// ==================== ADMIN: VIEW USER SCRIPTS ====================
 app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) => {
     try {
         const targetUser = req.params.username;
-        
         const userResult = await pool.query('SELECT * FROM users WHERE username = $1', [targetUser]);
         if (userResult.rows.length === 0) return res.status(404).send('User not found');
         const targetUserData = userResult.rows[0];
-        
         const scriptsResult = await pool.query('SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC', [targetUser]);
         const userScripts = scriptsResult.rows;
-        const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
         
-        let scriptCards = '';
-        if (userScripts.length === 0) {
-            scriptCards = `<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-title">No scripts yet</div><div class="empty-state-desc">This user hasn't created any scripts.</div></div>`;
-        } else {
-            userScripts.forEach(s => {
-                scriptCards += renderScriptCard(s, baseUrl);
-            });
-        }
-        
-        res.send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>${getHtmlHead(targetUser + "'s Scripts")}<style>${SHARED_STYLES}</style></head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div class="header-brand">
-                        <img src="/logo.svg" class="header-logo" alt="${BRAND_NAME}">
-                        <div>
-                            <div class="header-title">👤 ${targetUser}</div>
-                            <div class="header-subtitle">BY ZYROX-KIDO</div>
+        const infoCard = `
+            <div class="card" style="margin-bottom:20px;">
+                <div style="display:flex;align-items:center;gap:14px;">
+                    <div class="user-avatar ${targetUserData.role === 'ADMIN' ? 'user-avatar-admin' : ''}" style="width:48px;height:48px;border-radius:12px;font-size:18px;">${targetUser.charAt(0)}</div>
+                    <div>
+                        <div style="font-size:16px;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px;">
+                            ${targetUser}
+                            <span class="badge ${targetUserData.role === 'ADMIN' ? 'badge-admin' : 'badge-user'}">${targetUserData.role}</span>
                         </div>
-                    </div>
-                    <div class="header-right">
-                        <a href="/admin" class="btn btn-purple">← All Users</a>
-                        <a href="/" class="btn btn-ghost">Dashboard</a>
+                        <div style="font-size:12px;color:#71717a;margin-top:2px;">Joined ${new Date(targetUserData.created_at).toLocaleDateString()}</div>
                     </div>
                 </div>
-
-                <div class="card">
-                    <div class="user-info" style="padding: 5px 0;">
-                        <div class="${targetUserData.role === 'ADMIN' ? 'user-avatar user-avatar-admin' : 'user-avatar'}">${targetUser.charAt(0)}</div>
-                        <div class="user-details">
-                            <span class="user-name">${targetUser} <span class="role-tag ${targetUserData.role === 'ADMIN' ? 'role-admin-tag' : 'role-user-tag'}">${targetUserData.role}</span></span>
-                            <span class="user-meta">Joined: ${new Date(targetUserData.created_at).toLocaleDateString()}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <h2 class="section-title">📁 Scripts (${userScripts.length})</h2>
-                ${scriptCards}
-                <script>${TOAST_SCRIPT}</script>
-                ${getFooter()}
             </div>
-        </body>
-        </html>
-        `);
-    } catch (e) {
-        console.error('ADMIN USER ERROR:', e.message);
-        res.status(500).send('Server error: ' + e.message);
-    }
+        `;
+        
+        const scriptsHtml = userScripts.length === 0
+            ? `<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">No scripts</div><div class="empty-desc">This user hasn't created any scripts yet.</div></div>`
+            : `<div class="scripts-grid">${userScripts.map(renderScriptCard).join('')}</div>`;
+        
+        res.send(renderLayout({
+            title: targetUser + "'s Scripts",
+            pageTitle: `${targetUser}'s Scripts`,
+            pageSubtitle: `${userScripts.length} script${userScripts.length !== 1 ? 's' : ''}`,
+            content: infoCard + scriptsHtml,
+            user: req.session.user,
+            activeNav: 'admin',
+            actions: `<a href="/admin" class="btn btn-ghost">← All Users</a>`
+        }));
+    } catch (e) { console.error(e); res.status(500).send('Error'); }
 });
 
 // ==================== DELETE ====================
@@ -1200,19 +1216,14 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
         const script = result.rows[0];
         const isAdmin = req.session.user.role === 'ADMIN';
         if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
-
         await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]);
-        
-        if (isAdmin && script.owner !== req.session.user.username) {
-            return res.redirect('/admin/user/' + encodeURIComponent(script.owner));
-        }
+        if (isAdmin && script.owner !== req.session.user.username) return res.redirect('/admin/user/' + encodeURIComponent(script.owner));
         res.redirect('/');
-    } catch (e) { console.error(e); res.status(500).send('Server error'); }
+    } catch (e) { res.status(500).send('Error'); }
 });
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v22.0 running on port ${PORT}`);
-    console.log(`🎨 Fov.it-style UI enabled`);
-    console.log(`👑 Admin Panel at /admin`);
+    console.log(`✅ ${BRAND_NAME} v24.0 running on port ${PORT}`);
+    console.log(`🎨 Modern SaaS Dashboard`);
 });
