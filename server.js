@@ -123,7 +123,7 @@ app.get('/favicon.ico', (req, res) => {
     res.send(FAVICON_SVG_CONTENT);
 });
 
-// ==================== OBFUSCATION ====================
+// ==================== OBFUSCATION (Basic for Create) ====================
 function obfuscateScript(code) {
     const encoded = Buffer.from(code, 'utf8').toString('base64');
     return `
@@ -144,16 +144,28 @@ if _f then _f() end
 `;
 }
 
-// ==================== HEAVY OBFUSCATION (Generate Button) ====================
+// ==================== HEAVY OBFUSCATION (FIXED - XOR + Base64) ====================
 function heavyObfuscate(code) {
-    const b64 = Buffer.from(code, 'utf8').toString('base64');
+    // Step 1: Convert to bytes
+    const bytes = Buffer.from(code, 'utf8');
+    
+    // Step 2: XOR encrypt with random 8-byte key
+    const key = crypto.randomBytes(8);
+    const encrypted = Buffer.alloc(bytes.length);
+    for (let i = 0; i < bytes.length; i++) {
+        encrypted[i] = bytes[i] ^ key[i % key.length];
+    }
+    
+    // Step 3: Base64 encode the encrypted bytes
+    const b64 = encrypted.toString('base64');
+    
+    // Step 4: Split into chunks for readability obfuscation
     const chunks = [];
     for (let i = 0; i < b64.length; i += 50) {
         chunks.push(b64.substr(i, 50));
     }
-    const key = crypto.randomBytes(8).toString('hex');
     const chunkStr = chunks.map(c => `"${c}"`).join('..');
-    const numKey = Array.from(Buffer.from(key, 'hex')).join(',');
+    const numKey = Array.from(key).join(',');
     const timestamp = new Date().toISOString();
     
     return `-- ═══════════════════════════════════════════
@@ -162,15 +174,6 @@ function heavyObfuscate(code) {
 -- Do not redistribute without permission
 -- ═══════════════════════════════════════════
 local _k={${numKey}}
-local _p=function(_s)
-    local _r=""
-    for _i=1,#_s do
-        local _c=string.byte(_s,_i)
-        local _key=_k[((_i-1)%#_k)+1]
-        _r=_r..string.char(bit32.bxor(_c,_key))
-    end
-    return _r
-end
 local _b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local _d=${chunkStr}
 local _o={}
@@ -182,17 +185,15 @@ for _i=1,#_o,4 do
     if _o[_i+2] then _r=_r..string.char(math.floor(_n/256)%256) end
     if _o[_i+3] then _r=_r..string.char(_n%256) end
 end
-local _dbg=debug and debug.getinfo
-if _dbg then
-    local _info=_dbg(1,"S")
-    if _info and _info.what=="main" then
-        local _f=loadstring(_p(_r))
-        if _f then _f() end
-    end
-else
-    local _f=loadstring(_p(_r))
-    if _f then _f() end
+local _out={}
+for _i=1,#_r do
+    local _c=string.byte(_r,_i)
+    local _key=_k[((_i-1)%#_k)+1]
+    _out[_i]=string.char(bit32.bxor(_c,_key))
 end
+local _code=table.concat(_out)
+local _f=loadstring(_code)
+if _f then _f() end
 -- 🔒 Protected by ${BRAND_NAME}
 `;
 }
@@ -283,7 +284,6 @@ const SHARED_STYLES = `
     .footer-brand { text-align: center; padding: 20px; color: #444; font-size: 12px; margin-top: 30px; }
     .footer-brand strong { background: linear-gradient(135deg, #00ff88, #aa44ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight: 800; }
 
-    /* Obfuscated Output Box */
     .obf-container { margin-top: 15px; padding: 15px; background: rgba(255, 215, 0, 0.05); border: 2px dashed #ffd700; border-radius: 12px; }
     .obf-label { color: #ffd700; font-weight: 800; font-size: 13px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
     .obf-box { background: #0a0a0a; border: 1px solid #ffd700; padding: 15px; border-radius: 10px; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; color: #ffd700; word-break: break-all; margin: 10px 0; max-height: 300px; overflow-y: auto; line-height: 1.4; white-space: pre-wrap; }
@@ -772,15 +772,12 @@ app.post('/generate-obf/:token', requireLogin, async (req, res) => {
         const script = result.rows[0];
         const isAdmin = req.session.user.role === 'ADMIN';
         
-        // Permission check
         if (script.owner !== req.session.user.username && !isAdmin) {
             return res.json({ success: false, error: 'Access Denied' });
         }
         
-        // Generate heavy obfuscated code
         const obfuscated = heavyObfuscate(script.real_content);
         
-        // Save to public_content
         await pool.query('UPDATE scripts SET public_content = $1 WHERE token = $2', [obfuscated, req.params.token]);
         
         console.log(`🔒 Obfuscated By Zyrox-Kido: ${script.name} (${script.owner})`);
@@ -938,7 +935,7 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 
 // ==================== START ====================
 app.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v15.0 running on port ${PORT}`);
-    console.log(`🔒 Generate Obfuscated By Zyrox-Kido enabled`);
+    console.log(`✅ ${BRAND_NAME} v16.0 running on port ${PORT}`);
+    console.log(`🔒 Generate Obfuscated By Zyrox-Kido (XOR+Base64) enabled`);
     console.log(`👑 Admin Panel at /admin`);
 });
