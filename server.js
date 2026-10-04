@@ -128,7 +128,7 @@ a{color:inherit;text-decoration:none}button{font-family:inherit;cursor:pointer;b
 .layout{display:flex;min-height:100vh;position:relative;z-index:1}
 .sidebar{width:264px;background:rgba(15,8,8,0.7);backdrop-filter:blur(20px);border-right:1px solid var(--border-0);padding:20px 14px;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50;transition:transform 0.35s cubic-bezier(0.4,0,0.2,1)}
 .sidebar-brand{display:flex;align-items:center;gap:11px;padding:6px 10px 18px 10px;border-bottom:1px solid var(--border-0);margin-bottom:16px}
-.sidebar-logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;color:#fff;box-shadow:0 4px 24px var(--accent-glow)}
+.sidebar-logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;color:#fff}
 .sidebar-brand-text{display:flex;flex-direction:column;min-width:0}
 .sidebar-brand-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px}
 .sidebar-brand-sub{font-size:10px;color:var(--text-3);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-top:2px}
@@ -137,7 +137,7 @@ a{color:inherit;text-decoration:none}button{font-family:inherit;cursor:pointer;b
 .nav-item{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;font-size:14px;font-weight:600;color:var(--text-1);transition:all 0.2s;cursor:pointer;position:relative;min-height:44px}
 .nav-item:hover{background:var(--bg-2);color:var(--text-0)}
 .nav-item.active{background:var(--accent-dim);color:var(--accent)}
-.nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:22px;background:linear-gradient(180deg,var(--red-1),var(--red-2));border-radius:0 4px 4px 0;box-shadow:0 0 12px var(--accent-glow)}
+.nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:22px;background:linear-gradient(180deg,var(--red-1),var(--red-2));border-radius:0 4px 4px 0}
 .nav-icon{width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
 .sidebar-footer{padding-top:14px;border-top:1px solid var(--border-0)}
 .user-card{display:flex;align-items:center;gap:10px;padding:10px;border-radius:11px;background:var(--bg-2);border:1px solid transparent;min-height:52px}
@@ -259,7 +259,7 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .chat-input-area{padding:16px 20px;border-top:1px solid var(--border-0);background:var(--bg-0)}
 .chat-input-area form{display:flex;gap:10px;align-items:center}
 .chat-input-area input{flex:1;margin:0;background:var(--bg-2);border-color:transparent}
-/* Voice Panel — SMALL Discord-style */
+/* Voice Panel — SMALL */
 .voice-panel{position:fixed;bottom:20px;right:20px;width:400px;max-width:calc(100vw - 32px);background:rgba(15,8,8,0.95);backdrop-filter:blur(30px);border:1px solid var(--border-1);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.8);z-index:9998;display:flex;flex-direction:column;overflow:hidden;transition:all 0.3s}
 .voice-panel-header{padding:10px 14px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between}
 .voice-live-dot{width:8px;height:8px;border-radius:50%;background:var(--red-1);box-shadow:0 0 12px var(--accent-glow);animation:pulse 1.5s infinite}
@@ -271,6 +271,12 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .voice-tile-screen{grid-column:span 2;aspect-ratio:16/10}
 .voice-tile video{width:100%;height:100%;object-fit:cover;display:block}
 .voice-tile-label{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.75);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px}
+.voice-tile:fullscreen{aspect-ratio:auto!important;width:100vw!important;height:100vh!important;border-radius:0!important;background:#000}
+.voice-tile:fullscreen video{object-fit:contain!important}
+.voice-tile:-webkit-full-screen{aspect-ratio:auto!important;width:100vw!important;height:100vh!important;border-radius:0!important;background:#000}
+.voice-tile:-webkit-full-screen video{object-fit:contain!important}
+.voice-tile:-moz-full-screen{aspect-ratio:auto!important;width:100vw!important;height:100vh!important;border-radius:0!important;background:#000}
+.voice-tile:-moz-full-screen video{object-fit:contain!important}
 .voice-controls{padding:10px 14px;border-top:1px solid var(--border-0);display:flex;gap:8px;justify-content:center}
 .voice-ctrl-btn{width:42px;height:42px;border-radius:11px;background:var(--bg-2);border:1px solid var(--border-0);color:var(--text-0);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
 .voice-ctrl-btn:hover{background:var(--bg-3);border-color:var(--border-1);transform:translateY(-2px)}
@@ -346,7 +352,6 @@ function renderScriptCard(s) {
     const prettyUrl = `${baseUrl}/raw/${slug}/${version}/${s.token}`;
     return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;"><div style="display:flex;gap:12px;"><div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-size:19px;">◈</div><div><div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">${s.name}</div><div style="display:flex;gap:8px;font-size:11.5px;color:var(--text-2);"><span class="badge badge-version">${version}</span><span>${new Date(s.created_at).toLocaleDateString()}</span></div></div></div></div><div style="background:var(--bg-0);border:1px solid var(--border-0);border-radius:10px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--accent-bright);word-break:break-all;margin-top:14px;">${prettyUrl}</div><div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="copyText('loadstring(game:HttpGet(\\'${prettyUrl}\\'))()', this)">📋 Copy</button><a href="/view/${slug}/${version}/${s.token}" target="_blank" class="btn btn-secondary btn-sm">◉ View</a><a href="/edit/${s.token}" class="btn btn-ghost btn-sm">✎ Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete('${s.token}', '${s.name}')">🗑 Delete</button></div></div>`;
 }
-
 // ==================== AUTH ====================
 app.get('/login', (req, res) => {
     res.send(`<!DOCTYPE html><html><head>${getHtmlHead('Login')}<style>${LAYOUT_STYLES}</style></head><body>
@@ -539,13 +544,16 @@ app.get('/server/:id', requireLogin, async (req, res) => {
         <div id="voicePanel" class="voice-panel" style="display:none;">
             <div class="voice-panel-header">
                 <div style="display:flex;align-items:center;gap:8px;"><div class="voice-live-dot"></div><span id="voicePanelName" style="font-weight:700;font-size:13px;">Voice</span></div>
-                <div style="display:flex;gap:6px;"><button onclick="minimizeVoice()" class="voice-min-btn" title="Minimize">−</button></div>
+                <div style="display:flex;gap:6px;">
+                    <button onclick="fullscreenBiggestTile()" class="voice-min-btn" title="Fullscreen">⛶</button>
+                    <button onclick="minimizeVoice()" class="voice-min-btn" title="Minimize">−</button>
+                </div>
             </div>
             <div id="voiceVideos" class="voice-videos"></div>
             <div class="voice-controls">
                 <button id="muteBtn" onclick="toggleMute()" class="voice-ctrl-btn" title="Mute">🎤</button>
                 <button id="shareBtn" onclick="toggleShareScreen()" class="voice-ctrl-btn" title="Share Screen">🖥️</button>
-                <button id="micTestBtn" onclick="toggleMicTest()" class="voice-ctrl-btn" title="Test Mic (Only you hear)">🎧</button>
+                <button id="micTestBtn" onclick="toggleMicTest()" class="voice-ctrl-btn" title="Test Mic">🎧</button>
                 <button onclick="leaveVoice()" class="voice-ctrl-btn voice-ctrl-leave" title="Disconnect">📞</button>
             </div>
         </div>
@@ -557,7 +565,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                     <input type="text" id="newChannelName" placeholder="e.g., gaming" maxlength="50">
                     <label class="form-label" style="margin-top:14px;">Visibility</label>
                     <select id="newChannelVis">
-                        <option value="public">🌐 Public — Everyone sees & chats</option>
+                        <option value="public">🌐 Public — Everyone</option>
                         <option value="private">🔒 Private — Read-only</option>
                         <option value="personal">👑 Personal — Only you</option>
                     </select>
@@ -654,9 +662,10 @@ app.get('/server/:id', requireLogin, async (req, res) => {
         window.toggleMicTest=async()=>{const btn=document.getElementById('micTestBtn');if(micTestActive){micTestActive=false;if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}btn.classList.remove('mic-test-active');showToast('Mic test OFF','success');return}try{const testStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true},video:false});window._micTestStream=testStream;const audioCtx=new(window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaStreamSource(testStream);const gainNode=audioCtx.createGain();gainNode.gain.value=1;source.connect(gainNode);gainNode.connect(audioCtx.destination);micTestAudio={audioCtx,source,gainNode};micTestActive=true;btn.classList.add('mic-test-active');showToast('🎧 Mic Test ON','success')}catch(e){showToast('Mic denied','error')}};
         window.toggleShareScreen=async()=>{if(!currentVoiceChannelId)return;if(isSharing){if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}isSharing=false;document.getElementById('shareBtn').textContent='🖥️';document.getElementById('shareBtn').style.background='';document.querySelector('[data-tile="self-screen"]')?.remove();for(const [sid,{pc}] of Object.entries(peerConnections)){try{const offer=await pc.createOffer();await pc.setLocalDescription(offer);socket.emit('webrtc_offer',{targetSocketId:sid,offer,isScreenShare:false})}catch(e){}}}else{try{screenStream=await navigator.mediaDevices.getDisplayMedia({video:{cursor:'always'},audio:false})}catch(e){return}isSharing=true;document.getElementById('shareBtn').textContent='⏹️';document.getElementById('shareBtn').style.background='linear-gradient(135deg,var(--red-1),var(--red-2))';addVideoTile('self-screen','Your Screen',screenStream,true,true);screenStream.getVideoTracks()[0].onended=()=>{if(isSharing)window.toggleShareScreen()};for(const [sid,{pc}] of Object.entries(peerConnections)){try{const vt=screenStream.getVideoTracks()[0];const s=pc.getSenders().find(s=>s.track&&s.track.kind==='video');if(s)await s.replaceTrack(vt);else pc.addTrack(vt,screenStream);const offer=await pc.createOffer();await pc.setLocalDescription(offer);socket.emit('webrtc_offer',{targetSocketId:sid,offer,isScreenShare:true})}catch(e){}}}};
         window.minimizeVoice=()=>{const v=document.getElementById('voiceVideos');v.style.display=v.style.display==='none'?'grid':'none'};
+        window.fullscreenBiggestTile=()=>{const tiles=document.querySelectorAll('.voice-tile');if(tiles.length===0)return;let biggest=tiles[0];let maxArea=0;tiles.forEach(t=>{const r=t.getBoundingClientRect();const area=r.width*r.height;if(area>maxArea){maxArea=area;biggest=t}});const v=biggest.querySelector('video');if(v){v.muted=true;if(v.requestFullscreen){v.requestFullscreen()}else if(v.webkitRequestFullscreen){v.webkitRequestFullscreen()}else if(v.mozRequestFullScreen){v.mozRequestFullScreen()}else if(v.msRequestFullscreen){v.msRequestFullscreen()}}};
         function createPeerConnection(sid){if(peerConnections[sid])return peerConnections[sid].pc;const pc=new RTCPeerConnection(iceServers);if(localStream)localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));if(screenStream)screenStream.getVideoTracks().forEach(t=>pc.addTrack(t,screenStream));pc.onicecandidate=e=>{if(e.candidate)socket.emit('webrtc_ice_candidate',{targetSocketId:sid,candidate:e.candidate})};pc.ontrack=e=>{const rs=e.streams[0];const isV=e.track.kind==='video';const meta=peerConnections[sid];if(isV){const tid=sid+'-screen';if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User')+"'s Screen",rs,true,false)}else{const tid=sid+'-audio';if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User'),rs,false,false)}};pc.onconnectionstatechange=()=>{if(['disconnected','failed','closed'].includes(pc.connectionState))removePeer(sid)};peerConnections[sid]={pc,username:null,isOfferer:false};return pc}
         function removePeer(sid){if(peerConnections[sid]){try{peerConnections[sid].pc.close()}catch(e){}delete peerConnections[sid]}document.querySelector('[data-tile="'+sid+'-screen"]')?.remove();document.querySelector('[data-tile="'+sid+'-audio"]')?.remove()}
-        function addVideoTile(id,label,stream,isScreen,isSelf){const videos=document.getElementById('voiceVideos');const tile=document.createElement('div');tile.className='voice-tile'+(isScreen?' voice-tile-screen':'');tile.dataset.tile=id;const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=isSelf;v.srcObject=stream;const l=document.createElement('div');l.className='voice-tile-label';l.textContent=label;tile.appendChild(v);tile.appendChild(l);videos.appendChild(tile)}
+        function addVideoTile(id,label,stream,isScreen,isSelf){const videos=document.getElementById('voiceVideos');const tile=document.createElement('div');tile.className='voice-tile'+(isScreen?' voice-tile-screen':'');tile.dataset.tile=id;tile.style.cursor='pointer';const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=isSelf;v.srcObject=stream;const l=document.createElement('div');l.className='voice-tile-label';l.textContent=label;tile.appendChild(v);tile.appendChild(l);tile.onclick=()=>{v.muted=true;if(v.requestFullscreen){v.requestFullscreen()}else if(v.webkitRequestFullscreen){v.webkitRequestFullscreen()}else if(v.mozRequestFullScreen){v.mozRequestFullScreen()}else if(v.msRequestFullscreen){v.msRequestFullscreen()}};videos.appendChild(tile)}
         socket.on('voice_participants',ps=>{document.querySelectorAll('.voice-participants').forEach(el=>el.innerHTML='');document.querySelectorAll('.voice-count').forEach(el=>{el.textContent='0';el.style.display='none'});ps.forEach(p=>{const c=document.getElementById('voice-participants-'+currentVoiceChannelId);if(c){const d=document.createElement('div');d.className='voice-user';d.innerHTML='<div class="voice-user-avatar">'+escapeHtml(p.username.charAt(0).toUpperCase())+'</div>'+escapeHtml(p.username)+(p.isMuted?' 🔇':'')+(p.isStreaming?' 🖥️':'');c.appendChild(d)}});const cnt=document.getElementById('voice-count-'+currentVoiceChannelId);if(cnt){cnt.textContent=ps.length;cnt.style.display=ps.length>0?'inline-block':'none'}});
         socket.on('voice_existing_users',async({users})=>{for(const u of users){try{const pc=createPeerConnection(u.socketId);peerConnections[u.socketId].username=u.username;peerConnections[u.socketId].isOfferer=true;const offer=await pc.createOffer();await pc.setLocalDescription(offer);socket.emit('webrtc_offer',{targetSocketId:u.socketId,offer,isScreenShare:false})}catch(e){}}});
         socket.on('webrtc_offer',async({fromSocketId,fromUsername,offer})=>{try{const pc=createPeerConnection(fromSocketId);peerConnections[fromSocketId].username=fromUsername;await pc.setRemoteDescription(new RTCSessionDescription(offer));const answer=await pc.createAnswer();await pc.setLocalDescription(answer);socket.emit('webrtc_answer',{targetSocketId:fromSocketId,answer})}catch(e){}});
@@ -722,11 +731,9 @@ io.on('connection', (socket) => {
     socket.on('webrtc_ice_candidate', (d) => { io.to(d.targetSocketId).emit('webrtc_ice_candidate', { fromSocketId: socket.id, candidate: d.candidate }); });
     socket.on('toggle_mute', (d) => { if (!socket.voiceChannelId) return; const r = voiceRooms.get(socket.voiceChannelId); if (r && r.has(socket.id)) { r.get(socket.id).isMuted = d.isMuted; io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values())); } });
     socket.on('toggle_stream', (d) => { if (!socket.voiceChannelId) return; const r = voiceRooms.get(socket.voiceChannelId); if (r && r.has(socket.id)) { r.get(socket.id).isStreaming = d.isStreaming; io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values())); } });
-    socket.on('send_friend_request', async (data) => { try { const { from, to } = data; if (!from || !to || from === to) return socket.emit('friend_error', { error: "Invalid" }); let targetUser = null; if (to.includes('#')) { const [name, tag] = to.split('#'); const r = await pool.query('SELECT username FROM users WHERE LOWER(username) = LOWER($1) AND tag = $2', [name, tag]); if (r.rows.length > 0) targetUser = r.rows[0].username; } else { const r = await pool.query('SELECT username FROM users WHERE LOWER(username) = LOWER($1)', [to]); if (r.rows.length > 0) targetUser = r.rows[0].username; } if (!targetUser) return socket.emit('friend_error', { error: 'Not found' }); const existing = await pool.query('SELECT * FROM friends WHERE (user1 = $1 AND user2 = $2) OR (user1 = $2 AND user2 = $1)', [from, targetUser]); if (existing.rows.length > 0) return socket.emit('friend_error', { error: 'Already exists' }); const sorted = [from, targetUser].sort(); await pool.query('INSERT INTO friends (user1, user2, status, requested_by) VALUES ($1, $2, $3, $4)', [sorted[0], sorted[1], 'pending', from]); const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === targetUser); if (targetSocket) targetSocket.emit('friend_request_received', { from }); socket.emit('friend_request_sent', { to: targetUser }); } catch (e) {} });
-    socket.on('accept_friend_request', async (data) => { try { const { user, from } = data; const sorted = [user, from].sort(); await pool.query('UPDATE friends SET status = $1 WHERE user1 = $2 AND user2 = $3', ['accepted', sorted[0], sorted[1]]); const fromSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === from); if (fromSocket) fromSocket.emit('friend_request_accepted', { by: user }); socket.emit('friend_list_updated'); } catch (e) {} });
     socket.on('disconnect', () => { if (socket.voiceChannelId) { const vcId = socket.voiceChannelId; const r = voiceRooms.get(vcId); if (r) { r.delete(socket.id); if (r.size === 0) voiceRooms.delete(vcId); else io.to('voice_' + vcId).emit('voice_participants', Array.from(r.values())); } socket.to('voice_' + vcId).emit('user_left_voice', { socketId: socket.id }); } });
 });
 
 server.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v35.0 — Discord-Style + Small Voice Panel`);
+    console.log(`✅ ${BRAND_NAME} v36.0 — Full Screen on Click`);
 });
