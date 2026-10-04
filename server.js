@@ -89,9 +89,9 @@ const BRAND_NAME = 'By Zyrox-Kido';
 const BRAND_SHORT = 'Zyrox-Kido';
 
 const LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#ff3b3b"/><stop offset="100%" style="stop-color:#cc0000"/></linearGradient></defs><path d="M50 5 L85 20 L85 50 C85 75 70 90 50 95 C30 90 15 75 15 50 L15 20 Z" fill="url(#g)" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/><text x="50" y="62" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#fff" text-anchor="middle">ZK</text></svg>';
-app.get('/logo.svg', (req, res) => { res.setHeader('Content-Type', 'image/svg+xml'); res.send(LOGO_SVG); });
-app.get('/favicon.svg', (req, res) => { res.setHeader('Content-Type', 'image/svg+xml'); res.send(LOGO_SVG); });
-app.get('/favicon.ico', (req, res) => { res.setHeader('Content-Type', 'image/svg+xml'); res.send(LOGO_SVG); });
+app.get('/logo.svg', function(req, res) { res.setHeader('Content-Type', 'image/svg+xml'); res.send(LOGO_SVG); });
+app.get('/favicon.svg', function(req, res) { res.setHeader('Content-Type', 'image/svg+xml'); res.send(LOGO_SVG); });
+app.get('/favicon.ico', function(req, res) { res.setHeader('Content-Type', 'image/svg+xml'); res.send(LOGO_SVG); });
 
 // ==================== OBFUSCATION ====================
 function obfuscateScript(code) {
@@ -223,6 +223,7 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .chat-channels-list{flex:1;overflow-y:auto;padding:10px 8px}
 .channel-group-label{font-size:10px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;padding:8px 12px 6px 12px;display:flex;justify-content:space-between;align-items:center}
 .channel-group-label button{background:none;border:none;color:var(--text-3);font-size:16px;cursor:pointer;padding:0 4px}
+.channel-group-label button:hover{color:var(--accent)}
 .channel-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;cursor:pointer;color:var(--text-2);font-size:13.5px;font-weight:600;margin-bottom:2px;position:relative}
 .channel-item:hover{background:var(--bg-2);color:var(--text-0)}
 .channel-item.active{background:var(--accent-dim);color:var(--accent)}
@@ -518,10 +519,24 @@ app.post('/api/servers/:id/kick', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ============ CREATE CHANNEL — OWNER/ADMIN ONLY ============
 app.post('/api/servers/:id/channels', requireLogin, async function(req, res) {
     try {
         const serverId = parseInt(req.params.id);
         const { name, type, visibility } = req.body;
+        const me = req.session.user.username;
+        const isGlobalAdmin = req.session.user.role === 'ADMIN';
+
+        // PERMISSION CHECK — Owner o Global Admin lang
+        const srvR = await pool.query('SELECT * FROM servers WHERE id = $1', [serverId]);
+        if (srvR.rows.length === 0) return res.status(404).json({ error: 'Server not found' });
+        const srv = srvR.rows[0];
+        const isOwner = srv.owner === me;
+
+        if (!isOwner && !isGlobalAdmin) {
+            return res.status(403).json({ error: 'Only owner/admin can create channels' });
+        }
+
         if (!name) return res.status(400).json({ error: 'Name required' });
         const cleanName = name.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-').substring(0, 30);
         if (!cleanName) return res.status(400).json({ error: 'Invalid name' });
@@ -529,22 +544,34 @@ app.post('/api/servers/:id/channels', requireLogin, async function(req, res) {
         if (chk.rows.length > 0) return res.status(400).json({ error: 'Exists' });
         const vis = visibility || 'public';
         const ownerOnly = vis === 'personal';
-        const r = await pool.query('INSERT INTO channels (server_id, name, type, created_by, visibility, owner_only) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *', [serverId, cleanName, type === 'voice' ? 'voice' : 'text', req.session.user.username, vis, ownerOnly]);
+        const r = await pool.query('INSERT INTO channels (server_id, name, type, created_by, visibility, owner_only) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *', [serverId, cleanName, type === 'voice' ? 'voice' : 'text', me, vis, ownerOnly]);
         io.emit('channel_created', r.rows[0]);
         res.json(r.rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ============ RENAME CHANNEL — OWNER/ADMIN ONLY ============
 app.post('/api/channels/:id/rename', requireLogin, async function(req, res) {
     try {
         const { name } = req.body;
+        const me = req.session.user.username;
+        const isGlobalAdmin = req.session.user.role === 'ADMIN';
+
         if (!name) return res.status(400).json({ error: 'Name required' });
+
         const chk = await pool.query('SELECT c.*, s.owner FROM channels c JOIN servers s ON c.server_id = s.id WHERE c.id = $1', [req.params.id]);
         if (chk.rows.length === 0) return res.status(404).json({ error: 'Not found' });
         const ch = chk.rows[0];
-        const isAdmin = req.session.user.role === 'ADMIN';
-        if (ch.owner !== req.session.user.username && ch.created_by !== req.session.user.username && !isAdmin) return res.status(403).json({ error: 'Denied' });
+        const isOwner = ch.owner === me;
+
+        // OWNER o ADMIN lang ang pwedeng mag-rename
+        if (!isOwner && !isGlobalAdmin) {
+            return res.status(403).json({ error: 'Only owner/admin can rename channels' });
+        }
+
         const cleanName = name.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-').substring(0, 30);
+        if (!cleanName) return res.status(400).json({ error: 'Invalid name' });
+
         await pool.query('UPDATE channels SET name = $1 WHERE id = $2', [cleanName, req.params.id]);
         io.emit('channel_renamed', { id: parseInt(req.params.id), name: cleanName });
         res.json({ success: true });
@@ -594,7 +621,10 @@ app.get('/server/:id', requireLogin, async function(req, res) {
             '</div>';
         }).join('');
 
-        // Build the entire content via string concat
+        // Can create/rename channel? Owner o Admin lang
+        const canCreateChannel = isOwner || isGlobalAdmin;
+        const canRenameChannel = isOwner || isGlobalAdmin;
+
         let content = '';
         content += '<div class="chat-layout">';
         content += '<div class="chat-sidebar" id="chatSidebar">';
@@ -602,9 +632,17 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         content += '<div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;"><span style="font-size:20px;">' + (srv.icon || '🎮') + '</span><span style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + srv.name + '</span></div>';
         content += '</div>';
         content += '<div class="chat-channels-list">';
-        content += '<div class="channel-group-label"><span>💬 TEXT</span><button onclick="openCreateChannel(\'text\')" title="Create">+</button></div>';
-        content += '<div id="channelsList">' + visibleText.map(function(c) { return renderChannelItem(c, me, isOwner, isGlobalAdmin); }).join('') + '</div>';
-        content += '<div class="channel-group-label" style="margin-top:16px;"><span>🔊 VOICE</span><button onclick="openCreateChannel(\'voice\')" title="Create">+</button></div>';
+        content += '<div class="channel-group-label"><span>💬 TEXT</span>';
+        if (canCreateChannel) {
+            content += '<button onclick="openCreateChannel(\'text\')" title="Create (Owner/Admin only)">+</button>';
+        }
+        content += '</div>';
+        content += '<div id="channelsList">' + visibleText.map(function(c) { return renderChannelItem(c, me, canRenameChannel); }).join('') + '</div>';
+        content += '<div class="channel-group-label" style="margin-top:16px;"><span>🔊 VOICE</span>';
+        if (canCreateChannel) {
+            content += '<button onclick="openCreateChannel(\'voice\')" title="Create (Owner/Admin only)">+</button>';
+        }
+        content += '</div>';
         content += '<div id="voiceChannelsList">' + visibleVoice.map(function(c) { return renderVoiceChannelItem(c, me, isOwner, isGlobalAdmin); }).join('') + '</div>';
         content += '</div>';
         content += '<div class="chat-sidebar-footer"><a href="/servers" style="display:block;text-align:center;color:var(--text-2);font-size:12px;font-weight:700;padding:8px;">← All Servers</a></div>';
@@ -660,9 +698,14 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         content += '</div>';
         content += '</div>';
 
-        // Modals
-        content += '<div id="createChannelModal" class="modal-overlay" style="display:none;"><div class="modal-card"><div class="modal-header"><h3 style="font-size:18px;" id="createChannelTitle">Create Channel</h3><button onclick="closeModal(\'createChannelModal\')" class="modal-close">×</button></div><div class="modal-body"><label class="form-label">Channel Name</label><input type="text" id="newChannelName" placeholder="e.g., gaming" maxlength="50"><label class="form-label" style="margin-top:14px;">Visibility</label><select id="newChannelVis"><option value="public">🌐 Public — Everyone sees & chats</option><option value="private">🔒 Private — Everyone sees but read-only</option><option value="personal">👑 Personal — Only you can see</option></select></div><div class="modal-footer"><button onclick="closeModal(\'createChannelModal\')" class="btn btn-ghost">Cancel</button><button onclick="createChannel()" class="btn btn-primary">Create</button></div></div></div>';
-        content += '<div id="renameChannelModal" class="modal-overlay" style="display:none;"><div class="modal-card"><div class="modal-header"><h3 style="font-size:18px;">Rename Channel</h3><button onclick="closeModal(\'renameChannelModal\')" class="modal-close">×</button></div><div class="modal-body"><label class="form-label">New Name</label><input type="text" id="renameChannelInput" maxlength="50"></div><div class="modal-footer"><button onclick="closeModal(\'renameChannelModal\')" class="btn btn-ghost">Cancel</button><button onclick="saveRename()" class="btn btn-primary">Save</button></div></div></div>';
+        // Modals — create channel modal lang kung may permission
+        if (canCreateChannel) {
+            content += '<div id="createChannelModal" class="modal-overlay" style="display:none;"><div class="modal-card"><div class="modal-header"><h3 style="font-size:18px;" id="createChannelTitle">Create Channel</h3><button onclick="closeModal(\'createChannelModal\')" class="modal-close">×</button></div><div class="modal-body"><label class="form-label">Channel Name</label><input type="text" id="newChannelName" placeholder="e.g., gaming" maxlength="50"><label class="form-label" style="margin-top:14px;">Visibility</label><select id="newChannelVis"><option value="public">🌐 Public — Everyone sees & chats</option><option value="private">🔒 Private — Everyone sees but read-only</option><option value="personal">👑 Personal — Only you can see</option></select></div><div class="modal-footer"><button onclick="closeModal(\'createChannelModal\')" class="btn btn-ghost">Cancel</button><button onclick="createChannel()" class="btn btn-primary">Create</button></div></div></div>';
+        }
+        // Rename modal — owner/admin lang din
+        if (canRenameChannel) {
+            content += '<div id="renameChannelModal" class="modal-overlay" style="display:none;"><div class="modal-card"><div class="modal-header"><h3 style="font-size:18px;">Rename Channel</h3><button onclick="closeModal(\'renameChannelModal\')" class="modal-close">×</button></div><div class="modal-body"><label class="form-label">New Name</label><input type="text" id="renameChannelInput" maxlength="50"></div><div class="modal-footer"><button onclick="closeModal(\'renameChannelModal\')" class="btn btn-ghost">Cancel</button><button onclick="saveRename()" class="btn btn-primary">Save</button></div></div></div>';
+        }
 
         // Script
         content += '<script src="/socket.io/socket.io.js"></script>';
@@ -672,6 +715,8 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         content += 'const CURRENT_ROLE = ' + JSON.stringify(req.session.user.role) + ';';
         content += 'const IS_OWNER = ' + isOwner + ';';
         content += 'const IS_GLOBAL_ADMIN = ' + isGlobalAdmin + ';';
+        content += 'const CAN_CREATE_CHANNEL = ' + canCreateChannel + ';';
+        content += 'const CAN_RENAME_CHANNEL = ' + canRenameChannel + ';';
         content += 'const socket = io();';
         content += 'let currentChannelId = null;';
         content += 'let currentChannelType = "text";';
@@ -694,11 +739,11 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         content += 'function formatTime(ts){return new Date(ts).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}';
         content += 'function toggleChatSidebar(){document.getElementById("chatSidebar").classList.toggle("mobile-open")}';
         content += 'function closeModal(id){document.getElementById(id).style.display="none"}';
-        content += 'function openCreateChannel(type){currentChannelType=type;document.getElementById("createChannelTitle").textContent=type==="voice"?"Create Voice Channel":"Create Text Channel";document.getElementById("createChannelModal").style.display="flex";document.getElementById("newChannelName").value=""}';
-        content += 'async function createChannel(){const name=document.getElementById("newChannelName").value.trim();const vis=document.getElementById("newChannelVis").value;if(!name)return showToast("Name required","error");const r=await fetch("/api/servers/"+SERVER_ID+"/channels",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name,type:currentChannelType,visibility:vis})});const d=await r.json();if(d.id){addChannelToSidebar(d);closeModal("createChannelModal");showToast("Channel created!","success")}else showToast(d.error,"error")}';
+        content += 'function openCreateChannel(type){if(!CAN_CREATE_CHANNEL){return showToast("Only owner/admin can create channels","error")}currentChannelType=type;document.getElementById("createChannelTitle").textContent=type==="voice"?"Create Voice Channel":"Create Text Channel";document.getElementById("createChannelModal").style.display="flex";document.getElementById("newChannelName").value=""}';
+        content += 'async function createChannel(){if(!CAN_CREATE_CHANNEL){return showToast("Only owner/admin can create channels","error")}const name=document.getElementById("newChannelName").value.trim();const vis=document.getElementById("newChannelVis").value;if(!name)return showToast("Name required","error");const r=await fetch("/api/servers/"+SERVER_ID+"/channels",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name,type:currentChannelType,visibility:vis})});const d=await r.json();if(d.id){addChannelToSidebar(d);closeModal("createChannelModal");showToast("Channel created!","success")}else showToast(d.error,"error")}';
         content += 'function addChannelToSidebar(c){';
         content += 'if(c.type==="voice"){const list=document.getElementById("voiceChannelsList");const div=document.createElement("div");div.className="voice-channel-item";div.dataset.id=c.id;div.innerHTML=\'<div class="voice-item-header"><span>🔊</span><span class="voice-name">\'+escapeHtml(c.name)+\'</span><span class="voice-count" id="voice-count-\'+c.id+\'" style="display:none;">0</span></div><div class="voice-participants" id="voice-participants-\'+c.id+\'"></div><button class="voice-join-btn" onclick="joinVoice(\'+c.id+\',\\\'\'+c.name.replace(/\'/g,"\\\\\'")+\'\\\')">Join</button>\';list.appendChild(div);}';
-        content += 'else{const list=document.getElementById("channelsList");const div=document.createElement("div");div.className="channel-item";div.dataset.id=c.id;div.dataset.visibility=c.visibility||"public";div.innerHTML=\'<span class="channel-hash">#</span><span class="channel-name">\'+escapeHtml(c.name)+\'</span>\'+(c.visibility==="private"?\'<span class="badge badge-private" style="font-size:8px;">🔒</span>\':"")+(c.visibility==="personal"?\'<span class="badge badge-personal" style="font-size:8px;">👑</span>\':"")+(IS_OWNER||IS_GLOBAL_ADMIN||c.created_by===CURRENT_USER?\'<div class="channel-icons"><button class="channel-icon-btn" onclick="event.stopPropagation();openRename(\'+c.id+\',\\\'\'+c.name.replace(/\'/g,"\\\\\'")+\'\\\')">✏️</button></div>\':"");div.onclick=function(){switchChannel(c.id,c.name,c.visibility||"public",c.created_by,"text")};list.appendChild(div);}';
+        content += 'else{const list=document.getElementById("channelsList");const div=document.createElement("div");div.className="channel-item";div.dataset.id=c.id;div.dataset.visibility=c.visibility||"public";div.innerHTML=\'<span class="channel-hash">#</span><span class="channel-name">\'+escapeHtml(c.name)+\'</span>\'+(c.visibility==="private"?\'<span class="badge badge-private" style="font-size:8px;">🔒</span>\':"")+(c.visibility==="personal"?\'<span class="badge badge-personal" style="font-size:8px;">👑</span>\':"")+((IS_OWNER||IS_GLOBAL_ADMIN)?\'<div class="channel-icons"><button class="channel-icon-btn" onclick="event.stopPropagation();openRename(\'+c.id+\',\\\'\'+c.name.replace(/\'/g,"\\\\\'")+\'\\\')">✏️</button></div>\':"");div.onclick=function(){switchChannel(c.id,c.name,c.visibility||"public",c.created_by,"text")};list.appendChild(div);}';
         content += '}';
         content += 'function switchChannel(id,name,visibility,owner,type){currentChannelId=id;currentChannelVis=visibility||"public";currentChannelOwner=owner||"";document.getElementById("currentChannelName").textContent=name;input.placeholder=currentChannelVis==="private"?"Read-only":"Message #"+name;document.querySelectorAll(".channel-item").forEach(function(el){el.classList.remove("active")});const a=document.querySelector(\'.channel-item[data-id="\'+id+\'"]\');if(a)a.classList.add("active");messagesEl.innerHTML=\'<div style="text-align:center;color:var(--text-3);padding:20px 0;">Loading...</div>\';socket.emit("switch_channel",{channelId:id});const cantChat=(currentChannelVis==="private"&&!IS_OWNER&&!IS_GLOBAL_ADMIN&&currentChannelOwner!==CURRENT_USER);document.getElementById("chatInputArea").style.display=cantChat?"none":"block";document.getElementById("readOnlyNotice").style.display=cantChat?"block":"none";const badge=document.getElementById("channelBadge");if(currentChannelVis==="private"){badge.className="badge badge-private";badge.textContent="🔒 Read-only";badge.style.display="inline-block"}else if(currentChannelVis==="personal"){badge.className="badge badge-personal";badge.textContent="👑 Personal";badge.style.display="inline-block"}else badge.style.display="none";if(window.innerWidth<=900)document.getElementById("chatSidebar").classList.remove("mobile-open")}';
         content += 'function renderMessage(msg,isNew){const isOwn=msg.username===CURRENT_USER;const isA=msg.role==="ADMIN";const div=document.createElement("div");div.className="chat-message";div.dataset.id=msg.id;if(isNew)div.style.animation="msgIn 0.3s ease";const av=isA?"linear-gradient(135deg,#ffaa00,#ff6600)":"linear-gradient(135deg,var(--red-1),var(--red-2))";const rb=isA?\'<span style="font-size:9px;font-weight:800;color:#ffaa00;background:rgba(255,170,0,0.12);padding:2px 6px;border-radius:5px;margin-left:6px;">♛ ADMIN</span>\':"";div.innerHTML=\'<div class="msg-avatar" style="background:\'+av+\';">\'+escapeHtml(msg.username.charAt(0).toUpperCase())+\'</div><div class="msg-body"><div class="msg-meta"><span class="msg-username" style="color:\'+(isOwn?"var(--accent-bright)":"var(--text-0)")+\';">\'+(isOwn?"You":escapeHtml(msg.username))+\'</span>\'+rb+\'<span class="msg-time">\'+formatTime(msg.created_at)+\'</span></div><div class="msg-content">\'+escapeHtml(msg.message)+\'</div>\'+(IS_GLOBAL_ADMIN&&!isOwn?\'<button class="msg-delete" onclick="deleteMsg(\'+msg.id+\')">🗑</button>\':"")+\'</div>\';return div}';
@@ -709,8 +754,8 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         content += 'socket.on("channel_created",function(c){if(document.querySelector(\'[data-id="\'+c.id+\'"]\'))return;addChannelToSidebar(c)});';
         content += 'form.addEventListener("submit",function(e){e.preventDefault();const msg=input.value.trim();if(!msg||!currentChannelId)return;socket.emit("send_message",{username:CURRENT_USER,role:CURRENT_ROLE,message:msg,channelId:currentChannelId});input.value=""});';
         content += 'window.deleteMsg=function(id){if(confirm("Delete?"))socket.emit("delete_message",{messageId:id,role:CURRENT_ROLE,channelId:currentChannelId})};';
-        content += 'window.openRename=function(id,name){document.getElementById("renameChannelInput").value=name;document.getElementById("renameChannelModal").dataset.channelId=id;document.getElementById("renameChannelModal").style.display="flex"};';
-        content += 'window.saveRename=async function(){const id=document.getElementById("renameChannelModal").dataset.channelId;const name=document.getElementById("renameChannelInput").value.trim();if(!name)return;const r=await fetch("/api/channels/"+id+"/rename",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name})});const d=await r.json();if(d.success){showToast("Renamed!","success");closeModal("renameChannelModal")}else showToast(d.error,"error")};';
+        content += 'window.openRename=function(id,name){if(!CAN_RENAME_CHANNEL){return showToast("Only owner/admin can rename channels","error")}document.getElementById("renameChannelInput").value=name;document.getElementById("renameChannelModal").dataset.channelId=id;document.getElementById("renameChannelModal").style.display="flex"};';
+        content += 'window.saveRename=async function(){if(!CAN_RENAME_CHANNEL){return showToast("Only owner/admin can rename channels","error")}const id=document.getElementById("renameChannelModal").dataset.channelId;const name=document.getElementById("renameChannelInput").value.trim();if(!name)return;const r=await fetch("/api/channels/"+id+"/rename",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name})});const d=await r.json();if(d.success){showToast("Renamed!","success");closeModal("renameChannelModal")}else showToast(d.error,"error")};';
 
         // KICK
         content += 'window.kickMember=async function(username){if(!confirm("Kick "+username+" from this server?"))return;try{const r=await fetch("/api/servers/"+SERVER_ID+"/kick",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({targetUser:username})});const d=await r.json();if(d.success){showToast(username+" kicked","success")}else showToast(d.error||"Failed","error")}catch(e){showToast("Failed","error")}};';
@@ -736,76 +781,13 @@ app.get('/server/:id', requireLogin, async function(req, res) {
 
         content += 'function removePeer(sid){if(peerConnections[sid]){try{peerConnections[sid].pc.close()}catch(e){}delete peerConnections[sid]}delete voiceStreams[sid];const audioEl=document.querySelector(\'audio[data-audio-for="\'+sid+\'"]\');if(audioEl)audioEl.remove();const tile=document.querySelector(\'.voice-tile[data-tile="\'+sid+\'"]\');if(tile)tile.remove();if(viewingSocketId===sid)focusSelf()}';
 
-        // renderSelfTile — NO template literals
-        content += 'function renderSelfTile(){';
-        content += 'const strip=document.getElementById("voiceParticipantsStrip");';
-        content += 'let tile=document.querySelector(\'.voice-tile[data-tile="self"]\');';
-        content += 'if(!tile){';
-        content += 'tile=document.createElement("div");';
-        content += 'tile.className="voice-tile";';
-        content += 'tile.dataset.tile="self";';
-        content += 'tile.onclick=function(){focusSelf()};';
-        content += 'tile.innerHTML=\'<video autoplay playsinline muted></video><div class="voice-tile-avatar" style="display:none;">\'+escapeHtml(CURRENT_USER.charAt(0).toUpperCase())+\'</div><div class="voice-tile-label">You</div><div class="voice-tile-self-badge">YOU</div>\';';
-        content += 'strip.insertBefore(tile,strip.firstChild);';
-        content += '}';
-        content += 'const v=tile.querySelector("video");';
-        content += 'v.srcObject=isSharing?screenStream:localStream;';
-        content += 'if(viewingSocketId===null)tile.classList.add("active-focus");';
-        content += 'else tile.classList.remove("active-focus");';
-        content += '}';
+        content += 'function renderSelfTile(){const strip=document.getElementById("voiceParticipantsStrip");let tile=document.querySelector(\'.voice-tile[data-tile="self"]\');if(!tile){tile=document.createElement("div");tile.className="voice-tile";tile.dataset.tile="self";tile.onclick=function(){focusSelf()};tile.innerHTML=\'<video autoplay playsinline muted></video><div class="voice-tile-avatar" style="display:none;">\'+escapeHtml(CURRENT_USER.charAt(0).toUpperCase())+\'</div><div class="voice-tile-label">You</div><div class="voice-tile-self-badge">YOU</div>\';strip.insertBefore(tile,strip.firstChild)}const v=tile.querySelector("video");v.srcObject=isSharing?screenStream:localStream;if(viewingSocketId===null)tile.classList.add("active-focus");else tile.classList.remove("active-focus")}';
 
-        // renderParticipantTile — NO template literals
-        content += 'function renderParticipantTile(p){';
-        content += 'const sid=p.socketId;';
-        content += 'if(document.querySelector(\'.voice-tile[data-tile="\'+sid+\'"]\'))return;';
-        content += 'const canKick=(IS_OWNER||IS_GLOBAL_ADMIN)&&p.username!==CURRENT_USER;';
-        content += 'const tile=document.createElement("div");';
-        content += 'tile.className="voice-tile";';
-        content += 'tile.dataset.tile=sid;';
-        content += 'tile.onclick=function(e){if(e.target.classList.contains("voice-tile-kick"))return;focusUser(sid,p.username)};';
-        content += 'tile.innerHTML=\'<video autoplay playsinline muted></video><div class="voice-tile-avatar">\'+escapeHtml(p.username.charAt(0).toUpperCase())+\'</div><div class="voice-tile-stream-badge" style="display:\'+(p.isStreaming?"block":"none")+\'">● LIVE</div>\'+(p.isMuted?\'<div class="voice-tile-muted-badge">🔇</div>\':"")+\'<div class="voice-tile-label">\'+escapeHtml(p.username)+\'</div>\'+(canKick?\'<button class="voice-tile-kick" onclick="event.stopPropagation();kickFromVoice(\\\'\'+sid+\'\\\',\\\'\'+p.username.replace(/\'/g,"\\\\\'")+\'\\\')" title="Kick from voice">👢</button>\':"");';
-        content += 'document.getElementById("voiceParticipantsStrip").appendChild(tile);';
-        content += 'const vs=voiceStreams[sid];';
-        content += 'if(vs&&vs.video){const v=tile.querySelector("video");v.srcObject=vs.video;const av=tile.querySelector(".voice-tile-avatar");if(av)av.style.display="none"}';
-        content += '}';
+        content += 'function renderParticipantTile(p){const sid=p.socketId;if(document.querySelector(\'.voice-tile[data-tile="\'+sid+\'"]\'))return;const canKick=(IS_OWNER||IS_GLOBAL_ADMIN)&&p.username!==CURRENT_USER;const tile=document.createElement("div");tile.className="voice-tile";tile.dataset.tile=sid;tile.onclick=function(e){if(e.target.classList.contains("voice-tile-kick"))return;focusUser(sid,p.username)};tile.innerHTML=\'<video autoplay playsinline muted></video><div class="voice-tile-avatar">\'+escapeHtml(p.username.charAt(0).toUpperCase())+\'</div><div class="voice-tile-stream-badge" style="display:\'+(p.isStreaming?"block":"none")+\'">● LIVE</div>\'+(p.isMuted?\'<div class="voice-tile-muted-badge">🔇</div>\':"")+\'<div class="voice-tile-label">\'+escapeHtml(p.username)+\'</div>\'+(canKick?\'<button class="voice-tile-kick" onclick="event.stopPropagation();kickFromVoice(\\\'\'+sid+\'\\\',\\\'\'+p.username.replace(/\'/g,"\\\\\'")+\'\\\')" title="Kick from voice">👢</button>\':"");document.getElementById("voiceParticipantsStrip").appendChild(tile);const vs=voiceStreams[sid];if(vs&&vs.video){const v=tile.querySelector("video");v.srcObject=vs.video;const av=tile.querySelector(".voice-tile-avatar");if(av)av.style.display="none"}}';
 
         content += 'function updateParticipantTile(sid,p){const tile=document.querySelector(\'.voice-tile[data-tile="\'+sid+\'"]\');if(!tile)return;const sb=tile.querySelector(".voice-tile-stream-badge");if(sb)sb.style.display=p.isStreaming?"block":"none";const mb=tile.querySelector(".voice-tile-muted-badge");if(p.isMuted&&!mb){const nm=document.createElement("div");nm.className="voice-tile-muted-badge";nm.textContent="🔇";tile.appendChild(nm)}else if(!p.isMuted&&mb){mb.remove()}const vs=voiceStreams[sid];if(vs&&vs.video){const v=tile.querySelector("video");if(v&&!v.srcObject)v.srcObject=vs.video;const av=tile.querySelector(".voice-tile-avatar");if(av)av.style.display="none"}}';
 
-        // showFocusedUser — NO template literals
-        content += 'function showFocusedUser(sid,username){';
-        content += 'const vs=voiceStreams[sid];';
-        content += 'const mainVideo=document.getElementById("voiceMainVideo");';
-        content += 'const mainLabel=document.getElementById("voiceMainLabel");';
-        content += 'const mainBack=document.getElementById("voiceMainBack");';
-        content += 'const mainAvatar=document.getElementById("voiceMainAvatar");';
-        content += 'if(vs&&vs.video){';
-        content += 'const combined=new MediaStream();';
-        content += 'if(vs.audio)vs.audio.getAudioTracks().forEach(function(t){combined.addTrack(t)});';
-        content += 'vs.video.getVideoTracks().forEach(function(t){combined.addTrack(t)});';
-        content += 'mainVideo.srcObject=combined;';
-        content += 'mainVideo.muted=isDeafened;';
-        content += 'mainVideo.volume=1.0;';
-        content += 'mainVideo.classList.add("screen-mode");';
-        content += 'mainVideo.style.display="block";';
-        content += 'mainAvatar.classList.remove("show");';
-        content += 'mainLabel.textContent="🖥️ "+username+"\\\'s Screen";';
-        content += 'mainLabel.classList.add("live");';
-        content += 'mainBack.classList.add("show");';
-        content += '}else{';
-        content += 'mainVideo.srcObject=null;';
-        content += 'mainVideo.style.display="none";';
-        content += 'mainAvatar.classList.add("show");';
-        content += 'document.getElementById("voiceMainAvatarCircle").textContent=username.charAt(0).toUpperCase();';
-        content += 'document.getElementById("voiceMainAvatarName").textContent=username;';
-        content += 'document.getElementById("voiceMainAvatarStatus").textContent="Not sharing screen";';
-        content += 'mainLabel.textContent="👤 "+username;';
-        content += 'mainLabel.classList.remove("live");';
-        content += 'mainBack.classList.add("show");';
-        content += '}';
-        content += 'document.querySelectorAll(".voice-tile").forEach(function(t){t.classList.remove("active-focus")});';
-        content += 'const tile=document.querySelector(\'.voice-tile[data-tile="\'+sid+\'"]\');';
-        content += 'if(tile)tile.classList.add("active-focus");';
-        content += '}';
+        content += 'function showFocusedUser(sid,username){const vs=voiceStreams[sid];const mainVideo=document.getElementById("voiceMainVideo");const mainLabel=document.getElementById("voiceMainLabel");const mainBack=document.getElementById("voiceMainBack");const mainAvatar=document.getElementById("voiceMainAvatar");if(vs&&vs.video){const combined=new MediaStream();if(vs.audio)vs.audio.getAudioTracks().forEach(function(t){combined.addTrack(t)});vs.video.getVideoTracks().forEach(function(t){combined.addTrack(t)});mainVideo.srcObject=combined;mainVideo.muted=isDeafened;mainVideo.volume=1.0;mainVideo.classList.add("screen-mode");mainVideo.style.display="block";mainAvatar.classList.remove("show");mainLabel.textContent="🖥️ "+username+"\\\'s Screen";mainLabel.classList.add("live");mainBack.classList.add("show")}else{mainVideo.srcObject=null;mainVideo.style.display="none";mainAvatar.classList.add("show");document.getElementById("voiceMainAvatarCircle").textContent=username.charAt(0).toUpperCase();document.getElementById("voiceMainAvatarName").textContent=username;document.getElementById("voiceMainAvatarStatus").textContent="Not sharing screen";mainLabel.textContent="👤 "+username;mainLabel.classList.remove("live");mainBack.classList.add("show")}document.querySelectorAll(".voice-tile").forEach(function(t){t.classList.remove("active-focus")});const tile=document.querySelector(\'.voice-tile[data-tile="\'+sid+\'"]\');if(tile)tile.classList.add("active-focus")}';
 
         content += 'window.focusUser=function(sid,username){viewingSocketId=sid;showFocusedUser(sid,username);const vs=voiceStreams[sid];showToast(vs&&vs.video?"Watching "+username+"\\\'s screen":username+" is not sharing screen","success")};';
         content += 'window.focusSelf=function(){viewingSocketId=null;const mainVideo=document.getElementById("voiceMainVideo");const mainLabel=document.getElementById("voiceMainLabel");const mainBack=document.getElementById("voiceMainBack");const mainAvatar=document.getElementById("voiceMainAvatar");mainVideo.style.display="block";mainVideo.srcObject=isSharing?screenStream:localStream;mainVideo.muted=true;mainVideo.classList.toggle("screen-mode",isSharing);mainAvatar.classList.remove("show");mainLabel.textContent=isSharing?"🖥️ Your Screen":"👤 You";if(isSharing)mainLabel.classList.add("live");else mainLabel.classList.remove("live");mainBack.classList.remove("show");document.querySelectorAll(".voice-tile").forEach(function(t){t.classList.remove("active-focus")});const selfTile=document.querySelector(\'.voice-tile[data-tile="self"]\');if(selfTile)selfTile.classList.add("active-focus");showToast("Back to your view","success")};';
@@ -831,10 +813,10 @@ app.get('/server/:id', requireLogin, async function(req, res) {
     } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
 });
 
-function renderChannelItem(c, me, isOwner, isGlobalAdmin) {
-    const canEdit = isOwner || isGlobalAdmin || c.created_by === me;
+// ============ renderChannelItem — OWNER/ADMIN lang may ✏️ ============
+function renderChannelItem(c, me, canRename) {
     let icons = '';
-    if (canEdit) {
+    if (canRename) {
         icons = '<div class="channel-icons"><button class="channel-icon-btn" onclick="event.stopPropagation();openRename(' + c.id + ', \'' + c.name.replace(/'/g, "\\'") + '\')" title="Rename">✏️</button></div>';
     }
     let badges = '';
@@ -1048,7 +1030,8 @@ io.on('connection', function(socket) {
 
 // ==================== START ====================
 server.listen(PORT, function() {
-    console.log('✅ ' + BRAND_NAME + ' v39.1 — Syntax Fixed');
+    console.log('✅ ' + BRAND_NAME + ' v39.3 — Rename: Owner/Admin Only');
+    console.log('🔒 Only Owner & Admin can create/rename channels');
     console.log('👤 Default: sarili mo lang ang nakikita mo');
     console.log('👆 Click user → papalitan ng screen nila');
     console.log('👆 Click "You" → babalik sa sarili mo');
