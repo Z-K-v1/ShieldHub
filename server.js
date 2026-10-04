@@ -3,7 +3,11 @@ const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
 const crypto = require('crypto');
+const http = require('http');
+const { Server } = require('socket.io');
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -55,6 +59,37 @@ async function initDB() {
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS version VARCHAR(50) DEFAULT 'V1';`);
         await pool.query(`UPDATE scripts SET slug = LOWER(REPLACE(name, ' ', '_')) WHERE slug = 'Script' OR slug IS NULL;`);
         await pool.query(`UPDATE scripts SET version = 'V1' WHERE version IS NULL;`);
+
+        // Channels table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS channels (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(50) UNIQUE NOT NULL,
+                description VARCHAR(200) DEFAULT '',
+                created_by VARCHAR(50) NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+        `);
+
+        // Chat messages
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id SERIAL PRIMARY KEY,
+                channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+                username VARCHAR(50) NOT NULL,
+                role VARCHAR(20) DEFAULT 'USER',
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+        `);
+
+        // Create default channel
+        const generalChannel = await pool.query(`SELECT * FROM channels WHERE name = 'general'`);
+        if (generalChannel.rows.length === 0) {
+            await pool.query(`INSERT INTO channels (name, description, created_by) VALUES ('general', 'General discussion', 'system')`);
+            console.log('💬 Default channel "general" created');
+        }
+
         console.log('✅ Tables created/verified');
 
         const adminPass = process.env.ADMIN_PASSWORD;
@@ -155,7 +190,6 @@ function getHtmlHead(title) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0a0505">
     <title>${title} · ${BRAND_SHORT}</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -166,7 +200,7 @@ function getHtmlHead(title) {
     `;
 }
 
-// ==================== RED PREMIUM STYLES (PC + CP Optimized) ====================
+// ==================== STYLES ====================
 const LAYOUT_STYLES = `
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     :root {
@@ -200,15 +234,11 @@ const LAYOUT_STYLES = `
         font-size: 14px;
         line-height: 1.5;
         -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
         overflow-x: hidden;
         position: relative;
         min-height: 100vh;
         overscroll-behavior-y: none;
     }
-
-    /* Ambient red glows */
     body::before {
         content: '';
         position: fixed;
@@ -219,12 +249,10 @@ const LAYOUT_STYLES = `
         pointer-events: none;
         z-index: 0;
     }
-
     a { color: inherit; text-decoration: none; }
     button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
     input, textarea, select, button { -webkit-appearance: none; appearance: none; }
 
-    /* ===== Layout ===== */
     .layout { display: flex; min-height: 100vh; position: relative; z-index: 1; }
 
     /* ===== Sidebar ===== */
@@ -243,7 +271,6 @@ const LAYOUT_STYLES = `
         transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
         padding-top: max(20px, env(safe-area-inset-top));
         padding-bottom: max(20px, env(safe-area-inset-bottom));
-        padding-left: max(14px, env(safe-area-inset-left));
     }
     .sidebar-brand {
         display: flex;
@@ -352,10 +379,8 @@ const LAYOUT_STYLES = `
         text-transform: uppercase; letter-spacing: 0.6px;
     }
 
-    /* ===== Main ===== */
     .main { flex: 1; margin-left: 264px; min-height: 100vh; display: flex; flex-direction: column; width: 100%; }
 
-    /* ===== Topbar ===== */
     .topbar {
         height: 64px;
         background: rgba(10,5,5,0.85);
@@ -395,7 +420,6 @@ const LAYOUT_STYLES = `
     .icon-btn:hover { background: var(--bg-3); color: var(--accent); border-color: var(--border-1); }
     .icon-btn:active { transform: scale(0.95); }
 
-    /* ===== Content ===== */
     .content { 
         padding: 32px; 
         padding-bottom: calc(32px + env(safe-area-inset-bottom));
@@ -405,7 +429,6 @@ const LAYOUT_STYLES = `
         margin: 0 auto; 
     }
 
-    /* ===== Page Header ===== */
     .page-header {
         display: flex; justify-content: space-between; align-items: flex-end;
         gap: 20px; flex-wrap: wrap;
@@ -426,7 +449,6 @@ const LAYOUT_STYLES = `
         font-size: 13.5px; color: var(--text-2); font-weight: 500;
     }
 
-    /* ===== Buttons ===== */
     .btn {
         display: inline-flex; align-items: center; justify-content: center; gap: 8px;
         padding: 11px 20px;
@@ -439,12 +461,10 @@ const LAYOUT_STYLES = `
         text-decoration: none;
         font-family: inherit;
         border: 1px solid transparent;
-        letter-spacing: 0.1px;
         min-height: 42px;
         user-select: none;
     }
     .btn:active { transform: scale(0.97); }
-
     .btn-primary {
         background: linear-gradient(135deg, var(--red-1), var(--red-2));
         color: #fff;
@@ -454,14 +474,12 @@ const LAYOUT_STYLES = `
         transform: translateY(-2px);
         box-shadow: 0 12px 32px rgba(255,59,59,0.5), inset 0 1px 0 rgba(255,255,255,0.3);
     }
-
     .btn-secondary {
         background: var(--bg-2);
         color: var(--text-0);
         border-color: var(--border-1);
     }
     .btn-secondary:hover { background: var(--bg-3); border-color: var(--border-2); transform: translateY(-2px); }
-
     .btn-danger {
         background: rgba(255,59,59,0.08);
         color: #ff5555;
@@ -472,7 +490,6 @@ const LAYOUT_STYLES = `
         border-color: rgba(255,59,59,0.4);
         transform: translateY(-2px);
     }
-
     .btn-ghost {
         background: transparent;
         color: var(--text-1);
@@ -483,11 +500,9 @@ const LAYOUT_STYLES = `
         color: var(--text-0); 
         border-color: var(--border-2); 
     }
-
     .btn-sm { padding: 9px 14px; font-size: 12.5px; border-radius: 9px; min-height: 38px; }
     .btn-block { width: 100%; }
 
-    /* ===== Stats ===== */
     .stats-row {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -538,7 +553,6 @@ const LAYOUT_STYLES = `
     }
     .stat-value-sm { font-size: 22px; letter-spacing: -0.5px; }
 
-    /* ===== Scripts Grid ===== */
     .scripts-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
@@ -569,7 +583,6 @@ const LAYOUT_STYLES = `
         transform: translateY(-3px);
         box-shadow: 0 24px 48px rgba(0,0,0,0.5), 0 0 40px rgba(255,59,59,0.12);
     }
-
     .script-card-header {
         display: flex; justify-content: space-between; align-items: flex-start;
         gap: 12px;
@@ -619,7 +632,6 @@ const LAYOUT_STYLES = `
         color: var(--accent-bright);
         border-color: rgba(255,59,59,0.25);
     }
-
     .script-card-url {
         background: var(--bg-0);
         border: 1px solid var(--border-0);
@@ -630,17 +642,13 @@ const LAYOUT_STYLES = `
         color: var(--accent-bright);
         word-break: break-all;
         line-height: 1.6;
-        transition: border-color 0.2s ease;
     }
-    .script-card-url:hover { border-color: var(--border-1); }
-
     .script-card-actions {
         display: flex; gap: 8px; flex-wrap: wrap;
         padding-top: 6px;
     }
     .script-card-actions .btn { flex: 1; min-width: calc(50% - 5px); }
 
-    /* ===== Empty ===== */
     .empty {
         background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
         border: 1px dashed var(--border-1);
@@ -661,11 +669,9 @@ const LAYOUT_STYLES = `
         font-family: 'Space Grotesk', sans-serif;
         font-size: 18px; font-weight: 700; color: var(--text-0); 
         margin-bottom: 8px; 
-        letter-spacing: -0.3px; 
     }
     .empty-desc { font-size: 13.5px; color: var(--text-2); margin-bottom: 24px; }
 
-    /* ===== Card / Form ===== */
     .card {
         position: relative;
         background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
@@ -725,7 +731,6 @@ const LAYOUT_STYLES = `
         padding-right: 42px;
     }
 
-    /* ===== User List ===== */
     .user-row {
         position: relative;
         background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
@@ -754,7 +759,6 @@ const LAYOUT_STYLES = `
     }
     .user-row-meta { font-size: 12px; color: var(--text-2); font-weight: 500; }
 
-    /* ===== Toast ===== */
     @keyframes toastIn {
         from { transform: translateX(400px) scale(0.9); opacity: 0; }
         to { transform: translateX(0) scale(1); opacity: 1; }
@@ -786,24 +790,16 @@ const LAYOUT_STYLES = `
         border-radius: 50%;
         flex-shrink: 0;
     }
-    .toast.success::before { 
-        background: var(--red-1); 
-        box-shadow: 0 0 16px var(--accent-glow); 
-    }
-    .toast.error::before { 
-        background: #ffb800; 
-        box-shadow: 0 0 16px rgba(255,184,0,0.5); 
-    }
+    .toast.success::before { background: var(--red-1); box-shadow: 0 0 16px var(--accent-glow); }
+    .toast.error::before { background: #ffb800; box-shadow: 0 0 16px rgba(255,184,0,0.5); }
     .toast.error { border-color: rgba(255,184,0,0.3); }
 
-    /* ===== Login ===== */
     .login-wrap {
         min-height: 100vh;
         display: flex; align-items: center; justify-content: center;
         padding: 20px;
         padding-top: calc(20px + env(safe-area-inset-top));
         padding-bottom: calc(20px + env(safe-area-inset-bottom));
-        position: relative;
     }
     .login-card {
         position: relative;
@@ -860,11 +856,9 @@ const LAYOUT_STYLES = `
         font-size: 13.5px; 
         color: var(--red-1); 
         font-weight: 700;
-        transition: opacity 0.2s;
     }
-    .login-link:hover { opacity: 0.8; text-decoration: underline; }
+    .login-link:hover { text-decoration: underline; }
 
-    /* ===== Mobile Menu Button ===== */
     .menu-btn {
         display: none;
         width: 42px; height: 42px;
@@ -875,13 +869,11 @@ const LAYOUT_STYLES = `
         color: var(--text-1);
         font-size: 18px;
         cursor: pointer;
-        transition: all 0.2s ease;
         flex-shrink: 0;
     }
     .menu-btn:hover { background: var(--bg-3); color: var(--accent); }
     .menu-btn:active { transform: scale(0.95); }
 
-    /* ===== Overlay ===== */
     .overlay {
         display: none;
         position: fixed; inset: 0;
@@ -894,7 +886,6 @@ const LAYOUT_STYLES = `
     .overlay.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    /* ===== Scrollbar ===== */
     ::-webkit-scrollbar { width: 10px; height: 10px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { 
@@ -904,94 +895,50 @@ const LAYOUT_STYLES = `
     }
     ::-webkit-scrollbar-thumb:hover { background: var(--border-2); }
 
-    /* =============================================
-       TABLET (768px - 900px)
-       ============================================= */
     @media (max-width: 900px) {
-        .sidebar { 
-            transform: translateX(-100%); 
-            width: 280px;
-        }
-        .sidebar.open { 
-            transform: translateX(0); 
-            box-shadow: 40px 0 100px rgba(0,0,0,0.8); 
-        }
+        .sidebar { transform: translateX(-100%); width: 280px; }
+        .sidebar.open { transform: translateX(0); box-shadow: 40px 0 100px rgba(0,0,0,0.8); }
         .main { margin-left: 0; }
         .menu-btn { display: flex; }
         .content { padding: 24px; }
         .topbar { padding: 0 24px; }
         .page-title { font-size: 28px; }
-        .scripts-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
-        .stats-row { grid-template-columns: repeat(2, 1fr); }
     }
-
-    /* =============================================
-       MOBILE (480px - 768px)
-       ============================================= */
     @media (max-width: 768px) {
-        body { font-size: 14px; }
         .content { padding: 18px; }
         .topbar { padding: 0 18px; height: 60px; }
         .page-header { margin-bottom: 22px; flex-direction: column; align-items: stretch; gap: 16px; }
-        .page-title { font-size: 24px; letter-spacing: -0.8px; }
-        .page-subtitle { font-size: 13px; }
+        .page-title { font-size: 24px; }
         .card { padding: 22px; }
         .stat { padding: 18px 20px; }
         .stat-value { font-size: 26px; }
         .script-card { padding: 20px; }
-        .script-card-name { font-size: 15.5px; }
         .form-row { grid-template-columns: 1fr; gap: 0; }
-        .scripts-grid { grid-template-columns: 1fr; gap: 14px; }
+        .scripts-grid { grid-template-columns: 1fr; }
         .stats-row { grid-template-columns: 1fr 1fr; gap: 12px; }
-        .btn { padding: 12px 18px; font-size: 13.5px; }
-        .btn-sm { padding: 10px 14px; font-size: 12.5px; }
+        .btn { padding: 12px 18px; }
         textarea { min-height: 260px; font-size: 12px; }
         .login-card { padding: 36px 28px; }
-        .login-logo { width: 64px; height: 64px; font-size: 24px; border-radius: 18px; }
+        .login-logo { width: 64px; height: 64px; font-size: 24px; }
         .login-title { font-size: 22px; }
-        .user-row { padding: 14px 16px; }
-        .user-row-name { font-size: 14px; }
     }
-
-    /* =============================================
-       SMALL MOBILE (under 480px)
-       ============================================= */
     @media (max-width: 480px) {
         .content { padding: 14px; }
         .topbar { padding: 0 14px; height: 58px; }
         .page-title { font-size: 22px; }
-        .page-header { margin-bottom: 18px; }
         .card { padding: 18px; border-radius: 14px; }
-        .stat { padding: 16px 16px; border-radius: 14px; }
+        .stat { padding: 16px 16px; }
         .stat-value { font-size: 22px; }
-        .stat-value-sm { font-size: 18px; }
-        .stat-icon { width: 36px; height: 36px; font-size: 16px; margin-bottom: 12px; }
-        .script-card { padding: 16px; border-radius: 14px; }
-        .script-card-icon { width: 40px; height: 40px; font-size: 17px; border-radius: 11px; }
-        .script-card-name { font-size: 15px; }
+        .script-card { padding: 16px; }
         .script-card-actions .btn { flex: 1; min-width: 100%; }
         .script-card-actions { flex-direction: column; }
         .stats-row { grid-template-columns: 1fr; gap: 10px; }
         input, textarea, select { font-size: 16px; padding: 12px 14px; }
         textarea { min-height: 220px; font-size: 12px; }
-        .login-card { padding: 30px 22px; border-radius: 18px; }
-        .login-logo { width: 58px; height: 58px; font-size: 22px; border-radius: 16px; margin-bottom: 14px; }
+        .login-card { padding: 30px 22px; }
+        .login-logo { width: 58px; height: 58px; font-size: 22px; }
         .login-title { font-size: 20px; }
-        .login-sub { font-size: 12.5px; }
-        .empty { padding: 50px 20px; }
-        .empty-icon { width: 64px; height: 64px; font-size: 28px; }
-        .empty-title { font-size: 16px; }
-        .user-row { flex-direction: column; align-items: flex-start; gap: 12px; }
-        .user-row .btn { align-self: stretch; }
-        .toast { left: 14px; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 13px; padding: 13px 16px; }
-    }
-
-    /* =============================================
-       LANDSCAPE MOBILE
-       ============================================= */
-    @media (max-width: 900px) and (orientation: landscape) {
-        .content { padding: 16px; }
-        .page-header { margin-bottom: 16px; }
+        .toast { left: 14px; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); font-size: 13px; }
     }
 `;
 
@@ -1024,7 +971,6 @@ const TOAST_SCRIPT = `
         document.querySelector('.overlay').classList.toggle('active');
         document.body.style.overflow = document.querySelector('.sidebar').classList.contains('open') ? 'hidden' : '';
     }
-    // Close sidebar on nav click (mobile)
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', () => {
             if (window.innerWidth <= 900) {
@@ -1061,6 +1007,9 @@ function renderLayout({ title, pageTitle, pageSubtitle, content, user, activeNav
                     <a href="/create" class="nav-item ${activeNav === 'create' ? 'active' : ''}">
                         <span class="nav-icon">✦</span> Create Script
                     </a>
+                    <a href="/chat" class="nav-item ${activeNav === 'chat' ? 'active' : ''}">
+                        <span class="nav-icon">💬</span> Chat
+                    </a>
                     ${isAdmin ? `
                     <div class="nav-section-label">Administration</div>
                     <a href="/admin" class="nav-item ${activeNav === 'admin' ? 'active' : ''}">
@@ -1086,7 +1035,7 @@ function renderLayout({ title, pageTitle, pageSubtitle, content, user, activeNav
                         <div class="topbar-title">${pageTitle}</div>
                     </div>
                     <div class="topbar-right">
-                        <a href="/logout" class="icon-btn" title="Logout" aria-label="Logout">⏻</a>
+                        <a href="/logout" class="icon-btn" title="Logout">⏻</a>
                     </div>
                 </header>
                 <div class="content">
@@ -1288,7 +1237,7 @@ app.get('/create', requireLogin, (req, res) => {
                     <textarea name="content" placeholder="-- Paste your Lua script here..." required></textarea>
                 </div>
                 <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                    <button type="submit" class="btn btn-primary">Save Script</button>
+                    <button type="submit" class="btn btn-primary">💾 Save Script</button>
                     <a href="/" class="btn btn-ghost">Cancel</a>
                 </div>
             </form>
@@ -1345,7 +1294,7 @@ app.get('/edit/:token', requireLogin, async (req, res) => {
                         <textarea name="content" required>${escaped}</textarea>
                     </div>
                     <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                        <button type="submit" class="btn btn-primary">💾 Save Changes</button>
                         <a href="/" class="btn btn-ghost">Cancel</a>
                     </div>
                 </form>
@@ -1433,7 +1382,631 @@ app.get('/raw/:slug/:version/:token', async (req, res) => {
     } catch (e) { res.status(500).send("-- Server Error --"); }
 });
 
-// ==================== ADMIN ====================
+// ==================== SOCKET.IO CHAT (DISCORD-STYLE) ====================
+io.on('connection', (socket) => {
+    console.log('🔗 Connected:', socket.id);
+
+    socket.on('join_chat', async (data) => {
+        try {
+            const { username, role, channelId } = data;
+            socket.username = username;
+            socket.role = role;
+            socket.channelId = channelId;
+            socket.join('channel_' + channelId);
+
+            const result = await pool.query(
+                'SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50',
+                [channelId]
+            );
+            socket.emit('chat_history', result.rows.reverse());
+        } catch (e) { console.error('Join chat error:', e); }
+    });
+
+    socket.on('switch_channel', async (data) => {
+        try {
+            const { channelId } = data;
+            if (socket.channelId) socket.leave('channel_' + socket.channelId);
+            socket.channelId = channelId;
+            socket.join('channel_' + channelId);
+
+            const result = await pool.query(
+                'SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50',
+                [channelId]
+            );
+            socket.emit('chat_history', result.rows.reverse());
+        } catch (e) { console.error('Switch channel error:', e); }
+    });
+
+    socket.on('send_message', async (data) => {
+        try {
+            const { username, role, message, channelId } = data;
+            if (!message || message.trim().length === 0) return;
+            if (message.length > 500) return;
+
+            const result = await pool.query(
+                'INSERT INTO chat_messages (channel_id, username, role, message) VALUES ($1, $2, $3, $4) RETURNING *',
+                [channelId, username, role, message.trim().substring(0, 500)]
+            );
+            io.to('channel_' + channelId).emit('new_message', result.rows[0]);
+        } catch (e) { console.error('Send message error:', e); }
+    });
+
+    socket.on('delete_message', async (data) => {
+        try {
+            const { messageId, role, channelId } = data;
+            if (role !== 'ADMIN') return;
+            await pool.query('DELETE FROM chat_messages WHERE id = $1', [messageId]);
+            io.to('channel_' + channelId).emit('message_deleted', { messageId });
+        } catch (e) { console.error('Delete message error:', e); }
+    });
+
+    socket.on('create_channel', async (data) => {
+        try {
+            const { name, description, username } = data;
+            const cleanName = name.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-').substring(0, 30);
+            if (!cleanName) return socket.emit('channel_error', { error: 'Invalid channel name' });
+
+            const existing = await pool.query('SELECT * FROM channels WHERE name = $1', [cleanName]);
+            if (existing.rows.length > 0) return socket.emit('channel_error', { error: 'Channel already exists' });
+
+            const result = await pool.query(
+                'INSERT INTO channels (name, description, created_by) VALUES ($1, $2, $3) RETURNING *',
+                [cleanName, description || '', username]
+            );
+            io.emit('channel_created', result.rows[0]);
+        } catch (e) {
+            console.error('Create channel error:', e);
+            socket.emit('channel_error', { error: 'Failed to create channel' });
+        }
+    });
+
+    socket.on('delete_channel', async (data) => {
+        try {
+            const { channelId, role } = data;
+            if (role !== 'ADMIN') return;
+            
+            const channel = await pool.query('SELECT * FROM channels WHERE id = $1', [channelId]);
+            if (channel.rows.length === 0) return;
+            if (channel.rows[0].name === 'general') return socket.emit('channel_error', { error: 'Cannot delete #general' });
+
+            await pool.query('DELETE FROM channels WHERE id = $1', [channelId]);
+            io.emit('channel_deleted', { channelId });
+        } catch (e) { console.error('Delete channel error:', e); }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('❌ Disconnected:', socket.id);
+    });
+});
+
+// ==================== CHAT PAGE ====================
+app.get('/chat', requireLogin, async (req, res) => {
+    try {
+        const isAdmin = req.session.user.role === 'ADMIN';
+        const channelsResult = await pool.query('SELECT * FROM channels ORDER BY name ASC');
+        const channels = channelsResult.rows;
+
+        const chatContent = `
+        <div class="chat-layout">
+            <div class="chat-sidebar" id="chatSidebar">
+                <div class="chat-sidebar-header">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <div style="width:10px;height:10px;border-radius:50%;background:var(--red-1);box-shadow:0 0 12px var(--accent-glow);animation:pulse 2s infinite;"></div>
+                        <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:var(--text-0);">Channels</span>
+                    </div>
+                    <button onclick="openCreateChannel()" class="chat-add-btn" title="Create Channel">+</button>
+                </div>
+
+                <div class="chat-channels-list" id="channelsList">
+                    ${channels.map(c => `
+                        <div class="channel-item" data-id="${c.id}" data-name="${c.name}" onclick="switchChannel(${c.id}, '${c.name}')">
+                            <span class="channel-hash">#</span>
+                            <span class="channel-name">${c.name}</span>
+                            ${isAdmin && c.name !== 'general' ? `<button class="channel-delete" onclick="event.stopPropagation();deleteChannel(${c.id}, '${c.name}')" title="Delete">×</button>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="chat-sidebar-footer">
+                    <div class="chat-user-info">
+                        <div class="user-avatar ${isAdmin ? 'user-avatar-admin' : ''}">${req.session.user.username.charAt(0).toUpperCase()}</div>
+                        <div class="user-meta">
+                            <div class="user-name">${req.session.user.username}</div>
+                            <div class="user-role">${isAdmin ? '♛ Admin' : 'Member'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-main">
+                <div class="chat-header">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <button class="chat-mobile-toggle" onclick="toggleChatSidebar()">☰</button>
+                        <span style="color:var(--text-2);font-size:18px;">#</span>
+                        <span id="currentChannelName" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;color:var(--text-0);">general</span>
+                    </div>
+                    <div id="onlineCount" style="font-size:12px;color:var(--text-2);font-weight:600;">● Online</div>
+                </div>
+
+                <div id="chatMessages" class="chat-messages">
+                    <div style="text-align:center;color:var(--text-3);font-size:13px;padding:20px 0;">
+                        Loading...
+                    </div>
+                </div>
+
+                <div class="chat-input-area">
+                    <form id="chatForm">
+                        <input type="text" id="chatInput" placeholder="Message #general" maxlength="500" autocomplete="off">
+                        <button type="submit" class="btn btn-primary">
+                            <span style="font-size:16px;">➤</span>
+                        </button>
+                    </form>
+                    <div style="font-size:10.5px;color:var(--text-3);margin-top:8px;text-align:right;" id="charCount">0/500</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="createChannelModal" class="modal-overlay" style="display:none;">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;">Create Channel</h3>
+                    <button onclick="closeCreateChannel()" class="modal-close">×</button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">Channel Name</label>
+                    <input type="text" id="newChannelName" placeholder="e.g., gaming" maxlength="30" autocomplete="off">
+                    <label class="form-label" style="margin-top:14px;">Description (optional)</label>
+                    <input type="text" id="newChannelDesc" placeholder="What's this channel about?" maxlength="200" autocomplete="off">
+                </div>
+                <div class="modal-footer">
+                    <button onclick="closeCreateChannel()" class="btn btn-ghost">Cancel</button>
+                    <button onclick="createChannel()" class="btn btn-primary">Create Channel</button>
+                </div>
+            </div>
+        </div>
+
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+            const socket = io();
+            const messagesEl = document.getElementById('chatMessages');
+            const form = document.getElementById('chatForm');
+            const input = document.getElementById('chatInput');
+            const charCount = document.getElementById('charCount');
+            const currentUser = ${JSON.stringify(req.session.user.username)};
+            const currentRole = ${JSON.stringify(req.session.user.role)};
+            const isAdmin = currentRole === 'ADMIN';
+            let currentChannelId = null;
+
+            function escapeHtml(text) {
+                const d = document.createElement('div');
+                d.textContent = text;
+                return d.innerHTML;
+            }
+
+            function formatTime(ts) {
+                const d = new Date(ts);
+                const now = new Date();
+                const isToday = d.toDateString() === now.toDateString();
+                if (isToday) return 'Today at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            }
+
+            function switchChannel(id, name) {
+                currentChannelId = id;
+                document.getElementById('currentChannelName').textContent = name;
+                input.placeholder = 'Message #' + name;
+                document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+                const activeEl = document.querySelector('.channel-item[data-id="' + id + '"]');
+                if (activeEl) activeEl.classList.add('active');
+                messagesEl.innerHTML = '<div style="text-align:center;color:var(--text-3);font-size:13px;padding:20px 0;">Loading...</div>';
+                socket.emit('switch_channel', { channelId: id });
+                if (window.innerWidth <= 768) {
+                    document.getElementById('chatSidebar').classList.remove('mobile-open');
+                }
+            }
+
+            function toggleChatSidebar() {
+                document.getElementById('chatSidebar').classList.toggle('mobile-open');
+            }
+
+            function renderMessage(msg, isNew = false) {
+                const isOwn = msg.username === currentUser;
+                const isUserAdmin = msg.role === 'ADMIN';
+                const div = document.createElement('div');
+                div.className = 'chat-message';
+                div.dataset.id = msg.id;
+                if (isNew) div.style.animation = 'msgIn 0.3s ease';
+                
+                const avatarColor = isUserAdmin ? 'linear-gradient(135deg,#ffaa00,#ff6600)' : 'linear-gradient(135deg,var(--red-1),var(--red-2))';
+                const roleBadge = isUserAdmin ? '<span style="font-size:9px;font-weight:800;color:#ffaa00;background:rgba(255,170,0,0.12);padding:2px 6px;border-radius:5px;letter-spacing:0.5px;margin-left:6px;">ADMIN</span>' : '';
+                
+                div.innerHTML = \`
+                    <div class="msg-avatar" style="background:\${avatarColor};">\${escapeHtml(msg.username.charAt(0).toUpperCase())}</div>
+                    <div class="msg-body">
+                        <div class="msg-meta">
+                            <span class="msg-username" style="color:\${isOwn ? 'var(--accent-bright)' : 'var(--text-0)'};">\${isOwn ? 'You' : escapeHtml(msg.username)}</span>\${roleBadge}
+                            <span class="msg-time">\${formatTime(msg.created_at)}</span>
+                        </div>
+                        <div class="msg-content">\${escapeHtml(msg.message)}</div>
+                        \${isAdmin && !isOwn ? \`<button class="msg-delete" onclick="deleteMsg(\${msg.id})">🗑 Delete</button>\` : ''}
+                    </div>
+                \`;
+                return div;
+            }
+
+            socket.on('chat_history', (messages) => {
+                messagesEl.innerHTML = '';
+                if (messages.length === 0) {
+                    messagesEl.innerHTML = '<div style="text-align:center;color:var(--text-3);font-size:13px;padding:60px 20px;"><div style="font-size:48px;margin-bottom:12px;">👋</div><div style="font-size:15px;font-weight:700;color:var(--text-2);margin-bottom:6px;">Welcome to the channel!</div><div style="font-size:12px;">Be the first to say something.</div></div>';
+                    return;
+                }
+                messages.forEach(m => messagesEl.appendChild(renderMessage(m)));
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            });
+
+            socket.on('new_message', (msg) => {
+                messagesEl.appendChild(renderMessage(msg, true));
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            });
+
+            socket.on('message_deleted', ({ messageId }) => {
+                const el = messagesEl.querySelector('[data-id="' + messageId + '"]');
+                if (el) {
+                    el.style.opacity = '0';
+                    el.style.transform = 'translateX(-20px)';
+                    el.style.transition = 'all 0.3s ease';
+                    setTimeout(() => el.remove(), 300);
+                }
+            });
+
+            socket.on('channel_created', (channel) => {
+                const list = document.getElementById('channelsList');
+                const div = document.createElement('div');
+                div.className = 'channel-item';
+                div.dataset.id = channel.id;
+                div.dataset.name = channel.name;
+                div.onclick = () => switchChannel(channel.id, channel.name);
+                div.innerHTML = '<span class="channel-hash">#</span><span class="channel-name">' + escapeHtml(channel.name) + '</span>' + (isAdmin && channel.name !== 'general' ? '<button class="channel-delete" onclick="event.stopPropagation();deleteChannel(' + channel.id + ', \\'' + channel.name + '\\')" title="Delete">×</button>' : '');
+                list.appendChild(div);
+                switchChannel(channel.id, channel.name);
+                showToast('Channel #' + channel.name + ' created!', 'success');
+            });
+
+            socket.on('channel_deleted', ({ channelId }) => {
+                const el = document.querySelector('.channel-item[data-id="' + channelId + '"]');
+                if (el) el.remove();
+                if (currentChannelId === channelId) {
+                    switchChannel(1, 'general');
+                }
+                showToast('Channel deleted', 'success');
+            });
+
+            socket.on('channel_error', ({ error }) => {
+                showToast(error, 'error');
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const msg = input.value.trim();
+                if (!msg || !currentChannelId) return;
+                socket.emit('send_message', { 
+                    username: currentUser, 
+                    role: currentRole, 
+                    message: msg, 
+                    channelId: currentChannelId 
+                });
+                input.value = '';
+                charCount.textContent = '0/500';
+            });
+
+            input.addEventListener('input', () => {
+                charCount.textContent = input.value.length + '/500';
+            });
+
+            window.deleteMsg = function(id) {
+                if (confirm('Delete this message?')) {
+                    socket.emit('delete_message', { messageId: id, role: currentRole, channelId: currentChannelId });
+                }
+            };
+
+            window.deleteChannel = function(id, name) {
+                if (confirm('Delete channel #' + name + '? All messages will be lost.')) {
+                    socket.emit('delete_channel', { channelId: id, role: currentRole });
+                }
+            };
+
+            window.openCreateChannel = function() {
+                document.getElementById('createChannelModal').style.display = 'flex';
+                document.getElementById('newChannelName').focus();
+            };
+            window.closeCreateChannel = function() {
+                document.getElementById('createChannelModal').style.display = 'none';
+                document.getElementById('newChannelName').value = '';
+                document.getElementById('newChannelDesc').value = '';
+            };
+            window.createChannel = function() {
+                const name = document.getElementById('newChannelName').value.trim();
+                const desc = document.getElementById('newChannelDesc').value.trim();
+                if (!name) return showToast('Channel name required', 'error');
+                socket.emit('create_channel', { name, description: desc, username: currentUser });
+                closeCreateChannel();
+            };
+
+            socket.emit('join_chat', { username: currentUser, role: currentRole, channelId: 1 });
+            currentChannelId = 1;
+            const firstChannel = document.querySelector('.channel-item[data-id="1"]');
+            if (firstChannel) firstChannel.classList.add('active');
+        </script>
+
+        <style>
+            @keyframes msgIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes pulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.4; }
+            }
+            
+            .chat-layout {
+                display: grid;
+                grid-template-columns: 240px 1fr;
+                background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
+                border: 1px solid var(--border-0);
+                border-radius: 16px;
+                overflow: hidden;
+                height: calc(100vh - 220px);
+                min-height: 500px;
+                position: relative;
+            }
+
+            .chat-sidebar {
+                background: var(--bg-0);
+                border-right: 1px solid var(--border-0);
+                display: flex;
+                flex-direction: column;
+            }
+
+            .chat-sidebar-header {
+                padding: 16px 18px;
+                border-bottom: 1px solid var(--border-0);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .chat-add-btn {
+                width: 28px; height: 28px;
+                border-radius: 8px;
+                background: var(--bg-2);
+                border: 1px solid var(--border-0);
+                color: var(--text-1);
+                font-size: 18px;
+                display: flex; align-items: center; justify-content: center;
+                cursor: pointer;
+                padding: 0;
+                line-height: 1;
+            }
+            .chat-add-btn:hover {
+                background: var(--accent-dim);
+                color: var(--accent);
+                border-color: var(--accent);
+                transform: scale(1.1);
+            }
+
+            .chat-channels-list {
+                flex: 1;
+                overflow-y: auto;
+                padding: 10px 8px;
+            }
+
+            .channel-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 9px 12px;
+                border-radius: 8px;
+                cursor: pointer;
+                color: var(--text-2);
+                font-size: 13.5px;
+                font-weight: 600;
+                margin-bottom: 2px;
+                position: relative;
+            }
+            .channel-item:hover { background: var(--bg-2); color: var(--text-0); }
+            .channel-item.active { background: var(--accent-dim); color: var(--accent); }
+            .channel-item.active::before {
+                content: '';
+                position: absolute;
+                left: 0; top: 50%;
+                transform: translateY(-50%);
+                width: 3px;
+                height: 60%;
+                background: var(--accent);
+                border-radius: 0 3px 3px 0;
+            }
+            .channel-hash { color: var(--text-3); font-size: 16px; font-weight: 700; }
+            .channel-item.active .channel-hash { color: var(--accent); }
+            .channel-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .channel-delete {
+                width: 20px; height: 20px;
+                border-radius: 5px;
+                background: transparent;
+                border: none;
+                color: var(--text-3);
+                font-size: 16px;
+                cursor: pointer;
+                display: flex; align-items: center; justify-content: center;
+                opacity: 0;
+            }
+            .channel-item:hover .channel-delete { opacity: 1; }
+            .channel-delete:hover { background: rgba(255,59,59,0.2); color: var(--accent); }
+
+            .chat-sidebar-footer {
+                padding: 12px;
+                border-top: 1px solid var(--border-0);
+            }
+            .chat-user-info {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 8px;
+                border-radius: 8px;
+                background: var(--bg-2);
+            }
+
+            .chat-main { display: flex; flex-direction: column; min-width: 0; }
+
+            .chat-header {
+                padding: 16px 24px;
+                border-bottom: 1px solid var(--border-0);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background: var(--bg-0);
+            }
+
+            .chat-mobile-toggle {
+                display: none;
+                background: var(--bg-2);
+                border: 1px solid var(--border-0);
+                color: var(--text-1);
+                font-size: 16px;
+                width: 32px; height: 32px;
+                border-radius: 8px;
+                cursor: pointer;
+                align-items: center;
+                justify-content: center;
+                margin-right: 4px;
+            }
+
+            .chat-messages {
+                flex: 1;
+                overflow-y: auto;
+                padding: 20px 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+            }
+
+            .chat-message { display: flex; gap: 12px; align-items: flex-start; }
+
+            .msg-avatar {
+                width: 40px; height: 40px;
+                border-radius: 12px;
+                display: flex; align-items: center; justify-content: center;
+                font-weight: 800; font-size: 15px; color: #fff;
+                flex-shrink: 0;
+                box-shadow: 0 2px 12px rgba(255,59,59,0.25);
+            }
+
+            .msg-body { flex: 1; min-width: 0; }
+            .msg-meta {
+                display: flex; align-items: center; gap: 8px;
+                margin-bottom: 5px; flex-wrap: wrap;
+            }
+            .msg-username { font-weight: 700; font-size: 13.5px; }
+            .msg-time { font-size: 11px; color: var(--text-3); font-weight: 600; }
+            .msg-content {
+                font-size: 14px; line-height: 1.55; color: var(--text-0);
+                word-wrap: break-word; overflow-wrap: break-word;
+            }
+            .msg-delete {
+                background: none; border: none;
+                color: var(--text-3); font-size: 10.5px;
+                cursor: pointer; margin-top: 6px; padding: 0;
+                font-weight: 600;
+            }
+            .msg-delete:hover { color: var(--accent); }
+
+            .chat-input-area {
+                padding: 16px 20px;
+                border-top: 1px solid var(--border-0);
+                background: var(--bg-0);
+            }
+            .chat-input-area form { display: flex; gap: 10px; align-items: center; }
+            .chat-input-area input {
+                flex: 1; margin: 0;
+                background: var(--bg-2);
+                border-color: transparent;
+            }
+            .chat-input-area input:focus { background: var(--bg-1); border-color: var(--accent); }
+            .chat-input-area .btn { padding: 13px 20px; flex-shrink: 0; }
+
+            .modal-overlay {
+                position: fixed; inset: 0;
+                background: rgba(0,0,0,0.75);
+                backdrop-filter: blur(8px);
+                z-index: 1000;
+                display: flex; align-items: center; justify-content: center;
+                padding: 20px;
+            }
+            .modal-card {
+                background: var(--bg-1);
+                border: 1px solid var(--border-1);
+                border-radius: 18px;
+                width: 460px; max-width: 100%;
+                box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+            }
+            .modal-header {
+                padding: 20px 24px;
+                border-bottom: 1px solid var(--border-0);
+                display: flex; align-items: center; justify-content: space-between;
+            }
+            .modal-close {
+                width: 32px; height: 32px;
+                border-radius: 8px;
+                background: transparent; border: none;
+                color: var(--text-2); font-size: 22px;
+                cursor: pointer;
+                display: flex; align-items: center; justify-content: center;
+            }
+            .modal-close:hover { background: var(--bg-2); color: var(--text-0); }
+            .modal-body { padding: 22px 24px; }
+            .modal-body input { margin-bottom: 0; }
+            .modal-footer {
+                padding: 16px 24px;
+                border-top: 1px solid var(--border-0);
+                display: flex; gap: 10px; justify-content: flex-end;
+            }
+
+            @media (max-width: 768px) {
+                .chat-layout {
+                    grid-template-columns: 1fr;
+                    height: calc(100vh - 180px);
+                }
+                .chat-sidebar {
+                    position: absolute;
+                    top: 0; left: 0; bottom: 0;
+                    width: 260px;
+                    z-index: 10;
+                    transform: translateX(-100%);
+                    transition: transform 0.3s ease;
+                }
+                .chat-sidebar.mobile-open {
+                    transform: translateX(0);
+                    box-shadow: 20px 0 60px rgba(0,0,0,0.8);
+                }
+                .chat-mobile-toggle { display: flex; }
+                .chat-messages { padding: 16px; }
+                .chat-input-area { padding: 14px 16px; }
+                .msg-avatar { width: 36px; height: 36px; font-size: 14px; }
+            }
+        </style>
+    `;
+
+    res.send(renderLayout({
+        title: 'Chat',
+        pageTitle: 'Chat',
+        pageSubtitle: 'Talk with other members',
+        content: chatContent,
+        user: req.session.user,
+        activeNav: 'chat'
+    }));
+    } catch (e) { res.status(500).send('Error: ' + e.message); }
+});
+
+// ==================== ADMIN PANEL ====================
 app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
     try {
         const usersResult = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
@@ -1529,7 +2102,7 @@ app.get('/delete/:token', requireLogin, async (req, res) => {
 });
 
 // ==================== START ====================
-app.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v27.0 — PC + CP Optimized`);
-    console.log(`📱 Responsive design for desktop & mobile`);
+server.listen(PORT, () => {
+    console.log(`✅ ${BRAND_NAME} v28.0 — With Discord-Style Chat`);
+    console.log(`💬 Chat enabled at /chat`);
 });
