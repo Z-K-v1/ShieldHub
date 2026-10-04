@@ -19,7 +19,7 @@ const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorize
 async function initDB() {
     try {
         await pool.query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, role VARCHAR(20) DEFAULT 'USER', display_name VARCHAR(50), tag VARCHAR(4), bio VARCHAR(200) DEFAULT '', created_at TIMESTAMP DEFAULT NOW());`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS scripts (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, slug VARCHAR(100) NOT NULL DEFAULT 'Script', version VARCHAR(50) NOT NULL DEFAULT 'V1', real_content TEXT NOT NULL, public_content TEXT NOT NULL, token VARCHAR(64) UNIQUE NOT NULL, owner VARCHAR(50) NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS scripts (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, slug VARCHAR(100) NOT NULL DEFAULT 'Script', version VARCHAR(50) NOT NULL DEFAULT 'V1', real_content TEXT NOT NULL, public_content TEXT NOT NULL, token VARCHAR(64) UNIQUE NOT NULL, owner VARCHAR(50) NOT NULL, access_type VARCHAR(20) DEFAULT 'public', allowed_ids TEXT DEFAULT '[]', created_at TIMESTAMP DEFAULT NOW());`);
         await pool.query(`CREATE TABLE IF NOT EXISTS "session" ("sid" VARCHAR NOT NULL COLLATE "default", "sess" JSON NOT NULL, "expire" TIMESTAMP(6) NOT NULL, CONSTRAINT "session_pkey" PRIMARY KEY ("sid"));`);
         await pool.query(`CREATE TABLE IF NOT EXISTS servers (id SERIAL PRIMARY KEY, name VARCHAR(100) NOT NULL, owner VARCHAR(50) NOT NULL, invite_code VARCHAR(16) UNIQUE NOT NULL, icon VARCHAR(10) DEFAULT '🎮', created_at TIMESTAMP DEFAULT NOW());`);
         await pool.query(`CREATE TABLE IF NOT EXISTS server_members (id SERIAL PRIMARY KEY, server_id INTEGER REFERENCES servers(id) ON DELETE CASCADE, username VARCHAR(50) NOT NULL, role VARCHAR(20) DEFAULT 'MEMBER', joined_at TIMESTAMP DEFAULT NOW(), UNIQUE(server_id, username));`);
@@ -33,6 +33,8 @@ async function initDB() {
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio VARCHAR(200) DEFAULT '';`);
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS slug VARCHAR(100) DEFAULT 'Script';`);
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS version VARCHAR(50) DEFAULT 'V1';`);
+        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS access_type VARCHAR(20) DEFAULT 'public';`);
+        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS allowed_ids TEXT DEFAULT '[]';`);
         await pool.query(`ALTER TABLE channels ADD COLUMN IF NOT EXISTS server_id INTEGER REFERENCES servers(id) ON DELETE CASCADE;`);
         await pool.query(`ALTER TABLE channels ADD COLUMN IF NOT EXISTS type VARCHAR(10) DEFAULT 'text';`);
         await pool.query(`ALTER TABLE channels ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) DEFAULT 'public';`);
@@ -151,7 +153,7 @@ a{color:inherit;text-decoration:none}button{font-family:inherit;cursor:pointer;b
 .topbar-left{display:flex;align-items:center;gap:14px;min-width:0;flex:1}
 .topbar-title{font-size:15px;font-weight:700;font-family:'Space Grotesk',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .topbar-right{display:flex;align-items:center;gap:8px}
-.icon-btn{width:40px;height:40px;border-radius:11px;background:var(--bg-2);border:1px solid var(--border-0);display:flex;align-items:center;justify-content:center;color:var(--text-1);font-size:15px}
+.icon-btn{width:40px;height:40px;border-radius:11px;background:var(--bg-2);border:1px solid var(--border-0);display:flex;align-items:center;justify-content:center;color:var(--text-1);font-size:15px;cursor:pointer}
 .icon-btn:hover{background:var(--bg-3);color:var(--accent)}
 .content{padding:32px;flex:1;max-width:1440px;width:100%;margin:0 auto}
 .page-header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:32px}
@@ -167,9 +169,11 @@ a{color:inherit;text-decoration:none}button{font-family:inherit;cursor:pointer;b
 .btn-ghost{background:transparent;color:var(--text-1);border-color:var(--border-1)}
 .btn-ghost:hover{background:var(--bg-2);color:var(--text-0)}
 .btn-sm{padding:9px 14px;font-size:12.5px;border-radius:9px;min-height:38px}
+.btn-success{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 4px 20px rgba(34,197,94,0.3)}
+.btn-success:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(34,197,94,0.5)}
 .card{position:relative;background:linear-gradient(180deg,var(--bg-1),var(--bg-0));border:1px solid var(--border-0);border-radius:16px;padding:30px}
 .form-group{margin-bottom:20px}
-.form-label{display:block;font-size:12px;font-weight:700;color:var(--text-1);margin-bottom:9px;text-transform:uppercase}
+.form-label{display:block;font-size:12px;font-weight:700;color:var(--text-1);margin-bottom:9px;text-transform:uppercase;letter-spacing:0.5px}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px}
 input,textarea,select{width:100%;padding:13px 15px;background:var(--bg-0);border:1px solid var(--border-0);border-radius:11px;color:var(--text-0);font-size:15px;font-family:inherit;outline:none;min-height:48px}
 input:focus,textarea:focus,select:focus{border-color:var(--accent);background:var(--bg-1);box-shadow:0 0 0 3px var(--accent-dim)}
@@ -185,6 +189,8 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .badge-owner{background:rgba(74,158,255,0.12);color:#7cc0ff;border-color:rgba(74,158,255,0.25)}
 .badge-private{background:rgba(255,59,59,0.15);color:#ff8888;border-color:rgba(255,59,59,0.3)}
 .badge-personal{background:rgba(184,85,255,0.15);color:#c490ff;border-color:rgba(184,85,255,0.3)}
+.badge-public{background:rgba(34,197,94,0.12);color:#22c55e;border-color:rgba(34,197,94,0.25)}
+.badge-whitelist{background:rgba(255,170,0,0.12);color:#ffbb44;border-color:rgba(255,170,0,0.25)}
 @keyframes toastIn{from{transform:translateX(400px) scale(0.9);opacity:0}to{transform:translateX(0) scale(1);opacity:1}}
 @keyframes toastOut{to{transform:translateX(400px) scale(0.9);opacity:0}}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--bg-2);border:1px solid var(--border-1);color:var(--text-0);padding:14px 20px;border-radius:12px;font-weight:600;font-size:13.5px;box-shadow:0 24px 60px rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;gap:12px;animation:toastIn 0.35s}
@@ -260,6 +266,15 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .chat-input-area form{display:flex;gap:10px;align-items:center}
 .chat-input-area input{flex:1;margin:0;background:var(--bg-2);border-color:transparent}
 
+/* ID WHITELIST */
+.id-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+.id-row{display:flex;align-items:center;gap:10px}
+.id-row input{flex:1;font-family:'JetBrains Mono',monospace;font-size:14px}
+.id-row .btn-remove{width:48px;height:48px;border-radius:11px;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.35);color:#ff5555;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.id-row .btn-remove:hover{background:rgba(220,38,38,0.3)}
+.access-info{font-size:12px;color:var(--text-3);margin-top:8px;font-weight:500}
+.access-info b{color:var(--accent-bright)}
+
 .voice-panel{position:fixed;bottom:24px;right:24px;width:420px;max-width:calc(100vw - 32px);background:rgba(15,8,8,0.95);backdrop-filter:blur(30px);border:1px solid var(--border-1);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,0.7);z-index:9998;display:flex;flex-direction:column;overflow:hidden;transition:all 0.3s}
 .voice-panel.fullscreen{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:100vw!important;border-radius:0!important;z-index:10000!important;bottom:0!important;right:0!important}
 .voice-panel-header{padding:12px 16px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between}
@@ -269,7 +284,6 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .voice-min-btn{width:28px;height:28px;border-radius:6px;color:var(--text-2);font-size:16px;background:var(--bg-2);border:1px solid var(--border-0);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .voice-min-btn:hover{color:var(--accent);background:var(--bg-3)}
 .voice-panel.fullscreen #voicePanelName{font-size:18px!important;font-weight:800!important}
-
 .voice-body{padding:12px;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 160px);overflow-y:auto}
 .voice-panel:not(.fullscreen) .voice-body{max-height:420px}
 .voice-main-view{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:16/9;border:1px solid var(--border-0);width:100%;display:flex;align-items:center;justify-content:center}
@@ -286,7 +300,6 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .voice-main-back{position:absolute;top:10px;right:10px;background:rgba(255,59,59,0.9);color:#fff;font-size:11px;font-weight:800;padding:6px 12px;border-radius:8px;cursor:pointer;border:none;font-family:inherit;display:none;align-items:center;gap:5px;backdrop-filter:blur(8px)}
 .voice-main-back.show{display:flex}
 .voice-main-back:hover{background:rgba(220,38,38,1)}
-
 .voice-participants-strip{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 6px 2px;min-height:70px;scrollbar-width:thin}
 .voice-tile{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:1;border:2px solid var(--border-0);min-width:80px;max-width:100px;width:100px;cursor:pointer;transition:all 0.15s;flex-shrink:0}
 .voice-tile:hover{transform:translateY(-3px);border-color:var(--accent-glow);box-shadow:0 4px 16px rgba(255,59,59,0.3)}
@@ -301,7 +314,6 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .voice-tile-kick{position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.8);color:#fff;font-size:11px;width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;font-family:inherit;z-index:3;opacity:0;transition:opacity 0.15s}
 .voice-tile:hover .voice-tile-kick{opacity:1}
 .voice-tile-kick:hover{background:rgba(220,38,38,0.95)}
-
 .voice-controls{padding:12px 16px;border-top:1px solid var(--border-0);display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .voice-ctrl-btn{width:46px;height:46px;border-radius:12px;background:var(--bg-2);border:1px solid var(--border-0);color:var(--text-0);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
 .voice-ctrl-btn:hover{background:var(--bg-3);border-color:var(--border-1)}
@@ -310,6 +322,17 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .deafen-active{background:rgba(220,38,38,0.25)!important;border-color:rgba(220,38,38,0.5)!important;color:#ff5555!important}
 .mic-test-active{background:linear-gradient(135deg,#00ff88,#00cc66)!important;color:#000!important;animation:pulse-mic 1s infinite}
 @keyframes pulse-mic{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,0.7)}50%{box-shadow:0 0 0 12px rgba(0,255,136,0)}}
+
+/* COPY */
+.copy-chip{display:inline-flex;align-items:center;gap:5px;background:var(--bg-2);border:1px solid var(--border-0);border-radius:7px;padding:3px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent-bright);cursor:pointer;transition:all 0.15s;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.copy-chip:hover{background:var(--bg-3);border-color:var(--accent);color:#fff}
+.copy-btn-inline{background:transparent;border:none;color:var(--text-3);font-size:14px;cursor:pointer;padding:4px 6px;border-radius:6px;min-width:28px;min-height:28px;display:inline-flex;align-items:center;justify-content:center}
+.copy-btn-inline:hover{background:var(--bg-3);color:var(--accent)}
+.copy-btn-inline.copied{color:#22c55e!important;background:rgba(34,197,94,0.15)}
+
+/* NOTIFICATION SOUND INDICATOR */
+.notif-toggle{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.notif-toggle.muted::after{content:'';position:absolute;width:24px;height:2px;background:#ff5555;transform:rotate(-45deg);border-radius:2px}
 
 @media(max-width:900px){
     .sidebar{transform:translateX(-100%);width:280px}
@@ -341,10 +364,91 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 
 const TOAST_SCRIPT = `
 function showToast(message,type){if(type===undefined)type='success';var e=document.querySelector('.toast');if(e)e.remove();var t=document.createElement('div');t.className='toast '+type;t.textContent=message;document.body.appendChild(t);setTimeout(function(){t.classList.add('hiding');setTimeout(function(){t.remove()},300)},2400)}
-function copyText(text,btn){navigator.clipboard.writeText(text).then(function(){if(btn){var o=btn.innerHTML;btn.innerHTML='✓';setTimeout(function(){btn.innerHTML=o},1400)}showToast('Copied')}).catch(function(){showToast('Failed','error')})}
+
+function copyToClipboard(text,btn,showMini){
+    if(showMini===undefined)showMini=true;
+    function doFallback(){try{var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);return true;}catch(e){return false;}}
+    function onSuccess(){if(btn){var old=btn.innerHTML;btn.innerHTML='✓';btn.classList.add('copied');setTimeout(function(){btn.innerHTML=old;btn.classList.remove('copied');},1400);}if(showMini){showToast('Copied!','success');}}
+    function onFail(){if(btn){btn.innerHTML='✗';setTimeout(function(){btn.innerHTML='📋';},1400);}showToast('Copy failed','error');}
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(onSuccess).catch(function(){if(doFallback())onSuccess();else onFail();});}
+    else{if(doFallback())onSuccess();else onFail();}
+}
+function copyText(text,btn){copyToClipboard(text,btn,true);}
 function confirmDelete(token,name){if(confirm('Delete "'+name+'"?'))window.location.href='/delete/'+token}
 function toggleSidebar(){document.querySelector('.sidebar').classList.toggle('open');document.querySelector('.overlay').classList.toggle('active')}
 document.querySelectorAll('.nav-item').forEach(function(i){i.addEventListener('click',function(){if(window.innerWidth<=900){document.querySelector('.sidebar').classList.remove('open');document.querySelector('.overlay').classList.remove('active')}})});
+
+/* ==================== NOTIFICATION SOUND ==================== */
+var NotificationSound = {
+    ctx: null,
+    enabled: true,
+    init: function(){
+        try{
+            var saved = localStorage.getItem('zk_notif_sound');
+            if(saved === '0') this.enabled = false;
+        }catch(e){}
+    },
+    toggle: function(){
+        this.enabled = !this.enabled;
+        try{ localStorage.setItem('zk_notif_sound', this.enabled ? '1' : '0'); }catch(e){}
+        this.updateUI();
+        if(this.enabled) this.play();
+        return this.enabled;
+    },
+    updateUI: function(){
+        var btns = document.querySelectorAll('.notif-toggle-btn');
+        for(var i = 0; i < btns.length; i++){
+            btns[i].textContent = this.enabled ? '🔔' : '🔕';
+            if(this.enabled) btns[i].classList.remove('muted');
+            else btns[i].classList.add('muted');
+            btns[i].title = this.enabled ? 'Notification Sound: ON' : 'Notification Sound: OFF';
+        }
+    },
+    ensureCtx: function(){
+        if(!this.ctx){
+            try{ this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+            catch(e){ return null; }
+        }
+        if(this.ctx.state === 'suspended'){ this.ctx.resume().catch(function(){}); }
+        return this.ctx;
+    },
+    // Discord-style "pop" notification
+    play: function(){
+        if(!this.enabled) return;
+        var ctx = this.ensureCtx();
+        if(!ctx) return;
+        try{
+            var now = ctx.currentTime;
+            // Two-tone pop: higher then lower (like Discord)
+            var osc1 = ctx.createOscillator();
+            var gain1 = ctx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(880, now);
+            osc1.frequency.exponentialRampToValueAtTime(660, now + 0.08);
+            gain1.gain.setValueAtTime(0, now);
+            gain1.gain.linearRampToValueAtTime(0.35, now + 0.01);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.2);
+
+            var osc2 = ctx.createOscillator();
+            var gain2 = ctx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(1320, now + 0.02);
+            osc2.frequency.exponentialRampToValueAtTime(990, now + 0.1);
+            gain2.gain.setValueAtTime(0, now + 0.02);
+            gain2.gain.linearRampToValueAtTime(0.25, now + 0.03);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.start(now + 0.02);
+            osc2.stop(now + 0.22);
+        }catch(e){}
+    }
+};
+NotificationSound.init();
 `;
 
 function renderLayout(opts) {
@@ -356,6 +460,7 @@ function renderLayout(opts) {
     var activeNav = opts.activeNav;
     var actions = opts.actions;
     var isAdmin = user.role === 'ADMIN';
+    var notifBtn = '<button class="icon-btn notif-toggle-btn notif-toggle" onclick="NotificationSound.toggle()" title="Notification Sound">🔔</button>';
     return '<!DOCTYPE html><html lang="en"><head>' + getHtmlHead(title) + '<style>' + LAYOUT_STYLES + '</style></head><body>' +
     '<div class="layout">' +
         '<aside class="sidebar" id="sidebar">' +
@@ -372,23 +477,117 @@ function renderLayout(opts) {
         '</aside>' +
         '<div class="overlay" onclick="toggleSidebar()"></div>' +
         '<div class="main">' +
-            '<header class="topbar"><div class="topbar-left"><button class="menu-btn" onclick="toggleSidebar()">☰</button><div class="topbar-title">' + pageTitle + '</div></div><div class="topbar-right"><a href="/logout" class="icon-btn">⏻</a></div></header>' +
+            '<header class="topbar"><div class="topbar-left"><button class="menu-btn" onclick="toggleSidebar()">☰</button><div class="topbar-title">' + pageTitle + '</div></div><div class="topbar-right">' + notifBtn + '<a href="/logout" class="icon-btn">⏻</a></div></header>' +
             '<div class="content"><div class="page-header"><div><div class="page-title">' + pageTitle + '</div>' + (pageSubtitle ? '<div class="page-subtitle">' + pageSubtitle + '</div>' : '') + '</div>' + (actions || '') + '</div>' + content + '</div>' +
         '</div>' +
     '</div>' +
     '<script>' + TOAST_SCRIPT + '</script>' +
+    '<script>setTimeout(function(){NotificationSound.updateUI();},50);</script>' +
     '</body></html>';
 }
 
+// Script card with access badge
 function renderScriptCard(s) {
     const baseUrl = process.env.RENDER_EXTERNAL_URL || ('http://localhost:' + PORT);
     const slug = s.slug || 'Script';
     const version = s.version || 'V1';
+    const accessType = s.access_type || 'public';
+    let allowedCount = 0;
+    try { allowedCount = JSON.parse(s.allowed_ids || '[]').length; } catch(e) {}
     const prettyUrl = baseUrl + '/raw/' + slug + '/' + version + '/' + s.token;
-    return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;"><div style="display:flex;gap:12px;"><div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-size:19px;">◈</div><div><div style="font-family:\'Space Grotesk\',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">' + s.name + '</div><div style="display:flex;gap:8px;font-size:11.5px;color:var(--text-2);"><span class="badge badge-version">' + version + '</span><span>' + new Date(s.created_at).toLocaleDateString() + '</span></div></div></div></div><div style="background:var(--bg-0);border:1px solid var(--border-0);border-radius:10px;padding:12px 14px;font-family:\'JetBrains Mono\',monospace;font-size:10.5px;color:var(--accent-bright);word-break:break-all;margin-top:14px;">' + prettyUrl + '</div><div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="copyText(\'loadstring(game:HttpGet(\\\'' + prettyUrl + '\\\'))()\', this)">📋 Copy</button><a href="/view/' + slug + '/' + version + '/' + s.token + '" target="_blank" class="btn btn-secondary btn-sm">◉ View</a><a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">✎ Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name + '\')">🗑 Delete</button></div></div>';
+    const loadstring = "loadstring(game:HttpGet('" + prettyUrl + "'))()";
+    const accessBadge = accessType === 'whitelist'
+        ? '<span class="badge badge-whitelist">🔒 Whitelist (' + allowedCount + ')</span>'
+        : '<span class="badge badge-public">🌐 Public</span>';
+    return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;"><div style="display:flex;gap:12px;"><div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-size:19px;">◈</div><div><div style="font-family:\'Space Grotesk\',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">' + s.name + '</div><div style="display:flex;gap:8px;font-size:11.5px;color:var(--text-2);flex-wrap:wrap;"><span class="badge badge-version">' + version + '</span>' + accessBadge + '<span>' + new Date(s.created_at).toLocaleDateString() + '</span></div></div></div></div>' +
+    '<div class="copy-chip" onclick="copyToClipboard(\'' + prettyUrl.replace(/'/g, "\\'") + '\',this,true)" title="Click to copy URL" style="margin-top:14px;">' +
+        '<span style="font-size:11px;">🔗</span>' +
+        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + prettyUrl + '</span>' +
+        '<span style="font-size:11px;">📋</span>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">' +
+        '<button class="btn btn-primary btn-sm" onclick="copyToClipboard(\'' + loadstring.replace(/'/g, "\\'") + '\',this,true)">📋 Loadstring</button>' +
+        '<a href="/view/' + slug + '/' + version + '/' + s.token + '" target="_blank" class="btn btn-secondary btn-sm">◉ View</a>' +
+        '<a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">✎ Edit</a>' +
+        '<button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name + '\')">🗑</button>' +
+    '</div></div>';
 }
 
-// ==================== AUTH ====================
+// ID list renderer
+function renderIdList(ids) {
+    if (!ids || ids.length === 0) {
+        return '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric" pattern="[0-9]*"><button type="button" class="btn-remove" onclick="removeIdRow(this)">×</button></div>';
+    }
+    return ids.map(function(id) {
+        return '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric" pattern="[0-9]*" value="' + String(id).replace(/"/g, '&quot;') + '"><button type="button" class="btn-remove" onclick="removeIdRow(this)">×</button></div>';
+    }).join('');
+}
+
+// ==================== ACCESS TYPE FORM SCRIPT ====================
+const ACCESS_FORM_SCRIPT = `
+function updateAccessUI(){
+    var sel = document.getElementById('accessType');
+    var wrap = document.getElementById('idListWrap');
+    var info = document.getElementById('accessInfo');
+    if(!sel || !wrap) return;
+    if(sel.value === 'whitelist'){
+        wrap.style.display = 'block';
+        if(info) info.innerHTML = 'Only users in this list can execute the script. Others will see <b>"Script in protection"</b>.';
+    } else {
+        wrap.style.display = 'none';
+        if(info) info.innerHTML = 'Everyone can execute this script. No user ID required.';
+    }
+}
+function addIdRow(){
+    var list = document.getElementById('idList');
+    if(!list) return;
+    var row = document.createElement('div');
+    row.className = 'id-row';
+    row.innerHTML = '<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric" pattern="[0-9]*"><button type="button" class="btn-remove" onclick="removeIdRow(this)">×</button>';
+    list.appendChild(row);
+    var inputs = list.querySelectorAll('.id-input');
+    if(inputs.length) inputs[inputs.length - 1].focus();
+}
+function removeIdRow(btn){
+    var row = btn.parentNode;
+    var list = row.parentNode;
+    row.remove();
+    if(list.children.length === 0){
+        addIdRow();
+    }
+}
+function collectIds(){
+    var inputs = document.querySelectorAll('.id-input');
+    var ids = [];
+    for(var i = 0; i < inputs.length; i++){
+        var v = inputs[i].value.trim();
+        if(v && /^[0-9]+$/.test(v)) ids.push(v);
+    }
+    return ids;
+}
+function prepareAccessSubmit(form){
+    var sel = document.getElementById('accessType');
+    var accEl = document.getElementById('accessTypeHidden');
+    var idsEl = document.getElementById('allowedIdsHidden');
+    if(!sel || !accEl || !idsEl) return true;
+    accEl.value = sel.value;
+    if(sel.value === 'whitelist'){
+        var ids = collectIds();
+        if(ids.length === 0){
+            alert('Please add at least one Roblox User ID for whitelist access.');
+            return false;
+        }
+        idsEl.value = JSON.stringify(ids);
+    } else {
+        idsEl.value = '[]';
+    }
+    return true;
+}
+document.addEventListener('DOMContentLoaded', function(){
+    updateAccessUI();
+});
+`;
+
 app.get('/login', function(req, res) {
     res.send('<!DOCTYPE html><html><head>' + getHtmlHead('Login') + '<style>' + LAYOUT_STYLES + '</style></head><body>' +
     '<div class="login-wrap"><div class="login-card"><div class="login-brand"><div class="login-logo">ZK</div><div class="login-title">Welcome back</div><div class="login-sub">Sign in to continue</div></div>' +
@@ -396,7 +595,7 @@ app.get('/login', function(req, res) {
     '<div class="login-msg error">' + (req.query.error ? 'Invalid credentials' : '') + '</div>' +
     '<div class="login-msg success">' + (req.query.registered ? 'Account created!' : '') + '</div>' +
     '<a href="/register" class="login-link">Create an account →</a>' +
-    '</div></div></body></html>');
+    '</div></div><script>' + TOAST_SCRIPT + '</script></body></html>');
 });
 app.post('/login', async function(req, res) {
     try { const { username, password } = req.body; const r = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]); if (r.rows.length === 0) return res.redirect('/login?error=1'); const u = r.rows[0]; if (u.password !== password) return res.redirect('/login?error=1'); req.session.user = { username: u.username, role: u.role }; res.redirect('/'); } catch (e) { res.redirect('/login?error=1'); }
@@ -406,7 +605,7 @@ app.get('/register', function(req, res) {
     '<div class="login-wrap"><div class="login-card"><div class="login-brand"><div class="login-logo">ZK</div><div class="login-title">Create account</div><div class="login-sub">Join ' + BRAND_SHORT + '</div></div>' +
     '<form action="/register" method="POST"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><input type="password" name="confirmPassword" placeholder="Confirm password" required><button type="submit" class="btn btn-primary" style="width:100%">Create Account →</button></form>' +
     '<div class="login-msg error">' + (req.query.error || '') + '</div><a href="/login" class="login-link">← Back to sign in</a>' +
-    '</div></div></body></html>');
+    '</div></div><script>' + TOAST_SCRIPT + '</script></body></html>');
 });
 app.post('/register', async function(req, res) {
     try { const { username, password, confirmPassword } = req.body; if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match'); if (username.length < 2 || password.length < 4) return res.redirect('/register?error=Min 2 chars, 4 chars pass'); const ex = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]); if (ex.rows.length > 0) return res.redirect('/register?error=Username taken'); const role = username === 'Z-K' ? 'ADMIN' : 'USER'; const tag = Math.floor(1000 + Math.random() * 9000).toString(); await pool.query('INSERT INTO users (username, password, role, display_name, tag) VALUES ($1, $2, $3, $4, $5)', [username, password, role, username, tag]); res.redirect('/login?registered=1'); } catch (e) { res.redirect('/register?error=Server error'); }
@@ -425,27 +624,138 @@ app.get('/', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).send('Error'); }
 });
 
+// CREATE — with Access Type UI
 app.get('/create', requireLogin, function(req, res) {
-    const content = '<div class="card" style="max-width:920px"><form action="/create" method="POST"><div class="form-row"><div class="form-group"><label class="form-label">Script Name</label><input type="text" name="name" required autofocus></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>' + versionDropdown('V1') + '</select></div></div><div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required></textarea></div><div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">💾 Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div>';
+    const accessUI = '<div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public">🌐 Public (Everyone)</option><option value="whitelist">🔒 Whitelist (Specific User IDs only)</option></select></div>' +
+    '<div class="form-group" id="idListWrap" style="display:none;"><label class="form-label">👤 Roblox User IDs</label><div class="id-list" id="idList">' + renderIdList([]) + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button><div class="access-info" id="accessInfo"></div></div>' +
+    '<input type="hidden" name="access_type" id="accessTypeHidden" value="public"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]">';
+
+    const content = '<div class="card" style="max-width:920px"><form action="/create" method="POST" onsubmit="return prepareAccessSubmit(this)"><div class="form-row"><div class="form-group"><label class="form-label">📝 Script Name (Title)</label><input type="text" name="name" required autofocus></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>' + versionDropdown('V1') + '</select></div></div>' + accessUI + '<div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required></textarea></div><div style="display:flex;gap:12px;flex-wrap:wrap;"><button type="submit" class="btn btn-primary">💾 Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div>' +
+    '<script>' + ACCESS_FORM_SCRIPT + '</script>';
     res.send(renderLayout({ title: 'Create', pageTitle: 'Create Script', pageSubtitle: 'Add a new Lua script', content: content, user: req.session.user, activeNav: 'create' }));
 });
 app.post('/create', requireLogin, async function(req, res) {
-    try { const { name, version, content } = req.body; const slug = makeSlug(name); const ver = version || 'V1'; const token = crypto.randomBytes(16).toString('hex'); await pool.query('INSERT INTO scripts (name, slug, version, real_content, public_content, token, owner) VALUES ($1, $2, $3, $4, $5, $6, $7)', [name, slug, ver, content, obfuscateScript(content), token, req.session.user.username]); res.redirect('/'); } catch (e) { res.status(500).send('Error: ' + e.message); }
+    try {
+        const name = req.body.name;
+        const version = req.body.version || 'V1';
+        const content = req.body.content;
+        const access_type = req.body.access_type || 'public';
+        let allowed_ids = req.body.allowed_ids || '[]';
+        // Validate JSON
+        try { JSON.parse(allowed_ids); } catch(e) { allowed_ids = '[]'; }
+        const slug = makeSlug(name);
+        const token = crypto.randomBytes(16).toString('hex');
+        await pool.query('INSERT INTO scripts (name, slug, version, real_content, public_content, token, owner, access_type, allowed_ids) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [name, slug, version, content, obfuscateScript(content), token, req.session.user.username, access_type, allowed_ids]);
+        res.redirect('/');
+    } catch (e) { res.status(500).send('Error: ' + e.message); }
 });
 
+// EDIT — with Access Type UI
 app.get('/edit/:token', requireLogin, async function(req, res) {
-    try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.status(404).send("Not found"); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); const escaped = s.real_content.replace(/</g, '&lt;').replace(/>/g, '&gt;'); const content = '<div class="card" style="max-width:920px"><form action="/edit/' + s.token + '" method="POST"><div class="form-row"><div class="form-group"><label class="form-label">Script Name</label><input type="text" name="name" value="' + s.name + '" required></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>' + versionDropdown(s.version) + '</select></div></div><div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div><div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">💾 Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div>'; res.send(renderLayout({ title: 'Edit', pageTitle: 'Edit: ' + s.name, pageSubtitle: 'Update your script', content: content, user: req.session.user, activeNav: 'dashboard' })); } catch (e) { res.status(500).send('Error'); }
+    try {
+        const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (r.rows.length === 0) return res.status(404).send("Not found");
+        const s = r.rows[0];
+        const isAdmin = req.session.user.role === 'ADMIN';
+        if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied");
+        const escaped = s.real_content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        let ids = [];
+        try { ids = JSON.parse(s.allowed_ids || '[]'); } catch(e) { ids = []; }
+        const accessType = s.access_type || 'public';
+        const baseUrl = process.env.RENDER_EXTERNAL_URL || ('http://localhost:' + PORT);
+        const prettyUrl = baseUrl + '/raw/' + s.slug + '/' + s.version + '/' + s.token;
+        const loadstring = "loadstring(game:HttpGet('" + prettyUrl + "'))()";
+        const accessUI = '<div style="background:linear-gradient(135deg,rgba(74,158,255,0.08),rgba(74,158,255,0.02));border:1px solid rgba(74,158,255,0.25);border-radius:12px;padding:16px;margin-bottom:20px;"><div style="font-size:10px;font-weight:800;color:#7cc0ff;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;">🔗 RAW LINK (ROBLOX)</div><div class="copy-chip" onclick="copyToClipboard(\'' + loadstring.replace(/'/g, "\\'") + '\',this,true)" style="background:rgba(74,158,255,0.1);border-color:rgba(74,158,255,0.3);font-size:11px;width:100%;">' + loadstring + ' 📋</div></div>' +
+        '<div class="form-group"><label class="form-label">📝 Script Name (Title)</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div>' +
+        '<div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public"' + (accessType === 'public' ? ' selected' : '') + '>🌐 Public (Everyone)</option><option value="whitelist"' + (accessType === 'whitelist' ? ' selected' : '') + '>🔒 Whitelist (Specific User IDs only)</option></select></div>' +
+        '<div class="form-group" id="idListWrap" style="display:' + (accessType === 'whitelist' ? 'block' : 'none') + ';"><label class="form-label">👤 Roblox User IDs</label><div class="id-list" id="idList">' + renderIdList(ids) + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button><div class="access-info" id="accessInfo"></div></div>' +
+        '<input type="hidden" name="access_type" id="accessTypeHidden" value="' + accessType + '"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="' + (s.allowed_ids || '[]').replace(/"/g, '&quot;') + '">';
+
+        const content = '<div class="card" style="max-width:920px"><form action="/edit/' + s.token + '" method="POST" onsubmit="return prepareAccessSubmit(this)">' +
+        '<div class="form-row"><div class="form-group"><label class="form-label">Version</label><select name="version" required>' + versionDropdown(s.version) + '</select></div></div>' +
+        accessUI +
+        '<div class="form-group"><label class="form-label">📜 Script Content (Lua)</label><textarea name="content" required style="min-height:400px;">' + escaped + '</textarea></div>' +
+        '<div style="display:flex;gap:12px;flex-wrap:wrap;"><button type="submit" class="btn btn-primary">💾 Save Changes</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div>' +
+        '<script>' + ACCESS_FORM_SCRIPT + '</script>';
+        res.send(renderLayout({ title: 'Edit', pageTitle: 'Edit Script', pageSubtitle: 'Update your script', content: content, user: req.session.user, activeNav: 'dashboard' }));
+    } catch (e) { res.status(500).send('Error'); }
 });
 app.post('/edit/:token', requireLogin, async function(req, res) {
-    try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.status(404).send("Not found"); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); const slug = makeSlug(req.body.name); const ver = req.body.version || 'V1'; await pool.query('UPDATE scripts SET name = $1, slug = $2, version = $3, real_content = $4, public_content = $5 WHERE token = $6', [req.body.name, slug, ver, req.body.content, obfuscateScript(req.body.content), req.params.token]); res.redirect('/'); } catch (e) { res.status(500).send('Error'); }
+    try {
+        const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (r.rows.length === 0) return res.status(404).send("Not found");
+        const s = r.rows[0];
+        const isAdmin = req.session.user.role === 'ADMIN';
+        if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied");
+        const name = req.body.name;
+        const version = req.body.version || 'V1';
+        const content = req.body.content;
+        const access_type = req.body.access_type || 'public';
+        let allowed_ids = req.body.allowed_ids || '[]';
+        try { JSON.parse(allowed_ids); } catch(e) { allowed_ids = '[]'; }
+        const slug = makeSlug(name);
+        await pool.query('UPDATE scripts SET name = $1, slug = $2, version = $3, real_content = $4, public_content = $5, access_type = $6, allowed_ids = $7 WHERE token = $8', [name, slug, version, content, obfuscateScript(content), access_type, allowed_ids, req.params.token]);
+        res.redirect('/');
+    } catch (e) { res.status(500).send('Error'); }
 });
 
+// VIEW — show access info
 app.get('/view/:slug/:version/:token', async function(req, res) {
-    try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.status(404).send("Not found"); const s = r.rows[0]; const baseUrl = process.env.RENDER_EXTERNAL_URL || ('http://localhost:' + PORT); const prettyUrl = baseUrl + '/raw/' + s.slug + '/' + s.version + '/' + s.token; const loadstring = 'loadstring(game:HttpGet("' + prettyUrl + '"))()'; res.send('<!DOCTYPE html><html><head>' + getHtmlHead(s.name) + '<style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card" style="width:640px;text-align:center;"><div class="login-brand"><div class="login-logo">ZK</div><div class="login-title">' + s.name + '</div><div class="login-sub" style="margin-top:10px;"><span class="badge badge-version">' + s.version + '</span></div></div><div style="background:var(--bg-0);border:1px solid var(--border-0);border-radius:12px;padding:18px;margin-bottom:18px;text-align:left;"><div style="font-size:10px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:12px;">Loadstring</div><div id="lsBox" style="font-family:\'JetBrains Mono\',monospace;font-size:11.5px;color:var(--accent-bright);word-break:break-all;line-height:1.8;">' + loadstring + '</div></div><button class="btn btn-primary" style="width:100%;padding:15px;" onclick="copyText(document.getElementById(\'lsBox\').innerText, this)">📋 Copy Loadstring</button><div style="margin-top:24px;font-size:11px;color:var(--text-3);font-weight:600;">Protected by ' + BRAND_NAME + '</div></div></div><script>' + TOAST_SCRIPT + '</script></body></html>'); } catch (e) { res.status(500).send('Error'); }
+    try {
+        const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (r.rows.length === 0) return res.status(404).send("Not found");
+        const s = r.rows[0];
+        const baseUrl = process.env.RENDER_EXTERNAL_URL || ('http://localhost:' + PORT);
+        const prettyUrl = baseUrl + '/raw/' + s.slug + '/' + s.version + '/' + s.token;
+        const loadstring = "loadstring(game:HttpGet('" + prettyUrl + "'))()";
+        const accessType = s.access_type || 'public';
+        let allowedCount = 0;
+        try { allowedCount = JSON.parse(s.allowed_ids || '[]').length; } catch(e) {}
+        const accessInfo = accessType === 'whitelist'
+            ? '<div style="background:rgba(255,170,0,0.1);border:1px solid rgba(255,170,0,0.25);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;color:#ffbb44;font-weight:600;">🔒 Whitelist — ' + allowedCount + ' allowed user ID(s). Others will see "Script in protection".</div>'
+            : '<div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;color:#22c55e;font-weight:600;">🌐 Public — Everyone can execute this script.</div>';
+        res.send('<!DOCTYPE html><html><head>' + getHtmlHead(s.name) + '<style>' + LAYOUT_STYLES + '</style></head><body>' +
+        '<div class="login-wrap"><div class="login-card" style="width:640px;text-align:center;">' +
+        '<div class="login-brand"><div class="login-logo">ZK</div><div class="login-title">' + s.name + '</div><div class="login-sub" style="margin-top:10px;"><span class="badge badge-version">' + s.version + '</span></div></div>' +
+        accessInfo +
+        '<div style="background:var(--bg-0);border:1px solid var(--border-0);border-radius:12px;padding:18px;margin-bottom:18px;text-align:left;">' +
+        '<div style="font-size:10px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:12px;">Loadstring</div>' +
+        '<div id="lsBox" style="font-family:\'JetBrains Mono\',monospace;font-size:11.5px;color:var(--accent-bright);word-break:break-all;line-height:1.8;">' + loadstring.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">' +
+        '<button class="btn btn-primary" style="flex:1;min-width:150px;padding:15px;" onclick="copyToClipboard(\'' + loadstring.replace(/'/g, "\\'") + '\',this,true)">📋 Copy Loadstring</button>' +
+        '<button class="btn btn-secondary" style="flex:1;min-width:150px;padding:15px;" onclick="copyToClipboard(\'' + prettyUrl.replace(/'/g, "\\'") + '\',this,true)">🔗 Copy URL</button>' +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--text-3);font-weight:600;">Protected by ' + BRAND_NAME + '</div>' +
+        '</div></div><script>' + TOAST_SCRIPT + '</script></body></html>');
+    } catch (e) { res.status(500).send('Error'); }
 });
 
+// RAW — check access_type + Roblox userId
 app.get('/raw/:slug/:version/:token', async function(req, res) {
-    try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.status(403).send("-- Denied --"); const s = r.rows[0]; if (s.slug !== req.params.slug || s.version !== req.params.version) return res.status(403).send("-- Denied --"); const ua = req.headers['user-agent'] || ''; for (const b of ['Mozilla', 'Chrome', 'Safari', 'Firefox', 'Edge', 'curl', 'wget']) if (ua.includes(b)) return res.status(403).send("-- Protected --"); res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.send(s.public_content); } catch (e) { res.status(500).send("-- Error --"); }
+    try {
+        const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
+        if (r.rows.length === 0) return res.status(403).send("-- Denied --");
+        const s = r.rows[0];
+        if (s.slug !== req.params.slug || s.version !== req.params.version) return res.status(403).send("-- Denied --");
+
+        // Whitelist check
+        const accessType = s.access_type || 'public';
+        if (accessType === 'whitelist') {
+            // Roblox sends ?userId= parameter when using HttpGet with game.Players.LocalPlayer.UserId
+            const userId = String(req.query.userId || req.query.userid || '').trim();
+            let allowed = [];
+            try { allowed = JSON.parse(s.allowed_ids || '[]').map(String); } catch(e) { allowed = []; }
+            if (!userId || allowed.indexOf(userId) === -1) {
+                return res.status(200).set('Content-Type', 'text/plain; charset=utf-8').send('-- Script in protection --');
+            }
+        }
+
+        const ua = req.headers['user-agent'] || '';
+        for (const b of ['Mozilla', 'Chrome', 'Safari', 'Firefox', 'Edge', 'curl', 'wget']) if (ua.includes(b)) return res.status(403).send("-- Protected --");
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.send(s.public_content);
+    } catch (e) { res.status(500).send("-- Error --"); }
 });
 
 app.get('/delete/:token', requireLogin, async function(req, res) {
@@ -462,11 +772,17 @@ app.get('/servers', requireLogin, async function(req, res) {
         cards = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;">';
         r.rows.forEach(function(s) {
             const isOwner = s.owner === me;
-            cards += '<div class="card" style="cursor:pointer" onclick="window.location.href=\'/server/' + s.id + '\'"><div style="display:flex;gap:12px;align-items:center;margin-bottom:14px;"><div style="width:44px;height:44px;border-radius:12px;background:var(--bg-2);display:flex;align-items:center;justify-content:center;font-size:22px;">' + (s.icon || '🎮') + '</div><div><div style="font-family:\'Space Grotesk\',sans-serif;font-size:16px;font-weight:700;">' + s.name + '</div><div style="display:flex;gap:8px;margin-top:4px;">' + (isOwner ? '<span class="badge badge-owner">👑 Owner</span>' : '<span class="badge badge-user">Member</span>') + '<span style="font-size:11px;color:var(--text-3);">' + s.member_count + ' members</span></div></div></div><div style="font-family:\'JetBrains Mono\',monospace;font-size:11px;color:var(--text-3);">Invite: <span style="color:var(--accent-bright);">' + s.invite_code + '</span></div><div style="display:flex;gap:8px;margin-top:14px;" onclick="event.stopPropagation()"><a href="/server/' + s.id + '" class="btn btn-primary btn-sm">Open</a><button onclick="copyText(\'' + s.invite_code + '\', this)" class="btn btn-secondary btn-sm">📋 Invite</button></div></div>';
+            cards += '<div class="card"><div style="display:flex;gap:12px;align-items:center;margin-bottom:14px;cursor:pointer;" onclick="window.location.href=\'/server/' + s.id + '\'"><div style="width:44px;height:44px;border-radius:12px;background:var(--bg-2);display:flex;align-items:center;justify-content:center;font-size:22px;">' + (s.icon || '🎮') + '</div><div style="flex:1;min-width:0;"><div style="font-family:\'Space Grotesk\',sans-serif;font-size:16px;font-weight:700;">' + s.name + '</div><div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;">' + (isOwner ? '<span class="badge badge-owner">👑 Owner</span>' : '<span class="badge badge-user">Member</span>') + '<span style="font-size:11px;color:var(--text-3);">' + s.member_count + ' members</span></div></div></div>' +
+            '<div class="copy-chip" onclick="copyToClipboard(\'' + s.invite_code + '\',this,true)" title="Click to copy invite code" style="margin-bottom:10px;width:100%;">' +
+                '<span style="font-size:11px;">🔑</span>' +
+                '<span style="flex:1;">Invite: <strong>' + s.invite_code + '</strong></span>' +
+                '<span style="font-size:11px;">📋</span>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;"><a href="/server/' + s.id + '" class="btn btn-primary btn-sm" style="flex:1;">Open</a><button onclick="copyToClipboard(\'' + s.invite_code + '\',this,true)" class="btn btn-secondary btn-sm" style="flex:1;">🔑 Copy Invite</button></div></div>';
         });
         cards += '</div>';
     }
-    const content = '<div style="display:flex;gap:10px;margin-bottom:20px;"><button onclick="document.getElementById(\'createServerModal\').style.display=\'flex\'" class="btn btn-primary">➕ Create Server</button><button onclick="document.getElementById(\'joinServerModal\').style.display=\'flex\'" class="btn btn-secondary">🔗 Join Server</button></div>' + cards +
+    const content = '<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;"><button onclick="document.getElementById(\'createServerModal\').style.display=\'flex\'" class="btn btn-primary">➕ Create Server</button><button onclick="document.getElementById(\'joinServerModal\').style.display=\'flex\'" class="btn btn-secondary">🔗 Join Server</button></div>' + cards +
     '<div id="createServerModal" class="modal-overlay" style="display:none"><div class="modal-card"><div class="modal-header"><h3 style="font-size:18px;">Create Server</h3><button onclick="document.getElementById(\'createServerModal\').style.display=\'none\'" class="modal-close">×</button></div><div class="modal-body"><label class="form-label">Server Name</label><input type="text" id="newServerName" maxlength="100" placeholder="My Server"><label class="form-label" style="margin-top:14px;">Icon</label><input type="text" id="newServerIcon" value="🎮" maxlength="2"></div><div class="modal-footer"><button onclick="document.getElementById(\'createServerModal\').style.display=\'none\'" class="btn btn-ghost">Cancel</button><button onclick="createServer()" class="btn btn-primary">Create</button></div></div></div>' +
     '<div id="joinServerModal" class="modal-overlay" style="display:none"><div class="modal-card"><div class="modal-header"><h3 style="font-size:18px;">Join Server</h3><button onclick="document.getElementById(\'joinServerModal\').style.display=\'none\'" class="modal-close">×</button></div><div class="modal-body"><label class="form-label">Invite Code</label><input type="text" id="joinInviteCode" placeholder="Paste invite code"></div><div class="modal-footer"><button onclick="document.getElementById(\'joinServerModal\').style.display=\'none\'" class="btn btn-ghost">Cancel</button><button onclick="joinServer()" class="btn btn-primary">Join</button></div></div></div>' +
     '<script>' +
@@ -519,24 +835,17 @@ app.post('/api/servers/:id/kick', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ============ CREATE CHANNEL — OWNER/ADMIN ONLY ============
 app.post('/api/servers/:id/channels', requireLogin, async function(req, res) {
     try {
         const serverId = parseInt(req.params.id);
         const { name, type, visibility } = req.body;
         const me = req.session.user.username;
         const isGlobalAdmin = req.session.user.role === 'ADMIN';
-
-        // PERMISSION CHECK — Owner o Global Admin lang
         const srvR = await pool.query('SELECT * FROM servers WHERE id = $1', [serverId]);
         if (srvR.rows.length === 0) return res.status(404).json({ error: 'Server not found' });
         const srv = srvR.rows[0];
         const isOwner = srv.owner === me;
-
-        if (!isOwner && !isGlobalAdmin) {
-            return res.status(403).json({ error: 'Only owner/admin can create channels' });
-        }
-
+        if (!isOwner && !isGlobalAdmin) return res.status(403).json({ error: 'Only owner/admin can create channels' });
         if (!name) return res.status(400).json({ error: 'Name required' });
         const cleanName = name.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-').substring(0, 30);
         if (!cleanName) return res.status(400).json({ error: 'Invalid name' });
@@ -550,28 +859,19 @@ app.post('/api/servers/:id/channels', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ============ RENAME CHANNEL — OWNER/ADMIN ONLY ============
 app.post('/api/channels/:id/rename', requireLogin, async function(req, res) {
     try {
         const { name } = req.body;
         const me = req.session.user.username;
         const isGlobalAdmin = req.session.user.role === 'ADMIN';
-
         if (!name) return res.status(400).json({ error: 'Name required' });
-
         const chk = await pool.query('SELECT c.*, s.owner FROM channels c JOIN servers s ON c.server_id = s.id WHERE c.id = $1', [req.params.id]);
         if (chk.rows.length === 0) return res.status(404).json({ error: 'Not found' });
         const ch = chk.rows[0];
         const isOwner = ch.owner === me;
-
-        // OWNER o ADMIN lang ang pwedeng mag-rename
-        if (!isOwner && !isGlobalAdmin) {
-            return res.status(403).json({ error: 'Only owner/admin can rename channels' });
-        }
-
+        if (!isOwner && !isGlobalAdmin) return res.status(403).json({ error: 'Only owner/admin can rename channels' });
         const cleanName = name.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-').substring(0, 30);
         if (!cleanName) return res.status(400).json({ error: 'Invalid name' });
-
         await pool.query('UPDATE channels SET name = $1 WHERE id = $2', [cleanName, req.params.id]);
         io.emit('channel_renamed', { id: parseInt(req.params.id), name: cleanName });
         res.json({ success: true });
@@ -615,33 +915,27 @@ app.get('/server/:id', requireLogin, async function(req, res) {
             const canKick = (isOwner || isGlobalAdmin) && m.username !== me && !isOwnerM;
             return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;font-size:13px;font-weight:600;color:' + nameColor + ';" data-member="' + m.username + '">' +
                 '<div style="width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;">' + m.username.charAt(0).toUpperCase() + '</div>' +
-                '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + m.username + '</span>' +
+                '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="copyToClipboard(\'' + m.username.replace(/'/g, "\\'") + '\',null,true)" title="Click to copy">' + m.username + '</span>' +
                 badge +
-                (canKick ? '<button onclick="kickMember(\'' + m.username + '\')" class="channel-icon-btn" title="Kick from server">👢</button>' : '') +
+                '<button onclick="copyToClipboard(\'' + m.username.replace(/'/g, "\\'") + '\',this,false)" class="copy-btn-inline" title="Copy username">📋</button>' +
+                (canKick ? '<button onclick="kickMember(\'' + m.username + '\')" class="channel-icon-btn" title="Kick">👢</button>' : '') +
             '</div>';
         }).join('');
 
-        // Can create/rename channel? Owner o Admin lang
         const canCreateChannel = isOwner || isGlobalAdmin;
         const canRenameChannel = isOwner || isGlobalAdmin;
 
         let content = '';
         content += '<div class="chat-layout">';
         content += '<div class="chat-sidebar" id="chatSidebar">';
-        content += '<div class="chat-sidebar-header">';
-        content += '<div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;"><span style="font-size:20px;">' + (srv.icon || '🎮') + '</span><span style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + srv.name + '</span></div>';
-        content += '</div>';
+        content += '<div class="chat-sidebar-header"><div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;"><span style="font-size:20px;">' + (srv.icon || '🎮') + '</span><span style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + srv.name + '</span></div></div>';
         content += '<div class="chat-channels-list">';
         content += '<div class="channel-group-label"><span>💬 TEXT</span>';
-        if (canCreateChannel) {
-            content += '<button onclick="openCreateChannel(\'text\')" title="Create (Owner/Admin only)">+</button>';
-        }
+        if (canCreateChannel) content += '<button onclick="openCreateChannel(\'text\')" title="Create">+</button>';
         content += '</div>';
         content += '<div id="channelsList">' + visibleText.map(function(c) { return renderChannelItem(c, me, canRenameChannel); }).join('') + '</div>';
         content += '<div class="channel-group-label" style="margin-top:16px;"><span>🔊 VOICE</span>';
-        if (canCreateChannel) {
-            content += '<button onclick="openCreateChannel(\'voice\')" title="Create (Owner/Admin only)">+</button>';
-        }
+        if (canCreateChannel) content += '<button onclick="openCreateChannel(\'voice\')" title="Create">+</button>';
         content += '</div>';
         content += '<div id="voiceChannelsList">' + visibleVoice.map(function(c) { return renderVoiceChannelItem(c, me, isOwner, isGlobalAdmin); }).join('') + '</div>';
         content += '</div>';
@@ -655,7 +949,7 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         content += '<span id="currentChannelName" style="font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:15px;">' + (visibleText[0] ? visibleText[0].name : 'general') + '</span>';
         content += '<span id="channelBadge" style="display:none;"></span>';
         content += '</div>';
-        content += '<div style="font-size:11px;color:var(--text-3);font-weight:600;">Invite: ' + srv.invite_code + '</div>';
+        content += '<div class="copy-chip" onclick="copyToClipboard(\'' + srv.invite_code + '\',this,true)" title="Copy invite">🔑 ' + srv.invite_code + ' 📋</div>';
         content += '</div>';
         content += '<div id="chatMessages" class="chat-messages"><div style="text-align:center;color:var(--text-3);padding:20px 0;">Loading...</div></div>';
         content += '<div class="chat-input-area" id="chatInputArea"><form id="chatForm"><input type="text" id="chatInput" placeholder="Message..." maxlength="500" autocomplete="off"><button type="submit" class="btn btn-primary">➤</button></form></div>';
@@ -698,16 +992,13 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         content += '</div>';
         content += '</div>';
 
-        // Modals — create channel modal lang kung may permission
         if (canCreateChannel) {
             content += '<div id="createChannelModal" class="modal-overlay" style="display:none;"><div class="modal-card"><div class="modal-header"><h3 style="font-size:18px;" id="createChannelTitle">Create Channel</h3><button onclick="closeModal(\'createChannelModal\')" class="modal-close">×</button></div><div class="modal-body"><label class="form-label">Channel Name</label><input type="text" id="newChannelName" placeholder="e.g., gaming" maxlength="50"><label class="form-label" style="margin-top:14px;">Visibility</label><select id="newChannelVis"><option value="public">🌐 Public — Everyone sees & chats</option><option value="private">🔒 Private — Everyone sees but read-only</option><option value="personal">👑 Personal — Only you can see</option></select></div><div class="modal-footer"><button onclick="closeModal(\'createChannelModal\')" class="btn btn-ghost">Cancel</button><button onclick="createChannel()" class="btn btn-primary">Create</button></div></div></div>';
         }
-        // Rename modal — owner/admin lang din
         if (canRenameChannel) {
             content += '<div id="renameChannelModal" class="modal-overlay" style="display:none;"><div class="modal-card"><div class="modal-header"><h3 style="font-size:18px;">Rename Channel</h3><button onclick="closeModal(\'renameChannelModal\')" class="modal-close">×</button></div><div class="modal-body"><label class="form-label">New Name</label><input type="text" id="renameChannelInput" maxlength="50"></div><div class="modal-footer"><button onclick="closeModal(\'renameChannelModal\')" class="btn btn-ghost">Cancel</button><button onclick="saveRename()" class="btn btn-primary">Save</button></div></div></div>';
         }
 
-        // Script
         content += '<script src="/socket.io/socket.io.js"></script>';
         content += '<script>';
         content += 'const SERVER_ID = ' + serverId + ';';
@@ -729,12 +1020,15 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         content += 'let micTestActive=false;';
         content += 'let micTestAudio=null;';
         content += 'let viewingSocketId=null;';
+        content += 'let chatWindowFocused = document.hasFocus();';
         content += 'const voiceStreams = {};';
         content += 'const iceServers={iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}]};';
         content += 'const messagesEl=document.getElementById("chatMessages");';
         content += 'const form=document.getElementById("chatForm");';
         content += 'const input=document.getElementById("chatInput");';
         content += 'socket.emit("register_user",{username:CURRENT_USER});';
+        content += 'window.addEventListener("focus",function(){chatWindowFocused=true});';
+        content += 'window.addEventListener("blur",function(){chatWindowFocused=false});';
         content += 'function escapeHtml(t){const d=document.createElement("div");d.textContent=t;return d.innerHTML}';
         content += 'function formatTime(ts){return new Date(ts).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}';
         content += 'function toggleChatSidebar(){document.getElementById("chatSidebar").classList.toggle("mobile-open")}';
@@ -743,12 +1037,12 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         content += 'async function createChannel(){if(!CAN_CREATE_CHANNEL){return showToast("Only owner/admin can create channels","error")}const name=document.getElementById("newChannelName").value.trim();const vis=document.getElementById("newChannelVis").value;if(!name)return showToast("Name required","error");const r=await fetch("/api/servers/"+SERVER_ID+"/channels",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name,type:currentChannelType,visibility:vis})});const d=await r.json();if(d.id){addChannelToSidebar(d);closeModal("createChannelModal");showToast("Channel created!","success")}else showToast(d.error,"error")}';
         content += 'function addChannelToSidebar(c){';
         content += 'if(c.type==="voice"){const list=document.getElementById("voiceChannelsList");const div=document.createElement("div");div.className="voice-channel-item";div.dataset.id=c.id;div.innerHTML=\'<div class="voice-item-header"><span>🔊</span><span class="voice-name">\'+escapeHtml(c.name)+\'</span><span class="voice-count" id="voice-count-\'+c.id+\'" style="display:none;">0</span></div><div class="voice-participants" id="voice-participants-\'+c.id+\'"></div><button class="voice-join-btn" onclick="joinVoice(\'+c.id+\',\\\'\'+c.name.replace(/\'/g,"\\\\\'")+\'\\\')">Join</button>\';list.appendChild(div);}';
-        content += 'else{const list=document.getElementById("channelsList");const div=document.createElement("div");div.className="channel-item";div.dataset.id=c.id;div.dataset.visibility=c.visibility||"public";div.innerHTML=\'<span class="channel-hash">#</span><span class="channel-name">\'+escapeHtml(c.name)+\'</span>\'+(c.visibility==="private"?\'<span class="badge badge-private" style="font-size:8px;">🔒</span>\':"")+(c.visibility==="personal"?\'<span class="badge badge-personal" style="font-size:8px;">👑</span>\':"")+((IS_OWNER||IS_GLOBAL_ADMIN)?\'<div class="channel-icons"><button class="channel-icon-btn" onclick="event.stopPropagation();openRename(\'+c.id+\',\\\'\'+c.name.replace(/\'/g,"\\\\\'")+\'\\\')">✏️</button></div>\':"");div.onclick=function(){switchChannel(c.id,c.name,c.visibility||"public",c.created_by,"text")};list.appendChild(div);}';
+        content += 'else{const list=document.getElementById("channelsList");const div=document.createElement("div");div.className="channel-item";div.dataset.id=c.id;div.dataset.visibility=c.visibility||"public";div.innerHTML=\'<span class="channel-hash">#</span><span class="channel-name">\'+escapeHtml(c.name)+\'</span>\'+(c.visibility==="private"?\'<span class="badge badge-private" style="font-size:8px;">🔒</span>\':"")+(c.visibility==="personal"?\'<span class="badge badge-personal" style="font-size:8px;">👑</span>\':"")+((IS_OWNER||IS_GLOBAL_ADMIN)?\'<div class="channel-icons"><button class="channel-icon-btn" onclick="event.stopPropagation();openRename(\'+c.id+\',\\\'\'+c.name.replace(/\'/g,"\\\\\'")+\'\\\')">✏️</button><button class="channel-icon-btn" onclick="event.stopPropagation();copyToClipboard(\\\'\'+c.name.replace(/\'/g,"\\\\\'")+\'\\\',this,false)">📋</button></div>\':"");div.onclick=function(){switchChannel(c.id,c.name,c.visibility||"public",c.created_by,"text")};list.appendChild(div);}';
         content += '}';
         content += 'function switchChannel(id,name,visibility,owner,type){currentChannelId=id;currentChannelVis=visibility||"public";currentChannelOwner=owner||"";document.getElementById("currentChannelName").textContent=name;input.placeholder=currentChannelVis==="private"?"Read-only":"Message #"+name;document.querySelectorAll(".channel-item").forEach(function(el){el.classList.remove("active")});const a=document.querySelector(\'.channel-item[data-id="\'+id+\'"]\');if(a)a.classList.add("active");messagesEl.innerHTML=\'<div style="text-align:center;color:var(--text-3);padding:20px 0;">Loading...</div>\';socket.emit("switch_channel",{channelId:id});const cantChat=(currentChannelVis==="private"&&!IS_OWNER&&!IS_GLOBAL_ADMIN&&currentChannelOwner!==CURRENT_USER);document.getElementById("chatInputArea").style.display=cantChat?"none":"block";document.getElementById("readOnlyNotice").style.display=cantChat?"block":"none";const badge=document.getElementById("channelBadge");if(currentChannelVis==="private"){badge.className="badge badge-private";badge.textContent="🔒 Read-only";badge.style.display="inline-block"}else if(currentChannelVis==="personal"){badge.className="badge badge-personal";badge.textContent="👑 Personal";badge.style.display="inline-block"}else badge.style.display="none";if(window.innerWidth<=900)document.getElementById("chatSidebar").classList.remove("mobile-open")}';
-        content += 'function renderMessage(msg,isNew){const isOwn=msg.username===CURRENT_USER;const isA=msg.role==="ADMIN";const div=document.createElement("div");div.className="chat-message";div.dataset.id=msg.id;if(isNew)div.style.animation="msgIn 0.3s ease";const av=isA?"linear-gradient(135deg,#ffaa00,#ff6600)":"linear-gradient(135deg,var(--red-1),var(--red-2))";const rb=isA?\'<span style="font-size:9px;font-weight:800;color:#ffaa00;background:rgba(255,170,0,0.12);padding:2px 6px;border-radius:5px;margin-left:6px;">♛ ADMIN</span>\':"";div.innerHTML=\'<div class="msg-avatar" style="background:\'+av+\';">\'+escapeHtml(msg.username.charAt(0).toUpperCase())+\'</div><div class="msg-body"><div class="msg-meta"><span class="msg-username" style="color:\'+(isOwn?"var(--accent-bright)":"var(--text-0)")+\';">\'+(isOwn?"You":escapeHtml(msg.username))+\'</span>\'+rb+\'<span class="msg-time">\'+formatTime(msg.created_at)+\'</span></div><div class="msg-content">\'+escapeHtml(msg.message)+\'</div>\'+(IS_GLOBAL_ADMIN&&!isOwn?\'<button class="msg-delete" onclick="deleteMsg(\'+msg.id+\')">🗑</button>\':"")+\'</div>\';return div}';
+        content += 'function renderMessage(msg,isNew){const isOwn=msg.username===CURRENT_USER;const isA=msg.role==="ADMIN";const div=document.createElement("div");div.className="chat-message";div.dataset.id=msg.id;if(isNew)div.style.animation="msgIn 0.3s ease";const av=isA?"linear-gradient(135deg,#ffaa00,#ff6600)":"linear-gradient(135deg,var(--red-1),var(--red-2))";const rb=isA?\'<span style="font-size:9px;font-weight:800;color:#ffaa00;background:rgba(255,170,0,0.12);padding:2px 6px;border-radius:5px;margin-left:6px;">♛ ADMIN</span>\':"";div.innerHTML=\'<div class="msg-avatar" style="background:\'+av+\';">\'+escapeHtml(msg.username.charAt(0).toUpperCase())+\'</div><div class="msg-body"><div class="msg-meta"><span class="msg-username" style="color:\'+(isOwn?"var(--accent-bright)":"var(--text-0)")+\';cursor:pointer;" onclick="copyToClipboard(\\\'\'+msg.username.replace(/\'/g,"\\\\\'")+\'\\\',null,true)" title="Click to copy username">\'+(isOwn?"You":escapeHtml(msg.username))+\'</span>\'+rb+\'<span class="msg-time">\'+formatTime(msg.created_at)+\'</span></div><div class="msg-content">\'+escapeHtml(msg.message)+\'</div>\'+(IS_GLOBAL_ADMIN&&!isOwn?\'<button class="msg-delete" onclick="deleteMsg(\'+msg.id+\')">🗑</button>\':"")+\'</div>\';return div}';
         content += 'socket.on("chat_history",function(msgs){messagesEl.innerHTML="";if(msgs.length===0){messagesEl.innerHTML=\'<div style="text-align:center;color:var(--text-3);padding:60px 20px;"><div style="font-size:48px;margin-bottom:12px;">👋</div><div style="font-size:15px;font-weight:700;color:var(--text-2);">Welcome!</div></div>\';return}msgs.forEach(function(m){messagesEl.appendChild(renderMessage(m))});messagesEl.scrollTop=messagesEl.scrollHeight});';
-        content += 'socket.on("new_message",function(msg){messagesEl.appendChild(renderMessage(msg,true));messagesEl.scrollTop=messagesEl.scrollHeight});';
+        content += 'socket.on("new_message",function(msg){messagesEl.appendChild(renderMessage(msg,true));messagesEl.scrollTop=messagesEl.scrollHeight;if(msg.username!==CURRENT_USER&&typeof NotificationSound!=="undefined"){NotificationSound.play()}});';
         content += 'socket.on("message_deleted",function(d){const el=messagesEl.querySelector(\'[data-id="\'+d.messageId+\'"]\');if(el){el.style.opacity="0";setTimeout(function(){el.remove()},300)}});';
         content += 'socket.on("channel_renamed",function(d){const el=document.querySelector(\'.channel-item[data-id="\'+d.id+\'"] .channel-name\');if(el)el.textContent=d.name;const v=document.querySelector(\'.voice-channel-item[data-id="\'+d.id+\'"] .voice-name\');if(v)v.textContent=d.name});';
         content += 'socket.on("channel_created",function(c){if(document.querySelector(\'[data-id="\'+c.id+\'"]\'))return;addChannelToSidebar(c)});';
@@ -757,12 +1051,10 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         content += 'window.openRename=function(id,name){if(!CAN_RENAME_CHANNEL){return showToast("Only owner/admin can rename channels","error")}document.getElementById("renameChannelInput").value=name;document.getElementById("renameChannelModal").dataset.channelId=id;document.getElementById("renameChannelModal").style.display="flex"};';
         content += 'window.saveRename=async function(){if(!CAN_RENAME_CHANNEL){return showToast("Only owner/admin can rename channels","error")}const id=document.getElementById("renameChannelModal").dataset.channelId;const name=document.getElementById("renameChannelInput").value.trim();if(!name)return;const r=await fetch("/api/channels/"+id+"/rename",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name})});const d=await r.json();if(d.success){showToast("Renamed!","success");closeModal("renameChannelModal")}else showToast(d.error,"error")};';
 
-        // KICK
         content += 'window.kickMember=async function(username){if(!confirm("Kick "+username+" from this server?"))return;try{const r=await fetch("/api/servers/"+SERVER_ID+"/kick",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({targetUser:username})});const d=await r.json();if(d.success){showToast(username+" kicked","success")}else showToast(d.error||"Failed","error")}catch(e){showToast("Failed","error")}};';
         content += 'socket.on("server_member_kicked",function(d){if(d.serverId!==SERVER_ID)return;const el=document.querySelector(\'[data-member="\'+d.username+\'"]\');if(el){el.style.opacity="0.3";el.style.textDecoration="line-through";setTimeout(function(){el.remove()},1500)}showToast(d.username+" was kicked from server","error")});';
         content += 'socket.on("you_were_kicked_from_server",function(d){if(d.serverId!==SERVER_ID)return;alert("You were kicked from this server by "+d.by);window.location.href="/servers"});';
 
-        // VOICE JOIN
         content += 'window.joinVoice=async function(channelId,channelName){try{if(currentVoiceChannelId===channelId)return;if(currentVoiceChannelId)window.leaveVoice();try{localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,sampleRate:48000,channelCount:2},video:false})}catch(e){return showToast("Mic denied","error")}currentVoiceChannelId=channelId;viewingSocketId=null;document.getElementById("voicePanelName").textContent=channelName;document.getElementById("voicePanel").style.display="flex";document.getElementById("voicePanel").classList.add("fullscreen");document.body.style.overflow="hidden";document.getElementById("voiceParticipantsStrip").innerHTML="";document.getElementById("voiceMainVideo").srcObject=localStream;document.getElementById("voiceMainVideo").classList.remove("screen-mode");document.getElementById("voiceMainLabel").textContent="👤 You";document.getElementById("voiceMainLabel").classList.remove("live");document.getElementById("voiceMainBack").classList.remove("show");document.getElementById("voiceMainAvatar").classList.remove("show");socket.emit("join_voice",{voiceChannelId:channelId,username:CURRENT_USER,role:CURRENT_ROLE});showToast("Joined voice","success")}catch(e){showToast("Failed","error")}};';
 
         content += 'window.leaveVoice=function(){if(localStream){localStream.getTracks().forEach(function(t){t.stop()});localStream=null}if(screenStream){screenStream.getTracks().forEach(function(t){t.stop()});screenStream=null}Object.values(peerConnections).forEach(function(pc){try{pc.pc.close()}catch(e){}});peerConnections={};Object.keys(voiceStreams).forEach(function(k){delete voiceStreams[k]});document.querySelectorAll("audio[data-audio-for]").forEach(function(el){el.remove()});socket.emit("leave_voice");currentVoiceChannelId=null;isSharing=false;isMuted=false;isDeafened=false;viewingSocketId=null;document.getElementById("voicePanel").style.display="none";document.getElementById("voicePanel").classList.remove("fullscreen");document.body.style.overflow="";document.getElementById("voiceParticipantsStrip").innerHTML="";document.getElementById("voiceMainVideo").srcObject=null;document.getElementById("muteBtn").textContent="🎤";document.getElementById("shareBtn").textContent="🖥️";document.getElementById("shareBtn").style.background="";document.getElementById("deafBtn").textContent="🎧";document.getElementById("deafBtn").classList.remove("deafen-active");if(window._micTestStream){window._micTestStream.getTracks().forEach(function(t){t.stop()});window._micTestStream=null}if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}micTestActive=false;const mBtn=document.getElementById("micTestBtn");if(mBtn)mBtn.classList.remove("mic-test-active")};';
@@ -783,7 +1075,7 @@ app.get('/server/:id', requireLogin, async function(req, res) {
 
         content += 'function renderSelfTile(){const strip=document.getElementById("voiceParticipantsStrip");let tile=document.querySelector(\'.voice-tile[data-tile="self"]\');if(!tile){tile=document.createElement("div");tile.className="voice-tile";tile.dataset.tile="self";tile.onclick=function(){focusSelf()};tile.innerHTML=\'<video autoplay playsinline muted></video><div class="voice-tile-avatar" style="display:none;">\'+escapeHtml(CURRENT_USER.charAt(0).toUpperCase())+\'</div><div class="voice-tile-label">You</div><div class="voice-tile-self-badge">YOU</div>\';strip.insertBefore(tile,strip.firstChild)}const v=tile.querySelector("video");v.srcObject=isSharing?screenStream:localStream;if(viewingSocketId===null)tile.classList.add("active-focus");else tile.classList.remove("active-focus")}';
 
-        content += 'function renderParticipantTile(p){const sid=p.socketId;if(document.querySelector(\'.voice-tile[data-tile="\'+sid+\'"]\'))return;const canKick=(IS_OWNER||IS_GLOBAL_ADMIN)&&p.username!==CURRENT_USER;const tile=document.createElement("div");tile.className="voice-tile";tile.dataset.tile=sid;tile.onclick=function(e){if(e.target.classList.contains("voice-tile-kick"))return;focusUser(sid,p.username)};tile.innerHTML=\'<video autoplay playsinline muted></video><div class="voice-tile-avatar">\'+escapeHtml(p.username.charAt(0).toUpperCase())+\'</div><div class="voice-tile-stream-badge" style="display:\'+(p.isStreaming?"block":"none")+\'">● LIVE</div>\'+(p.isMuted?\'<div class="voice-tile-muted-badge">🔇</div>\':"")+\'<div class="voice-tile-label">\'+escapeHtml(p.username)+\'</div>\'+(canKick?\'<button class="voice-tile-kick" onclick="event.stopPropagation();kickFromVoice(\\\'\'+sid+\'\\\',\\\'\'+p.username.replace(/\'/g,"\\\\\'")+\'\\\')" title="Kick from voice">👢</button>\':"");document.getElementById("voiceParticipantsStrip").appendChild(tile);const vs=voiceStreams[sid];if(vs&&vs.video){const v=tile.querySelector("video");v.srcObject=vs.video;const av=tile.querySelector(".voice-tile-avatar");if(av)av.style.display="none"}}';
+        content += 'function renderParticipantTile(p){const sid=p.socketId;if(document.querySelector(\'.voice-tile[data-tile="\'+sid+\'"]\'))return;const canKick=(IS_OWNER||IS_GLOBAL_ADMIN)&&p.username!==CURRENT_USER;const tile=document.createElement("div");tile.className="voice-tile";tile.dataset.tile=sid;tile.onclick=function(e){if(e.target.classList.contains("voice-tile-kick"))return;focusUser(sid,p.username)};tile.innerHTML=\'<video autoplay playsinline muted></video><div class="voice-tile-avatar">\'+escapeHtml(p.username.charAt(0).toUpperCase())+\'</div><div class="voice-tile-stream-badge" style="display:\'+(p.isStreaming?"block":"none")+\'">● LIVE</div>\'+(p.isMuted?\'<div class="voice-tile-muted-badge">🔇</div>\':"")+\'<div class="voice-tile-label">\'+escapeHtml(p.username)+\'</div>\'+(canKick?\'<button class="voice-tile-kick" onclick="event.stopPropagation();kickFromVoice(\\\'\'+sid+\'\\\',\\\'\'+p.username.replace(/\'/g,"\\\\\'")+\'\\\')" title="Kick">👢</button>\':"");document.getElementById("voiceParticipantsStrip").appendChild(tile);const vs=voiceStreams[sid];if(vs&&vs.video){const v=tile.querySelector("video");v.srcObject=vs.video;const av=tile.querySelector(".voice-tile-avatar");if(av)av.style.display="none"}}';
 
         content += 'function updateParticipantTile(sid,p){const tile=document.querySelector(\'.voice-tile[data-tile="\'+sid+\'"]\');if(!tile)return;const sb=tile.querySelector(".voice-tile-stream-badge");if(sb)sb.style.display=p.isStreaming?"block":"none";const mb=tile.querySelector(".voice-tile-muted-badge");if(p.isMuted&&!mb){const nm=document.createElement("div");nm.className="voice-tile-muted-badge";nm.textContent="🔇";tile.appendChild(nm)}else if(!p.isMuted&&mb){mb.remove()}const vs=voiceStreams[sid];if(vs&&vs.video){const v=tile.querySelector("video");if(v&&!v.srcObject)v.srcObject=vs.video;const av=tile.querySelector(".voice-tile-avatar");if(av)av.style.display="none"}}';
 
@@ -792,7 +1084,7 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         content += 'window.focusUser=function(sid,username){viewingSocketId=sid;showFocusedUser(sid,username);const vs=voiceStreams[sid];showToast(vs&&vs.video?"Watching "+username+"\\\'s screen":username+" is not sharing screen","success")};';
         content += 'window.focusSelf=function(){viewingSocketId=null;const mainVideo=document.getElementById("voiceMainVideo");const mainLabel=document.getElementById("voiceMainLabel");const mainBack=document.getElementById("voiceMainBack");const mainAvatar=document.getElementById("voiceMainAvatar");mainVideo.style.display="block";mainVideo.srcObject=isSharing?screenStream:localStream;mainVideo.muted=true;mainVideo.classList.toggle("screen-mode",isSharing);mainAvatar.classList.remove("show");mainLabel.textContent=isSharing?"🖥️ Your Screen":"👤 You";if(isSharing)mainLabel.classList.add("live");else mainLabel.classList.remove("live");mainBack.classList.remove("show");document.querySelectorAll(".voice-tile").forEach(function(t){t.classList.remove("active-focus")});const selfTile=document.querySelector(\'.voice-tile[data-tile="self"]\');if(selfTile)selfTile.classList.add("active-focus");showToast("Back to your view","success")};';
 
-        content += 'socket.on("voice_participants",function(ps){document.querySelectorAll(".voice-participants").forEach(function(el){el.innerHTML=""});document.querySelectorAll(".voice-count").forEach(function(el){el.textContent="0";el.style.display="none"});ps.forEach(function(p){const c=document.getElementById("voice-participants-"+currentVoiceChannelId);if(c){const canKick=(IS_OWNER||IS_GLOBAL_ADMIN)&&p.username!==CURRENT_USER;const d=document.createElement("div");d.className="voice-user";d.innerHTML=\'<div class="voice-user-avatar">\'+escapeHtml(p.username.charAt(0).toUpperCase())+\'</div><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">\'+escapeHtml(p.username)+(p.isMuted?" 🔇":"")+(p.isStreaming?" 🖥️":"")+\'</span>\'+(canKick?\'<button class="channel-icon-btn" style="opacity:0.6;" onclick="event.stopPropagation();kickFromVoice(\\\'\'+p.socketId+\'\\\',\\\'\'+p.username.replace(/\'/g,"\\\\\'")+\'\\\')" title="Kick from voice">👢</button>\':"");c.appendChild(d)}});const cnt=document.getElementById("voice-count-"+currentVoiceChannelId);if(cnt){cnt.textContent=ps.length;cnt.style.display=ps.length>0?"inline-block":"none"}renderSelfTile();const others=ps.filter(function(p){return p.socketId!==socket.id});document.querySelectorAll(".voice-tile").forEach(function(t){if(t.dataset.tile==="self")return;if(!others.find(function(p){return p.socketId===t.dataset.tile}))t.remove()});others.forEach(function(p){if(document.querySelector(\'.voice-tile[data-tile="\'+p.socketId+\'"]\'))updateParticipantTile(p.socketId,p);else renderParticipantTile(p)});if(viewingSocketId){const vp=ps.find(function(p){return p.socketId===viewingSocketId});if(!vp){focusSelf()}else showFocusedUser(viewingSocketId,vp.username)}});';
+        content += 'socket.on("voice_participants",function(ps){document.querySelectorAll(".voice-participants").forEach(function(el){el.innerHTML=""});document.querySelectorAll(".voice-count").forEach(function(el){el.textContent="0";el.style.display="none"});ps.forEach(function(p){const c=document.getElementById("voice-participants-"+currentVoiceChannelId);if(c){const canKick=(IS_OWNER||IS_GLOBAL_ADMIN)&&p.username!==CURRENT_USER;const d=document.createElement("div");d.className="voice-user";d.innerHTML=\'<div class="voice-user-avatar">\'+escapeHtml(p.username.charAt(0).toUpperCase())+\'</div><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">\'+escapeHtml(p.username)+(p.isMuted?" 🔇":"")+(p.isStreaming?" 🖥️":"")+\'</span>\'+(canKick?\'<button class="channel-icon-btn" style="opacity:0.6;" onclick="event.stopPropagation();kickFromVoice(\\\'\'+p.socketId+\'\\\',\\\'\'+p.username.replace(/\'/g,"\\\\\'")+\'\\\')" title="Kick">👢</button>\':"");c.appendChild(d)}});const cnt=document.getElementById("voice-count-"+currentVoiceChannelId);if(cnt){cnt.textContent=ps.length;cnt.style.display=ps.length>0?"inline-block":"none"}renderSelfTile();const others=ps.filter(function(p){return p.socketId!==socket.id});document.querySelectorAll(".voice-tile").forEach(function(t){if(t.dataset.tile==="self")return;if(!others.find(function(p){return p.socketId===t.dataset.tile}))t.remove()});others.forEach(function(p){if(document.querySelector(\'.voice-tile[data-tile="\'+p.socketId+\'"]\'))updateParticipantTile(p.socketId,p);else renderParticipantTile(p)});if(viewingSocketId){const vp=ps.find(function(p){return p.socketId===viewingSocketId});if(!vp){focusSelf()}else showFocusedUser(viewingSocketId,vp.username)}});';
 
         content += 'window.kickFromVoice=function(targetSocketId,username){if(!confirm("Kick "+(username||"this user")+" from voice?"))return;socket.emit("kick_from_voice",{targetSocketId:targetSocketId,kickedBy:CURRENT_USER})};';
         content += 'socket.on("you_were_kicked",function(d){showToast("You were kicked from voice by "+d.by,"error");window.leaveVoice()});';
@@ -813,11 +1105,10 @@ app.get('/server/:id', requireLogin, async function(req, res) {
     } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
 });
 
-// ============ renderChannelItem — OWNER/ADMIN lang may ✏️ ============
 function renderChannelItem(c, me, canRename) {
     let icons = '';
     if (canRename) {
-        icons = '<div class="channel-icons"><button class="channel-icon-btn" onclick="event.stopPropagation();openRename(' + c.id + ', \'' + c.name.replace(/'/g, "\\'") + '\')" title="Rename">✏️</button></div>';
+        icons = '<div class="channel-icons"><button class="channel-icon-btn" onclick="event.stopPropagation();openRename(' + c.id + ', \'' + c.name.replace(/'/g, "\\'") + '\')" title="Rename">✏️</button><button class="channel-icon-btn" onclick="event.stopPropagation();copyToClipboard(\'' + c.name.replace(/'/g, "\\'") + '\',this,false)" title="Copy name">📋</button></div>';
     }
     let badges = '';
     if (c.visibility === 'private') badges = '<span class="badge badge-private" style="font-size:8px;padding:1px 5px;">🔒</span>';
@@ -867,75 +1158,23 @@ const voiceRooms = new Map();
 
 io.on('connection', function(socket) {
     console.log('🔗 Connected:', socket.id);
-
     socket.on('register_user', function(d) { socket.username = d.username; });
-
     socket.on('join_chat', async function(data) {
-        try {
-            const channelId = data.channelId;
-            socket.channelId = channelId;
-            socket.join('channel_' + channelId);
-            const r = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50', [channelId]);
-            socket.emit('chat_history', r.rows.reverse());
-        } catch (e) { console.error(e); }
+        try { const channelId = data.channelId; socket.channelId = channelId; socket.join('channel_' + channelId); const r = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50', [channelId]); socket.emit('chat_history', r.rows.reverse()); } catch (e) { console.error(e); }
     });
-
     socket.on('switch_channel', async function(data) {
-        try {
-            const channelId = data.channelId;
-            if (socket.channelId) socket.leave('channel_' + socket.channelId);
-            socket.channelId = channelId;
-            socket.join('channel_' + channelId);
-            const r = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50', [channelId]);
-            socket.emit('chat_history', r.rows.reverse());
-        } catch (e) { console.error(e); }
+        try { const channelId = data.channelId; if (socket.channelId) socket.leave('channel_' + socket.channelId); socket.channelId = channelId; socket.join('channel_' + channelId); const r = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50', [channelId]); socket.emit('chat_history', r.rows.reverse()); } catch (e) { console.error(e); }
     });
-
     socket.on('send_message', async function(data) {
-        try {
-            const username = data.username;
-            const role = data.role;
-            const message = data.message;
-            const channelId = data.channelId;
-            if (!message || !message.trim()) return;
-            const chk = await pool.query('SELECT * FROM channels WHERE id = $1', [channelId]);
-            if (chk.rows.length === 0) return;
-            const ch = chk.rows[0];
-            const isAdmin = role === 'ADMIN';
-            if (ch.read_only && !isAdmin && ch.created_by !== username) return;
-            const r = await pool.query('INSERT INTO chat_messages (channel_id, username, role, message) VALUES ($1, $2, $3, $4) RETURNING *', [channelId, username, role, message.trim().substring(0, 500)]);
-            io.to('channel_' + channelId).emit('new_message', r.rows[0]);
-        } catch (e) { console.error(e); }
+        try { const username = data.username; const role = data.role; const message = data.message; const channelId = data.channelId; if (!message || !message.trim()) return; const chk = await pool.query('SELECT * FROM channels WHERE id = $1', [channelId]); if (chk.rows.length === 0) return; const ch = chk.rows[0]; const isAdmin = role === 'ADMIN'; if (ch.read_only && !isAdmin && ch.created_by !== username) return; const r = await pool.query('INSERT INTO chat_messages (channel_id, username, role, message) VALUES ($1, $2, $3, $4) RETURNING *', [channelId, username, role, message.trim().substring(0, 500)]); io.to('channel_' + channelId).emit('new_message', r.rows[0]); } catch (e) { console.error(e); }
     });
-
     socket.on('delete_message', async function(data) {
-        try {
-            const messageId = data.messageId;
-            const role = data.role;
-            const channelId = data.channelId;
-            if (role !== 'ADMIN') return;
-            await pool.query('DELETE FROM chat_messages WHERE id = $1', [messageId]);
-            io.to('channel_' + channelId).emit('message_deleted', { messageId: messageId });
-        } catch (e) { console.error(e); }
+        try { const messageId = data.messageId; const role = data.role; const channelId = data.channelId; if (role !== 'ADMIN') return; await pool.query('DELETE FROM chat_messages WHERE id = $1', [messageId]); io.to('channel_' + channelId).emit('message_deleted', { messageId: messageId }); } catch (e) { console.error(e); }
     });
-
     socket.on('join_voice', async function(data) {
-        try {
-            const voiceChannelId = data.voiceChannelId;
-            const username = data.username;
-            const role = data.role;
-            if (socket.voiceChannelId) {
-                socket.leave('voice_' + socket.voiceChannelId);
-                const pr = voiceRooms.get(socket.voiceChannelId);
-                if (pr) {
-                    pr.delete(socket.id);
-                    if (pr.size === 0) voiceRooms.delete(socket.voiceChannelId);
-                    else io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(pr.values()));
-                }
-            }
-            socket.voiceChannelId = voiceChannelId;
-            socket.voiceUsername = username;
-            socket.join('voice_' + voiceChannelId);
+        try { const voiceChannelId = data.voiceChannelId; const username = data.username; const role = data.role;
+            if (socket.voiceChannelId) { socket.leave('voice_' + socket.voiceChannelId); const pr = voiceRooms.get(socket.voiceChannelId); if (pr) { pr.delete(socket.id); if (pr.size === 0) voiceRooms.delete(socket.voiceChannelId); else io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(pr.values())); } }
+            socket.voiceChannelId = voiceChannelId; socket.voiceUsername = username; socket.join('voice_' + voiceChannelId);
             if (!voiceRooms.has(voiceChannelId)) voiceRooms.set(voiceChannelId, new Map());
             voiceRooms.get(voiceChannelId).set(socket.id, { socketId: socket.id, username: username, role: role, isStreaming: false, isMuted: false });
             const ps = Array.from(voiceRooms.get(voiceChannelId).values());
@@ -943,97 +1182,36 @@ io.on('connection', function(socket) {
             socket.emit('voice_existing_users', { users: ps.filter(function(p) { return p.socketId !== socket.id; }), self: socket.id });
         } catch (e) { console.error(e); }
     });
-
     socket.on('leave_voice', function() {
-        if (!socket.voiceChannelId) return;
-        const vcId = socket.voiceChannelId;
-        const r = voiceRooms.get(vcId);
-        if (r) {
-            r.delete(socket.id);
-            if (r.size === 0) voiceRooms.delete(vcId);
-            else io.to('voice_' + vcId).emit('voice_participants', Array.from(r.values()));
-        }
+        if (!socket.voiceChannelId) return; const vcId = socket.voiceChannelId; const r = voiceRooms.get(vcId);
+        if (r) { r.delete(socket.id); if (r.size === 0) voiceRooms.delete(vcId); else io.to('voice_' + vcId).emit('voice_participants', Array.from(r.values())); }
         socket.to('voice_' + vcId).emit('user_left_voice', { socketId: socket.id });
-        socket.leave('voice_' + vcId);
-        socket.voiceChannelId = null;
-        socket.voiceUsername = null;
+        socket.leave('voice_' + vcId); socket.voiceChannelId = null; socket.voiceUsername = null;
     });
-
     socket.on('kick_from_voice', function(data) {
-        const targetSocketId = data.targetSocketId;
-        const kickedBy = data.kickedBy;
-        const targetSocket = io.sockets.sockets.get(targetSocketId);
-        if (!targetSocket) return;
-        if (!socket.voiceChannelId) return;
-        const r = voiceRooms.get(socket.voiceChannelId);
-        if (!r || !r.has(socket.id)) return;
-        const kicker = r.get(socket.id);
-        const target = r.get(targetSocketId);
-        if (!target) return;
-        const canKick = ['OWNER', 'ADMIN'].indexOf(kicker.role) !== -1;
-        if (!canKick) return;
+        const targetSocketId = data.targetSocketId; const kickedBy = data.kickedBy;
+        const targetSocket = io.sockets.sockets.get(targetSocketId); if (!targetSocket) return;
+        if (!socket.voiceChannelId) return; const r = voiceRooms.get(socket.voiceChannelId); if (!r || !r.has(socket.id)) return;
+        const kicker = r.get(socket.id); const target = r.get(targetSocketId); if (!target) return;
+        const canKick = ['OWNER', 'ADMIN'].indexOf(kicker.role) !== -1; if (!canKick) return;
         targetSocket.emit('you_were_kicked', { by: kickedBy, from: socket.voiceChannelId });
-        if (targetSocket.voiceChannelId) {
-            const tVcId = targetSocket.voiceChannelId;
-            const tR = voiceRooms.get(tVcId);
-            if (tR) {
-                tR.delete(targetSocketId);
-                if (tR.size === 0) voiceRooms.delete(tVcId);
-                else io.to('voice_' + tVcId).emit('voice_participants', Array.from(tR.values()));
-            }
-            targetSocket.to('voice_' + tVcId).emit('user_left_voice', { socketId: targetSocketId });
-            targetSocket.leave('voice_' + tVcId);
-            targetSocket.voiceChannelId = null;
-        }
+        if (targetSocket.voiceChannelId) { const tVcId = targetSocket.voiceChannelId; const tR = voiceRooms.get(tVcId); if (tR) { tR.delete(targetSocketId); if (tR.size === 0) voiceRooms.delete(tVcId); else io.to('voice_' + tVcId).emit('voice_participants', Array.from(tR.values())); } targetSocket.to('voice_' + tVcId).emit('user_left_voice', { socketId: targetSocketId }); targetSocket.leave('voice_' + tVcId); targetSocket.voiceChannelId = null; }
     });
-
-    socket.on('webrtc_offer', function(d) {
-        io.to(d.targetSocketId).emit('webrtc_offer', { fromSocketId: socket.id, fromUsername: socket.voiceUsername, offer: d.offer, isScreenShare: d.isScreenShare });
-    });
-    socket.on('webrtc_answer', function(d) {
-        io.to(d.targetSocketId).emit('webrtc_answer', { fromSocketId: socket.id, answer: d.answer });
-    });
-    socket.on('webrtc_ice_candidate', function(d) {
-        io.to(d.targetSocketId).emit('webrtc_ice_candidate', { fromSocketId: socket.id, candidate: d.candidate });
-    });
-    socket.on('toggle_mute', function(d) {
-        if (!socket.voiceChannelId) return;
-        const r = voiceRooms.get(socket.voiceChannelId);
-        if (r && r.has(socket.id)) {
-            r.get(socket.id).isMuted = d.isMuted;
-            io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values()));
-        }
-    });
-    socket.on('toggle_stream', function(d) {
-        if (!socket.voiceChannelId) return;
-        const r = voiceRooms.get(socket.voiceChannelId);
-        if (r && r.has(socket.id)) {
-            r.get(socket.id).isStreaming = d.isStreaming;
-            io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values()));
-        }
-    });
-
+    socket.on('webrtc_offer', function(d) { io.to(d.targetSocketId).emit('webrtc_offer', { fromSocketId: socket.id, fromUsername: socket.voiceUsername, offer: d.offer, isScreenShare: d.isScreenShare }); });
+    socket.on('webrtc_answer', function(d) { io.to(d.targetSocketId).emit('webrtc_answer', { fromSocketId: socket.id, answer: d.answer }); });
+    socket.on('webrtc_ice_candidate', function(d) { io.to(d.targetSocketId).emit('webrtc_ice_candidate', { fromSocketId: socket.id, candidate: d.candidate }); });
+    socket.on('toggle_mute', function(d) { if (!socket.voiceChannelId) return; const r = voiceRooms.get(socket.voiceChannelId); if (r && r.has(socket.id)) { r.get(socket.id).isMuted = d.isMuted; io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values())); } });
+    socket.on('toggle_stream', function(d) { if (!socket.voiceChannelId) return; const r = voiceRooms.get(socket.voiceChannelId); if (r && r.has(socket.id)) { r.get(socket.id).isStreaming = d.isStreaming; io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values())); } });
     socket.on('disconnect', function() {
-        if (socket.voiceChannelId) {
-            const vcId = socket.voiceChannelId;
-            const r = voiceRooms.get(vcId);
-            if (r) {
-                r.delete(socket.id);
-                if (r.size === 0) voiceRooms.delete(vcId);
-                else io.to('voice_' + vcId).emit('voice_participants', Array.from(r.values()));
-            }
-            socket.to('voice_' + vcId).emit('user_left_voice', { socketId: socket.id });
-        }
+        if (socket.voiceChannelId) { const vcId = socket.voiceChannelId; const r = voiceRooms.get(vcId); if (r) { r.delete(socket.id); if (r.size === 0) voiceRooms.delete(vcId); else io.to('voice_' + vcId).emit('voice_participants', Array.from(r.values())); } socket.to('voice_' + vcId).emit('user_left_voice', { socketId: socket.id }); }
         console.log('❌ Disconnected:', socket.id);
     });
 });
 
-// ==================== START ====================
 server.listen(PORT, function() {
-    console.log('✅ ' + BRAND_NAME + ' v39.3 — Rename: Owner/Admin Only');
-    console.log('🔒 Only Owner & Admin can create/rename channels');
-    console.log('👤 Default: sarili mo lang ang nakikita mo');
-    console.log('👆 Click user → papalitan ng screen nila');
-    console.log('👆 Click "You" → babalik sa sarili mo');
-    console.log('👢 Kick: server + voice (Owner/Admin)');
+    console.log('✅ ' + BRAND_NAME + ' v41.0 — Access Type + Notification Sound');
+    console.log('🔒 Whitelist: Roblox User ID protection');
+    console.log('🔔 Notification Sound: Discord-style pop');
+    console.log('📋 Copy: URLs, Invites, Usernames');
+    console.log('🎮 Works on PC + CP');
 });
