@@ -15,7 +15,7 @@ if (!DATABASE_URL) { console.error('❌ DATABASE_URL not set!'); process.exit(1)
 
 const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
-// ==================== DATABASE ====================
+// ==================== DATABASE INIT ====================
 async function initDB() {
     try {
         await pool.query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, role VARCHAR(20) DEFAULT 'USER', display_name VARCHAR(50), tag VARCHAR(4), bio VARCHAR(200) DEFAULT '', created_at TIMESTAMP DEFAULT NOW());`);
@@ -168,7 +168,6 @@ a{color:inherit;text-decoration:none}button{font-family:inherit;cursor:pointer;b
 .btn-ghost:hover{background:var(--bg-2);color:var(--text-0)}
 .btn-sm{padding:9px 14px;font-size:12.5px;border-radius:9px;min-height:38px}
 .card{position:relative;background:linear-gradient(180deg,var(--bg-1),var(--bg-0));border:1px solid var(--border-0);border-radius:16px;padding:30px}
-.card::before{content:'';position:absolute;top:0;left:0;width:100%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,59,59,0.4),transparent)}
 .form-group{margin-bottom:20px}
 .form-label{display:block;font-size:12px;font-weight:700;color:var(--text-1);margin-bottom:9px;text-transform:uppercase}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px}
@@ -196,7 +195,7 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .login-card{position:relative;background:rgba(15,8,8,0.7);backdrop-filter:blur(30px);border:1px solid var(--border-1);border-radius:22px;padding:44px 40px;width:420px;max-width:100%;box-shadow:0 40px 100px rgba(0,0,0,0.7)}
 .login-brand{display:flex;flex-direction:column;align-items:center;margin-bottom:32px;text-align:center}
-.login-logo{width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:28px;color:#fff;margin-bottom:18px;box-shadow:0 16px 48px var(--accent-glow)}
+.login-logo{width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:28px;color:#fff;margin-bottom:18px}
 .login-title{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;margin-bottom:6px}
 .login-sub{font-size:13.5px;color:var(--text-2)}
 .login-card input{margin-bottom:13px;padding:14px 16px}
@@ -218,6 +217,7 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .modal-close:hover{background:var(--bg-2);color:var(--text-0)}
 .modal-body{padding:22px 24px}
 .modal-footer{padding:16px 24px;border-top:1px solid var(--border-0);display:flex;gap:10px;justify-content:flex-end}
+/* Chat Layout */
 .chat-layout{display:grid;grid-template-columns:240px 1fr 200px;background:linear-gradient(180deg,var(--bg-1),var(--bg-0));border:1px solid var(--border-0);border-radius:16px;overflow:hidden;height:calc(100vh - 220px);min-height:500px;position:relative}
 .chat-sidebar{background:var(--bg-0);border-right:1px solid var(--border-0);display:flex;flex-direction:column}
 .chat-sidebar-header{padding:16px 18px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between}
@@ -227,7 +227,6 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .channel-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;cursor:pointer;color:var(--text-2);font-size:13.5px;font-weight:600;margin-bottom:2px;position:relative}
 .channel-item:hover{background:var(--bg-2);color:var(--text-0)}
 .channel-item.active{background:var(--accent-dim);color:var(--accent)}
-.channel-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:60%;background:var(--accent);border-radius:0 3px 3px 0}
 .channel-hash{color:var(--text-3);font-size:16px;font-weight:700}
 .channel-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .channel-icons{display:flex;gap:2px;opacity:0;transition:opacity 0.2s}
@@ -259,30 +258,32 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .chat-input-area{padding:16px 20px;border-top:1px solid var(--border-0);background:var(--bg-0)}
 .chat-input-area form{display:flex;gap:10px;align-items:center}
 .chat-input-area input{flex:1;margin:0;background:var(--bg-2);border-color:transparent}
-/* Voice Panel — SMALL */
-.voice-panel{position:fixed;bottom:20px;right:20px;width:400px;max-width:calc(100vw - 32px);background:rgba(15,8,8,0.95);backdrop-filter:blur(30px);border:1px solid var(--border-1);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.8);z-index:9998;display:flex;flex-direction:column;overflow:hidden;transition:all 0.3s}
-.voice-panel-header{padding:10px 14px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between}
+/* Voice Panel */
+.voice-panel{position:fixed;bottom:24px;right:24px;width:380px;max-width:calc(100vw - 32px);background:rgba(15,8,8,0.95);backdrop-filter:blur(30px);border:1px solid var(--border-1);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,0.7);z-index:9998;display:flex;flex-direction:column;overflow:hidden;transition:all 0.3s}
+.voice-panel.fullscreen{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:100vw!important;border-radius:0!important;z-index:10000!important;bottom:0!important;right:0!important}
+.voice-panel.fullscreen .voice-videos{grid-template-columns:repeat(auto-fit,minmax(400px,1fr))!important;max-height:calc(100vh - 140px)!important;padding:20px!important;gap:16px!important}
+.voice-panel.fullscreen .voice-tile{aspect-ratio:16/9!important;border-radius:16px!important}
+.voice-panel.fullscreen .voice-tile-screen{grid-column:1/-1!important;aspect-ratio:16/9!important}
+.voice-panel.fullscreen .voice-panel-header{padding:16px 24px!important;background:rgba(0,0,0,0.5)!important}
+.voice-panel.fullscreen .voice-controls{padding:16px 24px!important;background:rgba(0,0,0,0.5)!important}
+.voice-panel.fullscreen .voice-ctrl-btn{width:54px!important;height:54px!important;font-size:22px!important}
+.voice-panel.fullscreen #voicePanelName{font-size:18px!important;font-weight:800!important}
+.voice-panel-header{padding:12px 16px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between}
 .voice-live-dot{width:8px;height:8px;border-radius:50%;background:var(--red-1);box-shadow:0 0 12px var(--accent-glow);animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-.voice-min-btn{width:26px;height:26px;border-radius:6px;color:var(--text-2);font-size:14px;background:var(--bg-2);border:1px solid var(--border-0);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.voice-min-btn{width:28px;height:28px;border-radius:6px;color:var(--text-2);font-size:16px;background:var(--bg-2);border:1px solid var(--border-0);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .voice-min-btn:hover{color:var(--accent);background:var(--bg-3)}
-.voice-videos{padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:260px;overflow-y:auto}
+.voice-videos{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:320px;overflow-y:auto}
 .voice-tile{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:1;border:1px solid var(--border-0)}
 .voice-tile-screen{grid-column:span 2;aspect-ratio:16/10}
 .voice-tile video{width:100%;height:100%;object-fit:cover;display:block}
 .voice-tile-label{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.75);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px}
-.voice-tile:fullscreen{aspect-ratio:auto!important;width:100vw!important;height:100vh!important;border-radius:0!important;background:#000}
-.voice-tile:fullscreen video{object-fit:contain!important}
-.voice-tile:-webkit-full-screen{aspect-ratio:auto!important;width:100vw!important;height:100vh!important;border-radius:0!important;background:#000}
-.voice-tile:-webkit-full-screen video{object-fit:contain!important}
-.voice-tile:-moz-full-screen{aspect-ratio:auto!important;width:100vw!important;height:100vh!important;border-radius:0!important;background:#000}
-.voice-tile:-moz-full-screen video{object-fit:contain!important}
-.voice-controls{padding:10px 14px;border-top:1px solid var(--border-0);display:flex;gap:8px;justify-content:center}
-.voice-ctrl-btn{width:42px;height:42px;border-radius:11px;background:var(--bg-2);border:1px solid var(--border-0);color:var(--text-0);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
-.voice-ctrl-btn:hover{background:var(--bg-3);border-color:var(--border-1);transform:translateY(-2px)}
+.voice-controls{padding:12px 16px;border-top:1px solid var(--border-0);display:flex;gap:10px;justify-content:center}
+.voice-ctrl-btn{width:46px;height:46px;border-radius:12px;background:var(--bg-2);border:1px solid var(--border-0);color:var(--text-0);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+.voice-ctrl-btn:hover{background:var(--bg-3);border-color:var(--border-1)}
 .voice-ctrl-leave{background:rgba(255,59,59,0.15);border-color:rgba(255,59,59,0.3);color:var(--accent)}
 .mic-test-active{background:linear-gradient(135deg,#00ff88,#00cc66)!important;color:#000!important;animation:pulse-mic 1s infinite}
-@keyframes pulse-mic{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,0.7)}50%{box-shadow:0 0 0 10px rgba(0,255,136,0)}}
+@keyframes pulse-mic{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,0.7)}50%{box-shadow:0 0 0 12px rgba(0,255,136,0)}}
 @media(max-width:900px){
     .sidebar{transform:translateX(-100%);width:280px}
     .sidebar.open{transform:translateX(0)}
@@ -296,8 +297,8 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
     .chat-sidebar:first-child{position:absolute;top:0;left:0;bottom:0;width:260px;z-index:10;transform:translateX(-100%);transition:transform 0.3s}
     .chat-sidebar.mobile-open{transform:translateX(0)}
     .chat-mobile-toggle{display:flex}
-    .voice-panel{bottom:12px;right:12px;left:12px;width:auto;max-width:none}
-    .voice-videos{max-height:200px}
+    .voice-panel{bottom:12px;right:12px;left:12px;width:auto}
+    .voice-panel.fullscreen .voice-videos{grid-template-columns:1fr!important;padding:10px!important}
 }
 @media(max-width:768px){
     .content{padding:18px}
@@ -307,7 +308,6 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
     .card{padding:22px}
     .form-row{grid-template-columns:1fr}
     .btn{padding:12px 18px}
-    .voice-panel{width:calc(100vw - 24px)}
 }
 `;
 
@@ -352,6 +352,7 @@ function renderScriptCard(s) {
     const prettyUrl = `${baseUrl}/raw/${slug}/${version}/${s.token}`;
     return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;"><div style="display:flex;gap:12px;"><div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-size:19px;">◈</div><div><div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">${s.name}</div><div style="display:flex;gap:8px;font-size:11.5px;color:var(--text-2);"><span class="badge badge-version">${version}</span><span>${new Date(s.created_at).toLocaleDateString()}</span></div></div></div></div><div style="background:var(--bg-0);border:1px solid var(--border-0);border-radius:10px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--accent-bright);word-break:break-all;margin-top:14px;">${prettyUrl}</div><div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="copyText('loadstring(game:HttpGet(\\'${prettyUrl}\\'))()', this)">📋 Copy</button><a href="/view/${slug}/${version}/${s.token}" target="_blank" class="btn btn-secondary btn-sm">◉ View</a><a href="/edit/${s.token}" class="btn btn-ghost btn-sm">✎ Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete('${s.token}', '${s.name}')">🗑 Delete</button></div></div>`;
 }
+
 // ==================== AUTH ====================
 app.get('/login', (req, res) => {
     res.send(`<!DOCTYPE html><html><head>${getHtmlHead('Login')}<style>${LAYOUT_STYLES}</style></head><body>
@@ -415,7 +416,6 @@ app.get('/raw/:slug/:version/:token', async (req, res) => {
 app.get('/delete/:token', requireLogin, async (req, res) => {
     try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.redirect('/'); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]); if (isAdmin && s.owner !== req.session.user.username) return res.redirect('/admin/user/' + encodeURIComponent(s.owner)); res.redirect('/'); } catch (e) { res.status(500).send('Error'); }
 });
-
 // ==================== SERVERS ====================
 app.get('/servers', requireLogin, async (req, res) => {
     const me = req.session.user.username;
@@ -511,12 +511,18 @@ app.get('/server/:id', requireLogin, async (req, res) => {
         const content = `
         <div class="chat-layout">
             <div class="chat-sidebar" id="chatSidebar">
-                <div class="chat-sidebar-header"><div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;"><span style="font-size:20px;">${srv.icon || '🎮'}</span><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${srv.name}</span></div></div>
+                <div class="chat-sidebar-header">
+                    <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1;"><span style="font-size:20px;">${srv.icon || '🎮'}</span><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${srv.name}</span></div>
+                </div>
                 <div class="chat-channels-list">
                     <div class="channel-group-label"><span>💬 TEXT</span><button onclick="openCreateChannel('text')" title="Create">+</button></div>
-                    <div id="channelsList">${visibleText.map(c => renderChannelItem(c, me, isOwner, isGlobalAdmin)).join('')}</div>
+                    <div id="channelsList">
+                        ${visibleText.map(c => renderChannelItem(c, me, isOwner, isGlobalAdmin)).join('')}
+                    </div>
                     <div class="channel-group-label" style="margin-top:16px;"><span>🔊 VOICE</span><button onclick="openCreateChannel('voice')" title="Create">+</button></div>
-                    <div id="voiceChannelsList">${visibleVoice.map(c => renderVoiceChannelItem(c, me, isOwner, isGlobalAdmin)).join('')}</div>
+                    <div id="voiceChannelsList">
+                        ${visibleVoice.map(c => renderVoiceChannelItem(c, me, isOwner, isGlobalAdmin)).join('')}
+                    </div>
                 </div>
                 <div class="chat-sidebar-footer"><a href="/servers" style="display:block;text-align:center;color:var(--text-2);font-size:12px;font-weight:700;padding:8px;">← All Servers</a></div>
             </div>
@@ -531,7 +537,9 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                     <div style="font-size:11px;color:var(--text-3);font-weight:600;">Invite: ${srv.invite_code}</div>
                 </div>
                 <div id="chatMessages" class="chat-messages"><div style="text-align:center;color:var(--text-3);padding:20px 0;">Loading...</div></div>
-                <div class="chat-input-area" id="chatInputArea"><form id="chatForm"><input type="text" id="chatInput" placeholder="Message..." maxlength="500" autocomplete="off"><button type="submit" class="btn btn-primary">➤</button></form></div>
+                <div class="chat-input-area" id="chatInputArea">
+                    <form id="chatForm"><input type="text" id="chatInput" placeholder="Message..." maxlength="500" autocomplete="off"><button type="submit" class="btn btn-primary">➤</button></form>
+                </div>
                 <div id="readOnlyNotice" style="display:none;padding:16px 20px;border-top:1px solid var(--border-0);background:var(--bg-0);color:var(--text-3);text-align:center;font-size:13px;font-weight:600;">🔒 Read-only channel</div>
             </div>
             <div class="chat-sidebar" style="border-left:1px solid var(--border-0);border-right:none;">
@@ -545,7 +553,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             <div class="voice-panel-header">
                 <div style="display:flex;align-items:center;gap:8px;"><div class="voice-live-dot"></div><span id="voicePanelName" style="font-weight:700;font-size:13px;">Voice</span></div>
                 <div style="display:flex;gap:6px;">
-                    <button onclick="fullscreenBiggestTile()" class="voice-min-btn" title="Fullscreen">⛶</button>
+                    <button onclick="toggleFullscreenVoice()" class="voice-min-btn" id="fullscreenBtn" title="Full Screen">⛶</button>
                     <button onclick="minimizeVoice()" class="voice-min-btn" title="Minimize">−</button>
                 </div>
             </div>
@@ -553,7 +561,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             <div class="voice-controls">
                 <button id="muteBtn" onclick="toggleMute()" class="voice-ctrl-btn" title="Mute">🎤</button>
                 <button id="shareBtn" onclick="toggleShareScreen()" class="voice-ctrl-btn" title="Share Screen">🖥️</button>
-                <button id="micTestBtn" onclick="toggleMicTest()" class="voice-ctrl-btn" title="Test Mic">🎧</button>
+                <button id="micTestBtn" onclick="toggleMicTest()" class="voice-ctrl-btn" title="Test Mic (Only you hear)">🎧</button>
                 <button onclick="leaveVoice()" class="voice-ctrl-btn voice-ctrl-leave" title="Disconnect">📞</button>
             </div>
         </div>
@@ -565,9 +573,9 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                     <input type="text" id="newChannelName" placeholder="e.g., gaming" maxlength="50">
                     <label class="form-label" style="margin-top:14px;">Visibility</label>
                     <select id="newChannelVis">
-                        <option value="public">🌐 Public — Everyone</option>
-                        <option value="private">🔒 Private — Read-only</option>
-                        <option value="personal">👑 Personal — Only you</option>
+                        <option value="public">🌐 Public — Everyone sees & chats</option>
+                        <option value="private">🔒 Private — Everyone sees but read-only</option>
+                        <option value="personal">👑 Personal — Only you can see</option>
                     </select>
                 </div>
                 <div class="modal-footer"><button onclick="closeModal('createChannelModal')" class="btn btn-ghost">Cancel</button><button onclick="createChannel()" class="btn btn-primary">Create</button></div>
@@ -656,16 +664,17 @@ app.get('/server/:id', requireLogin, async (req, res) => {
         window.deleteMsg=id=>{if(confirm('Delete?'))socket.emit('delete_message',{messageId:id,role:CURRENT_ROLE,channelId:currentChannelId})};
         window.openRename=(id,name)=>{document.getElementById('renameChannelInput').value=name;document.getElementById('renameChannelModal').dataset.channelId=id;document.getElementById('renameChannelModal').style.display='flex'};
         window.saveRename=async()=>{const id=document.getElementById('renameChannelModal').dataset.channelId;const name=document.getElementById('renameChannelInput').value.trim();if(!name)return;const r=await fetch('/api/channels/'+id+'/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});const d=await r.json();if(d.success){showToast('Renamed!','success');closeModal('renameChannelModal')}else showToast(d.error,'error')};
-        window.joinVoice=async(channelId,channelName)=>{try{if(currentVoiceChannelId===channelId)return;if(currentVoiceChannelId)window.leaveVoice();try{localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false})}catch(e){return showToast('Mic denied','error')}currentVoiceChannelId=channelId;document.getElementById('voicePanelName').textContent=channelName;document.getElementById('voicePanel').style.display='flex';document.getElementById('voiceVideos').innerHTML='';addVideoTile('self','You',localStream,false,true);socket.emit('join_voice',{voiceChannelId:channelId,username:CURRENT_USER,role:CURRENT_ROLE});showToast('Joined','success')}catch(e){showToast('Failed','error')}};
-        window.leaveVoice=()=>{if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}Object.values(peerConnections).forEach(({pc})=>{try{pc.close()}catch(e){}});peerConnections={};socket.emit('leave_voice');currentVoiceChannelId=null;isSharing=false;isMuted=false;document.getElementById('voicePanel').style.display='none';document.getElementById('voiceVideos').innerHTML='';document.getElementById('muteBtn').textContent='🎤';document.getElementById('shareBtn').textContent='🖥️';if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}micTestActive=false;const mBtn=document.getElementById('micTestBtn');if(mBtn)mBtn.classList.remove('mic-test-active')};
+        window.joinVoice=async(channelId,channelName)=>{try{if(currentVoiceChannelId===channelId)return;if(currentVoiceChannelId)window.leaveVoice();try{localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false})}catch(e){return showToast('Mic denied','error')}currentVoiceChannelId=channelId;document.getElementById('voicePanelName').textContent=channelName;document.getElementById('voicePanel').style.display='flex';document.getElementById('voicePanel').classList.add('fullscreen');document.body.style.overflow='hidden';document.getElementById('voiceVideos').innerHTML='';addVideoTile('self','You',localStream,false,true);socket.emit('join_voice',{voiceChannelId:channelId,username:CURRENT_USER,role:CURRENT_ROLE});showToast('Joined','success')}catch(e){showToast('Failed','error')}};
+        window.leaveVoice=()=>{if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}Object.values(peerConnections).forEach(({pc})=>{try{pc.close()}catch(e){}});peerConnections={};socket.emit('leave_voice');currentVoiceChannelId=null;isSharing=false;isMuted=false;document.getElementById('voicePanel').style.display='none';document.getElementById('voicePanel').classList.remove('fullscreen');document.body.style.overflow='';document.getElementById('voiceVideos').innerHTML='';document.getElementById('muteBtn').textContent='🎤';document.getElementById('shareBtn').textContent='🖥️';if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}micTestActive=false;const mBtn=document.getElementById('micTestBtn');if(mBtn)mBtn.classList.remove('mic-test-active')};
         window.toggleMute=()=>{if(!localStream)return;isMuted=!isMuted;localStream.getAudioTracks().forEach(t=>t.enabled=!isMuted);document.getElementById('muteBtn').textContent=isMuted?'🔇':'🎤';socket.emit('toggle_mute',{isMuted})};
-        window.toggleMicTest=async()=>{const btn=document.getElementById('micTestBtn');if(micTestActive){micTestActive=false;if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}btn.classList.remove('mic-test-active');showToast('Mic test OFF','success');return}try{const testStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true},video:false});window._micTestStream=testStream;const audioCtx=new(window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaStreamSource(testStream);const gainNode=audioCtx.createGain();gainNode.gain.value=1;source.connect(gainNode);gainNode.connect(audioCtx.destination);micTestAudio={audioCtx,source,gainNode};micTestActive=true;btn.classList.add('mic-test-active');showToast('🎧 Mic Test ON','success')}catch(e){showToast('Mic denied','error')}};
+        window.toggleMicTest=async()=>{const btn=document.getElementById('micTestBtn');if(micTestActive){micTestActive=false;if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}btn.classList.remove('mic-test-active');showToast('Mic test OFF','success');return}try{const testStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true},video:false});window._micTestStream=testStream;const audioCtx=new(window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaStreamSource(testStream);const gainNode=audioCtx.createGain();gainNode.gain.value=1;source.connect(gainNode);gainNode.connect(audioCtx.destination);micTestAudio={audioCtx,source,gainNode};micTestActive=true;btn.classList.add('mic-test-active');showToast('🎧 Mic Test ON — ikaw lang makakarinig','success')}catch(e){showToast('Mic denied','error')}};
+        window.toggleFullscreenVoice=()=>{const panel=document.getElementById('voicePanel');panel.classList.toggle('fullscreen');document.body.style.overflow=panel.classList.contains('fullscreen')?'hidden':''};
+        document.addEventListener('keydown',e=>{if(e.key==='Escape'){const p=document.getElementById('voicePanel');if(p&&p.classList.contains('fullscreen')){window.toggleFullscreenVoice()}}});
         window.toggleShareScreen=async()=>{if(!currentVoiceChannelId)return;if(isSharing){if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}isSharing=false;document.getElementById('shareBtn').textContent='🖥️';document.getElementById('shareBtn').style.background='';document.querySelector('[data-tile="self-screen"]')?.remove();for(const [sid,{pc}] of Object.entries(peerConnections)){try{const offer=await pc.createOffer();await pc.setLocalDescription(offer);socket.emit('webrtc_offer',{targetSocketId:sid,offer,isScreenShare:false})}catch(e){}}}else{try{screenStream=await navigator.mediaDevices.getDisplayMedia({video:{cursor:'always'},audio:false})}catch(e){return}isSharing=true;document.getElementById('shareBtn').textContent='⏹️';document.getElementById('shareBtn').style.background='linear-gradient(135deg,var(--red-1),var(--red-2))';addVideoTile('self-screen','Your Screen',screenStream,true,true);screenStream.getVideoTracks()[0].onended=()=>{if(isSharing)window.toggleShareScreen()};for(const [sid,{pc}] of Object.entries(peerConnections)){try{const vt=screenStream.getVideoTracks()[0];const s=pc.getSenders().find(s=>s.track&&s.track.kind==='video');if(s)await s.replaceTrack(vt);else pc.addTrack(vt,screenStream);const offer=await pc.createOffer();await pc.setLocalDescription(offer);socket.emit('webrtc_offer',{targetSocketId:sid,offer,isScreenShare:true})}catch(e){}}}};
         window.minimizeVoice=()=>{const v=document.getElementById('voiceVideos');v.style.display=v.style.display==='none'?'grid':'none'};
-        window.fullscreenBiggestTile=()=>{const tiles=document.querySelectorAll('.voice-tile');if(tiles.length===0)return;let biggest=tiles[0];let maxArea=0;tiles.forEach(t=>{const r=t.getBoundingClientRect();const area=r.width*r.height;if(area>maxArea){maxArea=area;biggest=t}});const v=biggest.querySelector('video');if(v){v.muted=true;if(v.requestFullscreen){v.requestFullscreen()}else if(v.webkitRequestFullscreen){v.webkitRequestFullscreen()}else if(v.mozRequestFullScreen){v.mozRequestFullScreen()}else if(v.msRequestFullscreen){v.msRequestFullscreen()}}};
         function createPeerConnection(sid){if(peerConnections[sid])return peerConnections[sid].pc;const pc=new RTCPeerConnection(iceServers);if(localStream)localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));if(screenStream)screenStream.getVideoTracks().forEach(t=>pc.addTrack(t,screenStream));pc.onicecandidate=e=>{if(e.candidate)socket.emit('webrtc_ice_candidate',{targetSocketId:sid,candidate:e.candidate})};pc.ontrack=e=>{const rs=e.streams[0];const isV=e.track.kind==='video';const meta=peerConnections[sid];if(isV){const tid=sid+'-screen';if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User')+"'s Screen",rs,true,false)}else{const tid=sid+'-audio';if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User'),rs,false,false)}};pc.onconnectionstatechange=()=>{if(['disconnected','failed','closed'].includes(pc.connectionState))removePeer(sid)};peerConnections[sid]={pc,username:null,isOfferer:false};return pc}
         function removePeer(sid){if(peerConnections[sid]){try{peerConnections[sid].pc.close()}catch(e){}delete peerConnections[sid]}document.querySelector('[data-tile="'+sid+'-screen"]')?.remove();document.querySelector('[data-tile="'+sid+'-audio"]')?.remove()}
-        function addVideoTile(id,label,stream,isScreen,isSelf){const videos=document.getElementById('voiceVideos');const tile=document.createElement('div');tile.className='voice-tile'+(isScreen?' voice-tile-screen':'');tile.dataset.tile=id;tile.style.cursor='pointer';const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=isSelf;v.srcObject=stream;const l=document.createElement('div');l.className='voice-tile-label';l.textContent=label;tile.appendChild(v);tile.appendChild(l);tile.onclick=()=>{v.muted=true;if(v.requestFullscreen){v.requestFullscreen()}else if(v.webkitRequestFullscreen){v.webkitRequestFullscreen()}else if(v.mozRequestFullScreen){v.mozRequestFullScreen()}else if(v.msRequestFullscreen){v.msRequestFullscreen()}};videos.appendChild(tile)}
+        function addVideoTile(id,label,stream,isScreen,isSelf){const videos=document.getElementById('voiceVideos');const tile=document.createElement('div');tile.className='voice-tile'+(isScreen?' voice-tile-screen':'');tile.dataset.tile=id;const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=isSelf;v.srcObject=stream;const l=document.createElement('div');l.className='voice-tile-label';l.textContent=label;tile.appendChild(v);tile.appendChild(l);videos.appendChild(tile)}
         socket.on('voice_participants',ps=>{document.querySelectorAll('.voice-participants').forEach(el=>el.innerHTML='');document.querySelectorAll('.voice-count').forEach(el=>{el.textContent='0';el.style.display='none'});ps.forEach(p=>{const c=document.getElementById('voice-participants-'+currentVoiceChannelId);if(c){const d=document.createElement('div');d.className='voice-user';d.innerHTML='<div class="voice-user-avatar">'+escapeHtml(p.username.charAt(0).toUpperCase())+'</div>'+escapeHtml(p.username)+(p.isMuted?' 🔇':'')+(p.isStreaming?' 🖥️':'');c.appendChild(d)}});const cnt=document.getElementById('voice-count-'+currentVoiceChannelId);if(cnt){cnt.textContent=ps.length;cnt.style.display=ps.length>0?'inline-block':'none'}});
         socket.on('voice_existing_users',async({users})=>{for(const u of users){try{const pc=createPeerConnection(u.socketId);peerConnections[u.socketId].username=u.username;peerConnections[u.socketId].isOfferer=true;const offer=await pc.createOffer();await pc.setLocalDescription(offer);socket.emit('webrtc_offer',{targetSocketId:u.socketId,offer,isScreenShare:false})}catch(e){}}});
         socket.on('webrtc_offer',async({fromSocketId,fromUsername,offer})=>{try{const pc=createPeerConnection(fromSocketId);peerConnections[fromSocketId].username=fromUsername;await pc.setRemoteDescription(new RTCSessionDescription(offer));const answer=await pc.createAnswer();await pc.setLocalDescription(answer);socket.emit('webrtc_answer',{targetSocketId:fromSocketId,answer})}catch(e){}});
@@ -675,7 +684,9 @@ app.get('/server/:id', requireLogin, async (req, res) => {
         const firstText=document.querySelector('.channel-item');
         if(firstText){const fid=parseInt(firstText.dataset.id);switchChannel(fid,firstText.querySelector('.channel-name').textContent,firstText.dataset.visibility||'public','','text')}
         </script>
-        <style>@keyframes msgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}</style>`;
+        <style>
+        @keyframes msgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        </style>`;
         res.send(renderLayout({ title: srv.name, pageTitle: srv.name, pageSubtitle: `${membersR.rows.length} members`, content, user: req.session.user, activeNav: 'servers' }));
     } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
 });
@@ -690,13 +701,20 @@ function renderChannelItem(c, me, isOwner, isGlobalAdmin) {
     if (c.visibility === 'private') badges = '<span class="badge badge-private" style="font-size:8px;padding:1px 5px;">🔒</span>';
     if (c.visibility === 'personal') badges = '<span class="badge badge-personal" style="font-size:8px;padding:1px 5px;">👑</span>';
     return `<div class="channel-item" data-id="${c.id}" data-name="${c.name.replace(/"/g, '&quot;')}" data-visibility="${c.visibility || 'public'}" onclick="switchChannel(${c.id}, '${c.name.replace(/'/g, "\\'")}', '${c.visibility || 'public'}', '${c.created_by}', 'text')">
-        <span class="channel-hash">#</span><span class="channel-name">${c.name}</span>${badges}${icons}
+        <span class="channel-hash">#</span>
+        <span class="channel-name">${c.name}</span>
+        ${badges}
+        ${icons}
     </div>`;
 }
 
 function renderVoiceChannelItem(c, me, isOwner, isGlobalAdmin) {
     return `<div class="voice-channel-item" data-id="${c.id}" data-name="${c.name.replace(/"/g, '&quot;')}">
-        <div class="voice-item-header"><span>🔊</span><span class="voice-name">${c.name}</span><span class="voice-count" id="voice-count-${c.id}" style="display:none;">0</span></div>
+        <div class="voice-item-header">
+            <span>🔊</span>
+            <span class="voice-name">${c.name}</span>
+            <span class="voice-count" id="voice-count-${c.id}" style="display:none;">0</span>
+        </div>
         <div class="voice-participants" id="voice-participants-${c.id}"></div>
         <button class="voice-join-btn" onclick="joinVoice(${c.id}, '${c.name.replace(/'/g, "\\'")}')">Join</button>
     </div>`;
@@ -704,36 +722,229 @@ function renderVoiceChannelItem(c, me, isOwner, isGlobalAdmin) {
 
 // ==================== FRIENDS ====================
 app.get('/friends', requireLogin, (req, res) => {
-    const content = `<div class="card"><h3 style="margin-bottom:14px;">Friends</h3><p style="color:var(--text-2);">Use servers to chat with others.</p><a href="/servers" class="btn btn-primary" style="margin-top:14px;">Go to Servers</a></div>`;
+    const content = `<div class="card"><h3 style="margin-bottom:14px;">Friends</h3><p style="color:var(--text-2);">Friends system ready. Use chat to talk with other users.</p><a href="/servers" class="btn btn-primary" style="margin-top:14px;">Go to Servers</a></div>`;
     res.send(renderLayout({ title: 'Friends', pageTitle: 'Friends', pageSubtitle: 'Manage your friends', content, user: req.session.user, activeNav: 'friends' }));
 });
 
 // ==================== ADMIN ====================
 app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
-    try { const u = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC'); let rows = ''; u.rows.forEach(x => { const isA = x.role === 'ADMIN'; rows += `<a href="/admin/user/${encodeURIComponent(x.username)}" class="card" style="display:flex;align-items:center;gap:14px;margin-bottom:10px;cursor:pointer;text-decoration:none;"><div class="user-avatar ${isA ? 'user-avatar-admin' : ''}">${x.username.charAt(0)}</div><div style="flex:1;"><div style="font-weight:700;">${x.username} <span class="badge ${isA ? 'badge-admin' : 'badge-user'}">${x.role}</span></div><div style="font-size:12px;color:var(--text-2);">Joined ${new Date(x.created_at).toLocaleDateString()}</div></div><span class="btn btn-ghost btn-sm">View</span></a>`; }); const content = rows || '<div class="empty"><div class="empty-icon">◉</div><div class="empty-title">No users</div></div>'; res.send(renderLayout({ title: 'Admin', pageTitle: 'Admin Panel', pageSubtitle: `${u.rows.length} users`, content, user: req.session.user, activeNav: 'admin' })); } catch (e) { res.status(500).send('Error'); }
+    try {
+        const u = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
+        let rows = '';
+        u.rows.forEach(x => { const isA = x.role === 'ADMIN'; rows += `<a href="/admin/user/${encodeURIComponent(x.username)}" class="card" style="display:flex;align-items:center;gap:14px;margin-bottom:10px;cursor:pointer;text-decoration:none;"><div class="user-avatar ${isA ? 'user-avatar-admin' : ''}">${x.username.charAt(0)}</div><div style="flex:1;"><div style="font-weight:700;">${x.username} <span class="badge ${isA ? 'badge-admin' : 'badge-user'}">${x.role}</span></div><div style="font-size:12px;color:var(--text-2);">Joined ${new Date(x.created_at).toLocaleDateString()}</div></div><span class="btn btn-ghost btn-sm">View</span></a>`; });
+        const content = rows || '<div class="empty"><div class="empty-icon">◉</div><div class="empty-title">No users</div></div>';
+        res.send(renderLayout({ title: 'Admin', pageTitle: 'Admin Panel', pageSubtitle: `${u.rows.length} users`, content, user: req.session.user, activeNav: 'admin' }));
+    } catch (e) { res.status(500).send('Error'); }
 });
 app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) => {
     try { const t = req.params.username; const s = await pool.query('SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC', [t]); const content = s.rows.length === 0 ? '<div class="empty"><div class="empty-icon">◈</div><div class="empty-title">No scripts</div></div>' : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;">${s.rows.map(renderScriptCard).join('')}</div>`; res.send(renderLayout({ title: t, pageTitle: `${t}'s Scripts`, pageSubtitle: `${s.rows.length} scripts`, content, user: req.session.user, activeNav: 'admin', actions: `<a href="/admin" class="btn btn-ghost">← All Users</a>` })); } catch (e) { res.status(500).send('Error'); }
 });
-
 // ==================== SOCKET.IO ====================
 const voiceRooms = new Map();
+
 io.on('connection', (socket) => {
+    console.log('🔗 Connected:', socket.id);
+
     socket.on('register_user', ({ username }) => { socket.username = username; });
-    socket.on('join_chat', async (data) => { try { const { channelId } = data; socket.channelId = channelId; socket.join('channel_' + channelId); const r = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50', [channelId]); socket.emit('chat_history', r.rows.reverse()); } catch (e) {} });
-    socket.on('switch_channel', async (data) => { try { const { channelId } = data; if (socket.channelId) socket.leave('channel_' + socket.channelId); socket.channelId = channelId; socket.join('channel_' + channelId); const r = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50', [channelId]); socket.emit('chat_history', r.rows.reverse()); } catch (e) {} });
-    socket.on('send_message', async (data) => { try { const { username, role, message, channelId } = data; if (!message || !message.trim()) return; const chk = await pool.query('SELECT * FROM channels WHERE id = $1', [channelId]); if (chk.rows.length === 0) return; const ch = chk.rows[0]; const isAdmin = role === 'ADMIN'; if (ch.read_only && !isAdmin && ch.created_by !== username) return; const r = await pool.query('INSERT INTO chat_messages (channel_id, username, role, message) VALUES ($1, $2, $3, $4) RETURNING *', [channelId, username, role, message.trim().substring(0, 500)]); io.to('channel_' + channelId).emit('new_message', r.rows[0]); } catch (e) {} });
-    socket.on('delete_message', async (data) => { try { const { messageId, role, channelId } = data; if (role !== 'ADMIN') return; await pool.query('DELETE FROM chat_messages WHERE id = $1', [messageId]); io.to('channel_' + channelId).emit('message_deleted', { messageId }); } catch (e) {} });
-    socket.on('join_voice', async (data) => { try { const { voiceChannelId, username, role } = data; if (socket.voiceChannelId) { socket.leave('voice_' + socket.voiceChannelId); const pr = voiceRooms.get(socket.voiceChannelId); if (pr) { pr.delete(socket.id); if (pr.size === 0) voiceRooms.delete(socket.voiceChannelId); else io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(pr.values())); } } socket.voiceChannelId = voiceChannelId; socket.voiceUsername = username; socket.join('voice_' + voiceChannelId); if (!voiceRooms.has(voiceChannelId)) voiceRooms.set(voiceChannelId, new Map()); voiceRooms.get(voiceChannelId).set(socket.id, { socketId: socket.id, username, role, isStreaming: false, isMuted: false }); const ps = Array.from(voiceRooms.get(voiceChannelId).values()); io.to('voice_' + voiceChannelId).emit('voice_participants', ps); socket.emit('voice_existing_users', { users: ps.filter(p => p.socketId !== socket.id), self: socket.id }); } catch (e) {} });
-    socket.on('leave_voice', () => { if (!socket.voiceChannelId) return; const vcId = socket.voiceChannelId; socket.leave('voice_' + vcId); const r = voiceRooms.get(vcId); if (r) { r.delete(socket.id); if (r.size === 0) voiceRooms.delete(vcId); else io.to('voice_' + vcId).emit('voice_participants', Array.from(r.values())); } socket.to('voice_' + vcId).emit('user_left_voice', { socketId: socket.id }); socket.voiceChannelId = null; });
-    socket.on('webrtc_offer', (d) => { io.to(d.targetSocketId).emit('webrtc_offer', { fromSocketId: socket.id, fromUsername: socket.voiceUsername, offer: d.offer, isScreenShare: d.isScreenShare }); });
-    socket.on('webrtc_answer', (d) => { io.to(d.targetSocketId).emit('webrtc_answer', { fromSocketId: socket.id, answer: d.answer }); });
-    socket.on('webrtc_ice_candidate', (d) => { io.to(d.targetSocketId).emit('webrtc_ice_candidate', { fromSocketId: socket.id, candidate: d.candidate }); });
-    socket.on('toggle_mute', (d) => { if (!socket.voiceChannelId) return; const r = voiceRooms.get(socket.voiceChannelId); if (r && r.has(socket.id)) { r.get(socket.id).isMuted = d.isMuted; io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values())); } });
-    socket.on('toggle_stream', (d) => { if (!socket.voiceChannelId) return; const r = voiceRooms.get(socket.voiceChannelId); if (r && r.has(socket.id)) { r.get(socket.id).isStreaming = d.isStreaming; io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values())); } });
-    socket.on('disconnect', () => { if (socket.voiceChannelId) { const vcId = socket.voiceChannelId; const r = voiceRooms.get(vcId); if (r) { r.delete(socket.id); if (r.size === 0) voiceRooms.delete(vcId); else io.to('voice_' + vcId).emit('voice_participants', Array.from(r.values())); } socket.to('voice_' + vcId).emit('user_left_voice', { socketId: socket.id }); } });
+
+    socket.on('join_chat', async (data) => {
+        try {
+            const { channelId } = data;
+            socket.channelId = channelId;
+            socket.join('channel_' + channelId);
+            const r = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50', [channelId]);
+            socket.emit('chat_history', r.rows.reverse());
+        } catch (e) { console.error(e); }
+    });
+
+    socket.on('switch_channel', async (data) => {
+        try {
+            const { channelId } = data;
+            if (socket.channelId) socket.leave('channel_' + socket.channelId);
+            socket.channelId = channelId;
+            socket.join('channel_' + channelId);
+            const r = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50', [channelId]);
+            socket.emit('chat_history', r.rows.reverse());
+        } catch (e) { console.error(e); }
+    });
+
+    socket.on('send_message', async (data) => {
+        try {
+            const { username, role, message, channelId } = data;
+            if (!message || !message.trim()) return;
+            const chk = await pool.query('SELECT * FROM channels WHERE id = $1', [channelId]);
+            if (chk.rows.length === 0) return;
+            const ch = chk.rows[0];
+            const isAdmin = role === 'ADMIN';
+            if (ch.read_only && !isAdmin && ch.created_by !== username) return;
+            const r = await pool.query('INSERT INTO chat_messages (channel_id, username, role, message) VALUES ($1, $2, $3, $4) RETURNING *', [channelId, username, role, message.trim().substring(0, 500)]);
+            io.to('channel_' + channelId).emit('new_message', r.rows[0]);
+        } catch (e) { console.error(e); }
+    });
+
+    socket.on('delete_message', async (data) => {
+        try {
+            const { messageId, role, channelId } = data;
+            if (role !== 'ADMIN') return;
+            await pool.query('DELETE FROM chat_messages WHERE id = $1', [messageId]);
+            io.to('channel_' + channelId).emit('message_deleted', { messageId });
+        } catch (e) { console.error(e); }
+    });
+
+    // VOICE EVENTS
+    socket.on('join_voice', async (data) => {
+        try {
+            const { voiceChannelId, username, role } = data;
+            if (socket.voiceChannelId) {
+                socket.leave('voice_' + socket.voiceChannelId);
+                const pr = voiceRooms.get(socket.voiceChannelId);
+                if (pr) {
+                    pr.delete(socket.id);
+                    if (pr.size === 0) voiceRooms.delete(socket.voiceChannelId);
+                    else io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(pr.values()));
+                }
+            }
+            socket.voiceChannelId = voiceChannelId;
+            socket.voiceUsername = username;
+            socket.join('voice_' + voiceChannelId);
+            if (!voiceRooms.has(voiceChannelId)) voiceRooms.set(voiceChannelId, new Map());
+            voiceRooms.get(voiceChannelId).set(socket.id, { socketId: socket.id, username, role, isStreaming: false, isMuted: false });
+            const ps = Array.from(voiceRooms.get(voiceChannelId).values());
+            io.to('voice_' + voiceChannelId).emit('voice_participants', ps);
+            socket.emit('voice_existing_users', { users: ps.filter(p => p.socketId !== socket.id), self: socket.id });
+        } catch (e) { console.error(e); }
+    });
+
+    socket.on('leave_voice', () => {
+        if (!socket.voiceChannelId) return;
+        const vcId = socket.voiceChannelId;
+        socket.leave('voice_' + vcId);
+        const r = voiceRooms.get(vcId);
+        if (r) {
+            r.delete(socket.id);
+            if (r.size === 0) voiceRooms.delete(vcId);
+            else io.to('voice_' + vcId).emit('voice_participants', Array.from(r.values()));
+        }
+        socket.to('voice_' + vcId).emit('user_left_voice', { socketId: socket.id });
+        socket.voiceChannelId = null;
+    });
+
+    socket.on('webrtc_offer', (d) => {
+        io.to(d.targetSocketId).emit('webrtc_offer', { fromSocketId: socket.id, fromUsername: socket.voiceUsername, offer: d.offer, isScreenShare: d.isScreenShare });
+    });
+
+    socket.on('webrtc_answer', (d) => {
+        io.to(d.targetSocketId).emit('webrtc_answer', { fromSocketId: socket.id, answer: d.answer });
+    });
+
+    socket.on('webrtc_ice_candidate', (d) => {
+        io.to(d.targetSocketId).emit('webrtc_ice_candidate', { fromSocketId: socket.id, candidate: d.candidate });
+    });
+
+    socket.on('toggle_mute', (d) => {
+        if (!socket.voiceChannelId) return;
+        const r = voiceRooms.get(socket.voiceChannelId);
+        if (r && r.has(socket.id)) {
+            r.get(socket.id).isMuted = d.isMuted;
+            io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values()));
+        }
+    });
+
+    socket.on('toggle_stream', (d) => {
+        if (!socket.voiceChannelId) return;
+        const r = voiceRooms.get(socket.voiceChannelId);
+        if (r && r.has(socket.id)) {
+            r.get(socket.id).isStreaming = d.isStreaming;
+            io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values()));
+        }
+    });
+
+    // FRIEND EVENTS
+    socket.on('send_friend_request', async (data) => {
+        try {
+            const { from, to } = data;
+            if (!from || !to || from === to) return socket.emit('friend_error', { error: "Invalid request" });
+            let targetUser = null;
+            if (to.includes('#')) {
+                const [name, tag] = to.split('#');
+                const r = await pool.query('SELECT username FROM users WHERE LOWER(username) = LOWER($1) AND tag = $2', [name, tag]);
+                if (r.rows.length > 0) targetUser = r.rows[0].username;
+            } else {
+                const r = await pool.query('SELECT username FROM users WHERE LOWER(username) = LOWER($1)', [to]);
+                if (r.rows.length > 0) targetUser = r.rows[0].username;
+            }
+            if (!targetUser) return socket.emit('friend_error', { error: 'User not found' });
+            const existing = await pool.query('SELECT * FROM friends WHERE (user1 = $1 AND user2 = $2) OR (user1 = $2 AND user2 = $1)', [from, targetUser]);
+            if (existing.rows.length > 0) {
+                if (existing.rows[0].status === 'accepted') return socket.emit('friend_error', { error: 'Already friends' });
+                return socket.emit('friend_error', { error: 'Request already sent' });
+            }
+            const sorted = [from, targetUser].sort();
+            await pool.query('INSERT INTO friends (user1, user2, status, requested_by) VALUES ($1, $2, $3, $4)', [sorted[0], sorted[1], 'pending', from]);
+            const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === targetUser);
+            if (targetSocket) targetSocket.emit('friend_request_received', { from });
+            socket.emit('friend_request_sent', { to: targetUser });
+        } catch (e) { console.error(e); socket.emit('friend_error', { error: 'Failed' }); }
+    });
+
+    socket.on('accept_friend_request', async (data) => {
+        try {
+            const { user, from } = data;
+            const sorted = [user, from].sort();
+            await pool.query('UPDATE friends SET status = $1 WHERE user1 = $2 AND user2 = $3', ['accepted', sorted[0], sorted[1]]);
+            const fromSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === from);
+            if (fromSocket) fromSocket.emit('friend_request_accepted', { by: user });
+            socket.emit('friend_list_updated');
+        } catch (e) { console.error(e); }
+    });
+
+    socket.on('decline_friend_request', async (data) => {
+        try {
+            const { user, from } = data;
+            const sorted = [user, from].sort();
+            await pool.query('DELETE FROM friends WHERE user1 = $1 AND user2 = $2', [sorted[0], sorted[1]]);
+            socket.emit('friend_list_updated');
+        } catch (e) { console.error(e); }
+    });
+
+    socket.on('remove_friend', async (data) => {
+        try {
+            const { user, friend } = data;
+            const sorted = [user, friend].sort();
+            await pool.query('DELETE FROM friends WHERE user1 = $1 AND user2 = $2', [sorted[0], sorted[1]]);
+            socket.emit('friend_list_updated');
+        } catch (e) { console.error(e); }
+    });
+
+    socket.on('send_dm', async (data) => {
+        try {
+            const { from, to, message } = data;
+            if (!message || !message.trim()) return;
+            const r = await pool.query('INSERT INTO dm_messages (from_user, to_user, message) VALUES ($1, $2, $3) RETURNING *', [from, to, message.trim().substring(0, 1000)]);
+            const toSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === to);
+            if (toSocket) toSocket.emit('new_dm', r.rows[0]);
+            socket.emit('new_dm', r.rows[0]);
+        } catch (e) { console.error(e); }
+    });
+
+    socket.on('disconnect', () => {
+        if (socket.voiceChannelId) {
+            const vcId = socket.voiceChannelId;
+            const r = voiceRooms.get(vcId);
+            if (r) {
+                r.delete(socket.id);
+                if (r.size === 0) voiceRooms.delete(vcId);
+                else io.to('voice_' + vcId).emit('voice_participants', Array.from(r.values()));
+            }
+            socket.to('voice_' + vcId).emit('user_left_voice', { socketId: socket.id });
+        }
+        console.log('❌ Disconnected:', socket.id);
+    });
 });
 
+// ==================== START ====================
 server.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v36.0 — Full Screen on Click`);
+    console.log(`✅ ${BRAND_NAME} v34.0 — Full Screen Voice + Mic Test`);
+    console.log(`🎤 Mic Test: ikaw lang makakarinig`);
+    console.log(`🖥️ Voice: Full screen layout`);
 });
