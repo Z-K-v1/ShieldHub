@@ -231,8 +231,8 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .channel-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .channel-icons{display:flex;gap:2px;opacity:0;transition:opacity 0.2s}
 .channel-item:hover .channel-icons{opacity:1}
-.channel-icon-btn{width:18px;height:18px;border-radius:4px;color:var(--text-3);font-size:11px;cursor:pointer;padding:0}
-.channel-icon-btn:hover{color:var(--accent)}
+.channel-icon-btn{width:22px;height:22px;border-radius:5px;color:var(--text-3);font-size:12px;cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:none}
+.channel-icon-btn:hover{color:var(--accent);background:var(--bg-3)}
 .voice-channel-item{display:flex;flex-direction:column;gap:6px;padding:9px 12px;background:var(--bg-2);border-radius:10px;margin-bottom:6px}
 .voice-item-header{display:flex;align-items:center;gap:8px;padding:4px 0}
 .voice-name{flex:1;font-size:13px;font-weight:600;color:var(--text-1)}
@@ -241,7 +241,7 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .voice-join-btn:hover{background:var(--accent);color:#fff}
 .voice-participants{display:flex;flex-direction:column;gap:3px}
 .voice-user{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);font-weight:600;padding:3px 0}
-.voice-user-avatar{width:18px;height:18px;border-radius:6px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:800}
+.voice-user-avatar{width:18px;height:18px;border-radius:6px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:800;flex-shrink:0}
 .chat-sidebar-footer{padding:12px;border-top:1px solid var(--border-0)}
 .chat-main{display:flex;flex-direction:column;min-width:0}
 .chat-header{padding:16px 24px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between;background:var(--bg-0)}
@@ -270,7 +270,6 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .voice-min-btn:hover{color:var(--accent);background:var(--bg-3)}
 .voice-panel.fullscreen #voicePanelName{font-size:18px!important;font-weight:800!important}
 
-/* Video Grid — Discord Style */
 .voice-videos{
     padding:10px;
     display:grid;
@@ -291,11 +290,13 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
     max-width:130px;
     width:100%;
     justify-self:center;
+    cursor:pointer;
+    transition:transform 0.15s,box-shadow 0.15s;
 }
+.voice-tile:hover{transform:scale(1.05);box-shadow:0 0 0 2px var(--accent-glow)}
 .voice-tile video{width:100%;height:100%;object-fit:cover;display:block}
 .voice-tile-label{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.75);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* Screen Share — Discord Style (malaki pero hindi sobra) */
 .voice-tile-screen{
     grid-column:1/-1;
     aspect-ratio:16/9;
@@ -306,7 +307,6 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 }
 .voice-tile-screen video{object-fit:contain;background:#000}
 
-/* Fullscreen mode */
 .voice-panel.fullscreen .voice-videos{
     grid-template-columns:repeat(auto-fill,minmax(140px,1fr))!important;
     max-height:calc(100vh - 160px)!important;
@@ -332,12 +332,13 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .voice-panel.fullscreen .voice-controls{padding:16px 24px!important;background:rgba(0,0,0,0.5)!important}
 .voice-panel.fullscreen .voice-ctrl-btn{width:54px!important;height:54px!important;font-size:22px!important}
 
-.voice-controls{padding:12px 16px;border-top:1px solid var(--border-0);display:flex;gap:10px;justify-content:center}
+.voice-controls{padding:12px 16px;border-top:1px solid var(--border-0);display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .voice-ctrl-btn{width:46px;height:46px;border-radius:12px;background:var(--bg-2);border:1px solid var(--border-0);color:var(--text-0);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
 .voice-ctrl-btn:hover{background:var(--bg-3);border-color:var(--border-1)}
 .voice-ctrl-leave{background:rgba(255,59,59,0.15);border-color:rgba(255,59,59,0.3);color:var(--accent)}
 .mic-test-active{background:linear-gradient(135deg,#00ff88,#00cc66)!important;color:#000!important;animation:pulse-mic 1s infinite}
 @keyframes pulse-mic{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,0.7)}50%{box-shadow:0 0 0 12px rgba(0,255,136,0)}}
+.deafen-active{background:rgba(220,38,38,0.25)!important;border-color:rgba(220,38,38,0.5)!important;color:#ff5555!important}
 
 @media(max-width:900px){
     .sidebar{transform:translateX(-100%);width:280px}
@@ -476,6 +477,7 @@ app.get('/raw/:slug/:version/:token', async (req, res) => {
 app.get('/delete/:token', requireLogin, async (req, res) => {
     try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.redirect('/'); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]); if (isAdmin && s.owner !== req.session.user.username) return res.redirect('/admin/user/' + encodeURIComponent(s.owner)); res.redirect('/'); } catch (e) { res.status(500).send('Error'); }
 });
+
 // ==================== SERVERS ====================
 app.get('/servers', requireLogin, async (req, res) => {
     const me = req.session.user.username;
@@ -506,6 +508,53 @@ app.post('/api/servers/create', requireLogin, async (req, res) => {
 
 app.post('/api/servers/join', requireLogin, async (req, res) => {
     try { const { invite_code } = req.body; const r = await pool.query('SELECT * FROM servers WHERE invite_code = $1', [invite_code]); if (r.rows.length === 0) return res.status(404).json({ error: 'Invalid code' }); const srv = r.rows[0]; const ex = await pool.query('SELECT * FROM server_members WHERE server_id = $1 AND username = $2', [srv.id, req.session.user.username]); if (ex.rows.length === 0) await pool.query('INSERT INTO server_members (server_id, username) VALUES ($1, $2)', [srv.id, req.session.user.username]); res.json(srv); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// KICK MEMBER FROM SERVER
+app.post('/api/servers/:id/kick', requireLogin, async (req, res) => {
+    try {
+        const serverId = parseInt(req.params.id);
+        const { targetUser } = req.body;
+        const me = req.session.user.username;
+        const isGlobalAdmin = req.session.user.role === 'ADMIN';
+
+        const srvR = await pool.query('SELECT * FROM servers WHERE id = $1', [serverId]);
+        if (srvR.rows.length === 0) return res.status(404).json({ error: 'Server not found' });
+        const srv = srvR.rows[0];
+        const isOwner = srv.owner === me;
+
+        if (!isOwner && !isGlobalAdmin) return res.status(403).json({ error: 'Only owner/admin can kick' });
+        if (targetUser === me) return res.status(400).json({ error: 'Cannot kick yourself' });
+        if (targetUser === srv.owner) return res.status(400).json({ error: 'Cannot kick owner' });
+
+        // Check target member role
+        const targetMember = await pool.query('SELECT * FROM server_members WHERE server_id = $1 AND username = $2', [serverId, targetUser]);
+        if (targetMember.rows.length === 0) return res.status(404).json({ error: 'User not in server' });
+
+        await pool.query('DELETE FROM server_members WHERE server_id = $1 AND username = $2', [serverId, targetUser]);
+        await pool.query('DELETE FROM channels WHERE server_id = $1 AND created_by = $2 AND owner_only = TRUE', [serverId, targetUser]);
+
+        // Notify kicked user
+        const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === targetUser);
+        if (targetSocket) {
+            // Remove from voice if there
+            if (targetSocket.voiceChannelId) {
+                const tVcId = targetSocket.voiceChannelId;
+                const tR = voiceRooms.get(tVcId);
+                if (tR) {
+                    tR.delete(targetSocket.id);
+                    if (tR.size === 0) voiceRooms.delete(tVcId);
+                    else io.to('voice_' + tVcId).emit('voice_participants', Array.from(tR.values()));
+                }
+                targetSocket.leave('voice_' + tVcId);
+                targetSocket.voiceChannelId = null;
+            }
+            targetSocket.emit('you_were_kicked_from_server', { serverId, by: me });
+        }
+
+        io.emit('server_member_kicked', { serverId, username: targetUser });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/servers/:id/channels', requireLogin, async (req, res) => {
@@ -557,7 +606,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
         const channels = channelsR.rows;
         const textChannels = channels.filter(c => c.type !== 'voice');
         const voiceChannels = channels.filter(c => c.type === 'voice');
-        const membersR = await pool.query('SELECT * FROM server_members WHERE server_id = $1', [serverId]);
+        const membersR = await pool.query('SELECT sm.*, u.role as global_role FROM server_members sm LEFT JOIN users u ON LOWER(u.username) = LOWER(sm.username) WHERE sm.server_id = $1 ORDER BY sm.role ASC, sm.username ASC', [serverId]);
 
         const visibleText = textChannels.filter(c => {
             if (c.owner_only && c.created_by !== me && !isOwner && !isGlobalAdmin) return false;
@@ -567,6 +616,23 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             if (c.owner_only && c.created_by !== me && !isOwner && !isGlobalAdmin) return false;
             return true;
         });
+
+        // Build members list with role badges + kick buttons
+        const membersHtml = membersR.rows.map(m => {
+            const isGlobalAdminM = m.global_role === 'ADMIN';
+            const isOwnerM = m.role === 'OWNER';
+            let badge = '';
+            let nameColor = 'var(--text-1)';
+            if (isOwnerM) { badge = '<span class="badge badge-owner" style="font-size:8px;padding:1px 5px;margin-left:4px;">👑</span>'; nameColor = '#7cc0ff'; }
+            else if (isGlobalAdminM) { badge = '<span class="badge badge-admin" style="font-size:8px;padding:1px 5px;margin-left:4px;">♛</span>'; nameColor = '#ffbb44'; }
+            const canKick = (isOwner || isGlobalAdmin) && m.username !== me && !isOwnerM;
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;font-size:13px;font-weight:600;color:${nameColor};" data-member="${m.username}">
+                <div style="width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;">${m.username.charAt(0).toUpperCase()}</div>
+                <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${m.username}</span>
+                ${badge}
+                ${canKick ? `<button onclick="kickMember('${m.username}')" class="channel-icon-btn" title="Kick from server">👢</button>` : ''}
+            </div>`;
+        }).join('');
 
         const content = `
         <div class="chat-layout">
@@ -605,7 +671,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             <div class="chat-sidebar" style="border-left:1px solid var(--border-0);border-right:none;">
                 <div class="chat-sidebar-header" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;">👥 Members (${membersR.rows.length})</div>
                 <div style="overflow-y:auto;flex:1;padding:10px 8px;">
-                    ${membersR.rows.map(m => `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;font-size:13px;color:var(--text-1);font-weight:600;"><div style="width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;">${m.username.charAt(0).toUpperCase()}</div>${m.username} ${m.role === 'OWNER' ? '👑' : ''}</div>`).join('')}
+                    ${membersHtml}
                 </div>
             </div>
         </div>
@@ -620,8 +686,9 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             <div id="voiceVideos" class="voice-videos"></div>
             <div class="voice-controls">
                 <button id="muteBtn" onclick="toggleMute()" class="voice-ctrl-btn" title="Mute">🎤</button>
+                <button id="deafBtn" onclick="toggleDeafen()" class="voice-ctrl-btn" title="Deafen">🎧</button>
                 <button id="shareBtn" onclick="toggleShareScreen()" class="voice-ctrl-btn" title="Share Screen">🖥️</button>
-                <button id="micTestBtn" onclick="toggleMicTest()" class="voice-ctrl-btn" title="Test Mic (Only you hear)">🎧</button>
+                <button id="micTestBtn" onclick="toggleMicTest()" class="voice-ctrl-btn" title="Test Mic">🎙️</button>
                 <button onclick="leaveVoice()" class="voice-ctrl-btn voice-ctrl-leave" title="Disconnect">📞</button>
             </div>
         </div>
@@ -663,7 +730,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
         let localStream=null, screenStream=null;
         let peerConnections={};
         let currentVoiceChannelId=null;
-        let isMuted=false, isSharing=false;
+        let isMuted=false, isDeafened=false, isSharing=false;
         let micTestActive=false;
         let micTestAudio=null;
         const iceServers={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
@@ -714,7 +781,22 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             else badge.style.display='none';
             if(window.innerWidth<=900)document.getElementById('chatSidebar').classList.remove('mobile-open');
         }
-        function renderMessage(msg,isNew){const isOwn=msg.username===CURRENT_USER;const isA=msg.role==='ADMIN';const div=document.createElement('div');div.className='chat-message';div.dataset.id=msg.id;if(isNew)div.style.animation='msgIn 0.3s ease';const av=isA?'linear-gradient(135deg,#ffaa00,#ff6600)':'linear-gradient(135deg,var(--red-1),var(--red-2))';const rb=isA?'<span style="font-size:9px;font-weight:800;color:#ffaa00;background:rgba(255,170,0,0.12);padding:2px 6px;border-radius:5px;margin-left:6px;">ADMIN</span>':'';div.innerHTML='<div class="msg-avatar" style="background:'+av+';">'+escapeHtml(msg.username.charAt(0).toUpperCase())+'</div><div class="msg-body"><div class="msg-meta"><span class="msg-username" style="color:'+(isOwn?'var(--accent-bright)':'var(--text-0)')+';">'+(isOwn?'You':escapeHtml(msg.username))+'</span>'+rb+'<span class="msg-time">'+formatTime(msg.created_at)+'</span></div><div class="msg-content">'+escapeHtml(msg.message)+'</div>'+(IS_GLOBAL_ADMIN&&!isOwn?'<button class="msg-delete" onclick="deleteMsg('+msg.id+')">🗑</button>':'')+'</div>';return div}
+        function renderMessage(msg,isNew){
+            const isOwn=msg.username===CURRENT_USER;
+            const isA=msg.role==='ADMIN';
+            const div=document.createElement('div');
+            div.className='chat-message';
+            div.dataset.id=msg.id;
+            if(isNew)div.style.animation='msgIn 0.3s ease';
+            const av=isA?'linear-gradient(135deg,#ffaa00,#ff6600)':'linear-gradient(135deg,var(--red-1),var(--red-2))';
+            const rb=isA?'<span style="font-size:9px;font-weight:800;color:#ffaa00;background:rgba(255,170,0,0.12);padding:2px 6px;border-radius:5px;margin-left:6px;">♛ ADMIN</span>':'';
+            div.innerHTML='<div class="msg-avatar" style="background:'+av+';">'+escapeHtml(msg.username.charAt(0).toUpperCase())+'</div>'
+                +'<div class="msg-body"><div class="msg-meta"><span class="msg-username" style="color:'+(isOwn?'var(--accent-bright)':'var(--text-0)')+';">'+(isOwn?'You':escapeHtml(msg.username))+'</span>'+rb+'<span class="msg-time">'+formatTime(msg.created_at)+'</span></div>'
+                +'<div class="msg-content">'+escapeHtml(msg.message)+'</div>'
+                +(IS_GLOBAL_ADMIN&&!isOwn?'<button class="msg-delete" onclick="deleteMsg('+msg.id+')">🗑</button>':'')
+                +'</div>';
+            return div;
+        }
         socket.on('chat_history',msgs=>{messagesEl.innerHTML='';if(msgs.length===0){messagesEl.innerHTML='<div style="text-align:center;color:var(--text-3);padding:60px 20px;"><div style="font-size:48px;margin-bottom:12px;">👋</div><div style="font-size:15px;font-weight:700;color:var(--text-2);">Welcome!</div></div>';return}msgs.forEach(m=>messagesEl.appendChild(renderMessage(m)));messagesEl.scrollTop=messagesEl.scrollHeight});
         socket.on('new_message',msg=>{messagesEl.appendChild(renderMessage(msg,true));messagesEl.scrollTop=messagesEl.scrollHeight});
         socket.on('message_deleted',({messageId})=>{const el=messagesEl.querySelector('[data-id="'+messageId+'"]');if(el){el.style.opacity='0';setTimeout(()=>el.remove(),300)}});
@@ -724,14 +806,129 @@ app.get('/server/:id', requireLogin, async (req, res) => {
         window.deleteMsg=id=>{if(confirm('Delete?'))socket.emit('delete_message',{messageId:id,role:CURRENT_ROLE,channelId:currentChannelId})};
         window.openRename=(id,name)=>{document.getElementById('renameChannelInput').value=name;document.getElementById('renameChannelModal').dataset.channelId=id;document.getElementById('renameChannelModal').style.display='flex'};
         window.saveRename=async()=>{const id=document.getElementById('renameChannelModal').dataset.channelId;const name=document.getElementById('renameChannelInput').value.trim();if(!name)return;const r=await fetch('/api/channels/'+id+'/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});const d=await r.json();if(d.success){showToast('Renamed!','success');closeModal('renameChannelModal')}else showToast(d.error,'error')};
-        window.joinVoice=async(channelId,channelName)=>{try{if(currentVoiceChannelId===channelId)return;if(currentVoiceChannelId)window.leaveVoice();try{localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false})}catch(e){return showToast('Mic denied','error')}currentVoiceChannelId=channelId;document.getElementById('voicePanelName').textContent=channelName;document.getElementById('voicePanel').style.display='flex';document.getElementById('voicePanel').classList.add('fullscreen');document.body.style.overflow='hidden';document.getElementById('voiceVideos').innerHTML='';addVideoTile('self','You',localStream,false,true);socket.emit('join_voice',{voiceChannelId:channelId,username:CURRENT_USER,role:CURRENT_ROLE});showToast('Joined','success')}catch(e){showToast('Failed','error')}};
-        window.leaveVoice=()=>{if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}Object.values(peerConnections).forEach(({pc})=>{try{pc.close()}catch(e){}});peerConnections={};socket.emit('leave_voice');currentVoiceChannelId=null;isSharing=false;isMuted=false;document.getElementById('voicePanel').style.display='none';document.getElementById('voicePanel').classList.remove('fullscreen');document.body.style.overflow='';document.getElementById('voiceVideos').innerHTML='';document.getElementById('muteBtn').textContent='🎤';document.getElementById('shareBtn').textContent='🖥️';document.getElementById('shareBtn').style.background='';if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}micTestActive=false;const mBtn=document.getElementById('micTestBtn');if(mBtn)mBtn.classList.remove('mic-test-active')};
-        window.toggleMute=()=>{if(!localStream)return;isMuted=!isMuted;localStream.getAudioTracks().forEach(t=>t.enabled=!isMuted);document.getElementById('muteBtn').textContent=isMuted?'🔇':'🎤';socket.emit('toggle_mute',{isMuted})};
-        window.toggleMicTest=async()=>{const btn=document.getElementById('micTestBtn');if(micTestActive){micTestActive=false;if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}btn.classList.remove('mic-test-active');showToast('Mic test OFF','success');return}try{const testStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true},video:false});window._micTestStream=testStream;const audioCtx=new(window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaStreamSource(testStream);const gainNode=audioCtx.createGain();gainNode.gain.value=1;source.connect(gainNode);gainNode.connect(audioCtx.destination);micTestAudio={audioCtx,source,gainNode};micTestActive=true;btn.classList.add('mic-test-active');showToast('🎧 Mic Test ON — ikaw lang makakarinig','success')}catch(e){showToast('Mic denied','error')}};
+
+        // ==================== KICK ====================
+        window.kickMember=async(username)=>{
+            if(!confirm('Kick '+username+' from this server?'))return;
+            try{
+                const r=await fetch('/api/servers/'+SERVER_ID+'/kick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({targetUser:username})});
+                const d=await r.json();
+                if(d.success){showToast(username+' kicked','success')}
+                else showToast(d.error||'Failed','error');
+            }catch(e){showToast('Failed','error')}
+        };
+        socket.on('server_member_kicked',({serverId,username})=>{
+            if(serverId!==SERVER_ID)return;
+            const el=document.querySelector('[data-member="'+username+'"]');
+            if(el){el.style.opacity='0.3';el.style.textDecoration='line-through';setTimeout(()=>el.remove(),1500)}
+            showToast(username+' was kicked from server','error');
+        });
+        socket.on('you_were_kicked_from_server',({serverId,by})=>{
+            if(serverId!==SERVER_ID)return;
+            alert('You were kicked from this server by '+by);
+            window.location.href='/servers';
+        });
+
+        // ==================== JOIN VOICE ====================
+        window.joinVoice=async(channelId,channelName)=>{
+            try{
+                if(currentVoiceChannelId===channelId)return;
+                if(currentVoiceChannelId)window.leaveVoice();
+                try{
+                    localStream=await navigator.mediaDevices.getUserMedia({
+                        audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,sampleRate:48000,channelCount:2},
+                        video:false
+                    });
+                }catch(e){return showToast('Mic denied','error')}
+                currentVoiceChannelId=channelId;
+                document.getElementById('voicePanelName').textContent=channelName;
+                document.getElementById('voicePanel').style.display='flex';
+                document.getElementById('voicePanel').classList.add('fullscreen');
+                document.body.style.overflow='hidden';
+                document.getElementById('voiceVideos').innerHTML='';
+                addVideoTile('self','You',localStream,false,true);
+                socket.emit('join_voice',{voiceChannelId:channelId,username:CURRENT_USER,role:CURRENT_ROLE});
+                showToast('Joined voice','success');
+            }catch(e){showToast('Failed','error')}
+        };
+
+        window.leaveVoice=()=>{
+            if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
+            if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}
+            Object.values(peerConnections).forEach(({pc})=>{try{pc.close()}catch(e){}});
+            peerConnections={};
+            socket.emit('leave_voice');
+            currentVoiceChannelId=null;
+            isSharing=false;isMuted=false;isDeafened=false;
+            document.getElementById('voicePanel').style.display='none';
+            document.getElementById('voicePanel').classList.remove('fullscreen');
+            document.body.style.overflow='';
+            document.getElementById('voiceVideos').innerHTML='';
+            document.getElementById('muteBtn').textContent='🎤';
+            document.getElementById('shareBtn').textContent='🖥️';
+            document.getElementById('shareBtn').style.background='';
+            document.getElementById('deafBtn').textContent='🎧';
+            document.getElementById('deafBtn').classList.remove('deafen-active');
+            if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}
+            if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}
+            micTestActive=false;
+            const mBtn=document.getElementById('micTestBtn');if(mBtn)mBtn.classList.remove('mic-test-active');
+        };
+
+        window.toggleMute=()=>{
+            if(!localStream)return;
+            isMuted=!isMuted;
+            localStream.getAudioTracks().forEach(t=>t.enabled=!isMuted);
+            document.getElementById('muteBtn').textContent=isMuted?'🔇':'🎤';
+            socket.emit('toggle_mute',{isMuted});
+        };
+
+        window.toggleDeafen=()=>{
+            isDeafened=!isDeafened;
+            const btn=document.getElementById('deafBtn');
+            btn.textContent=isDeafened?'🔇':'🎧';
+            if(isDeafened)btn.classList.add('deafen-active');else btn.classList.remove('deafen-active');
+            document.querySelectorAll('#voiceVideos video').forEach(v=>{
+                if(v.dataset.tile!=='self'){v.muted=isDeafened;}
+            });
+            if(isDeafened&&!isMuted){
+                isMuted=true;
+                if(localStream)localStream.getAudioTracks().forEach(t=>t.enabled=false);
+                document.getElementById('muteBtn').textContent='🔇';
+                socket.emit('toggle_mute',{isMuted:true});
+            }
+            showToast(isDeafened?'Deafened':'Undeafened','success');
+        };
+
+        window.toggleMicTest=async()=>{
+            const btn=document.getElementById('micTestBtn');
+            if(micTestActive){
+                micTestActive=false;
+                if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}
+                if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}
+                btn.classList.remove('mic-test-active');
+                showToast('Mic test OFF','success');
+                return;
+            }
+            try{
+                const testStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true},video:false});
+                window._micTestStream=testStream;
+                const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+                const source=audioCtx.createMediaStreamSource(testStream);
+                const gainNode=audioCtx.createGain();
+                gainNode.gain.value=1.5;
+                source.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                micTestAudio={audioCtx,source,gainNode};
+                micTestActive=true;
+                btn.classList.add('mic-test-active');
+                showToast('🎙️ Mic Test ON — ikaw lang makakarinig','success');
+            }catch(e){showToast('Mic denied','error')}
+        };
+
         window.toggleFullscreenVoice=()=>{const panel=document.getElementById('voicePanel');panel.classList.toggle('fullscreen');document.body.style.overflow=panel.classList.contains('fullscreen')?'hidden':''};
         document.addEventListener('keydown',e=>{if(e.key==='Escape'){const p=document.getElementById('voicePanel');if(p&&p.classList.contains('fullscreen')){window.toggleFullscreenVoice()}}});
 
-        // ==================== SCREEN SHARE (DISCORD STYLE) ====================
         window.toggleShareScreen=async()=>{
             if(!currentVoiceChannelId)return;
             if(isSharing){
@@ -741,6 +938,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                 document.getElementById('shareBtn').style.background='';
                 const st=document.querySelector('[data-tile="self-screen"]');
                 if(st)st.remove();
+                socket.emit('toggle_stream',{isStreaming:false});
                 for(const [sid,{pc}] of Object.entries(peerConnections)){
                     try{
                         const s=pc.getSenders().find(s=>s.track&&s.track.kind==='video');
@@ -758,6 +956,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                 document.getElementById('shareBtn').textContent='⏹️';
                 document.getElementById('shareBtn').style.background='linear-gradient(135deg,var(--red-1),var(--red-2))';
                 addVideoTile('self-screen','Your Screen',screenStream,true,true);
+                socket.emit('toggle_stream',{isStreaming:true});
                 screenStream.getVideoTracks()[0].onended=()=>{if(isSharing)window.toggleShareScreen()};
                 for(const [sid,{pc}] of Object.entries(peerConnections)){
                     try{
@@ -773,10 +972,38 @@ app.get('/server/:id', requireLogin, async (req, res) => {
         };
 
         window.minimizeVoice=()=>{const v=document.getElementById('voiceVideos');v.style.display=v.style.display==='none'?'grid':'none'};
-        function createPeerConnection(sid){if(peerConnections[sid])return peerConnections[sid].pc;const pc=new RTCPeerConnection(iceServers);if(localStream)localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));if(screenStream)screenStream.getVideoTracks().forEach(t=>pc.addTrack(t,screenStream));pc.onicecandidate=e=>{if(e.candidate)socket.emit('webrtc_ice_candidate',{targetSocketId:sid,candidate:e.candidate})};pc.ontrack=e=>{const rs=e.streams[0];const isV=e.track.kind==='video';const meta=peerConnections[sid];if(isV){const tid=sid+'-screen';if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User')+"'s Screen",rs,true,false)}else{const tid=sid+'-audio';if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User'),rs,false,false)}};pc.onconnectionstatechange=()=>{if(['disconnected','failed','closed'].includes(pc.connectionState))removePeer(sid)};peerConnections[sid]={pc,username:null,isOfferer:false};return pc}
-        function removePeer(sid){if(peerConnections[sid]){try{peerConnections[sid].pc.close()}catch(e){}delete peerConnections[sid]}document.querySelector('[data-tile="'+sid+'-screen"]')?.remove();document.querySelector('[data-tile="'+sid+'-audio"]')?.remove()}
 
-        // Discord-style video tile: screen share naka-pin sa taas, camera tiles sa ibaba
+        function createPeerConnection(sid){
+            if(peerConnections[sid])return peerConnections[sid].pc;
+            const pc=new RTCPeerConnection(iceServers);
+            if(localStream)localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+            if(screenStream)screenStream.getVideoTracks().forEach(t=>pc.addTrack(t,screenStream));
+            pc.onicecandidate=e=>{if(e.candidate)socket.emit('webrtc_ice_candidate',{targetSocketId:sid,candidate:e.candidate})};
+            pc.ontrack=e=>{
+                const rs=e.streams[0];
+                const isV=e.track.kind==='video';
+                const meta=peerConnections[sid];
+                if(isV){
+                    const tid=sid+'-screen';
+                    if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User')+"'s Screen",rs,true,false);
+                } else {
+                    const tid=sid+'-audio';
+                    if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User'),rs,false,false);
+                    const vid=document.querySelector('[data-tile="'+tid+'"] video');
+                    if(vid){vid.volume=1.0;}
+                }
+            };
+            pc.onconnectionstatechange=()=>{if(['disconnected','failed','closed'].includes(pc.connectionState))removePeer(sid)};
+            peerConnections[sid]={pc,username:null,isOfferer:false};
+            return pc;
+        }
+
+        function removePeer(sid){
+            if(peerConnections[sid]){try{peerConnections[sid].pc.close()}catch(e){}delete peerConnections[sid]}
+            document.querySelector('[data-tile="'+sid+'-screen"]')?.remove();
+            document.querySelector('[data-tile="'+sid+'-audio"]')?.remove();
+        }
+
         function addVideoTile(id,label,stream,isScreen,isSelf){
             const videos=document.getElementById('voiceVideos');
             if(document.querySelector('[data-tile="'+id+'"]'))return;
@@ -786,25 +1013,80 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             const v=document.createElement('video');
             v.autoplay=true;v.playsInline=true;v.muted=isSelf;
             v.srcObject=stream;
+            v.dataset.tile=id;
             if(isScreen){v.style.objectFit='contain';v.style.background='#000'}
             const l=document.createElement('div');
             l.className='voice-tile-label';
             l.textContent=label;
             tile.appendChild(v);
             tile.appendChild(l);
-            if(isScreen){
-                videos.insertBefore(tile,videos.firstChild);
-            } else {
-                videos.appendChild(tile);
-            }
+            if(isScreen)videos.insertBefore(tile,videos.firstChild);
+            else videos.appendChild(tile);
         }
 
-        socket.on('voice_participants',ps=>{document.querySelectorAll('.voice-participants').forEach(el=>el.innerHTML='');document.querySelectorAll('.voice-count').forEach(el=>{el.textContent='0';el.style.display='none'});ps.forEach(p=>{const c=document.getElementById('voice-participants-'+currentVoiceChannelId);if(c){const d=document.createElement('div');d.className='voice-user';d.innerHTML='<div class="voice-user-avatar">'+escapeHtml(p.username.charAt(0).toUpperCase())+'</div>'+escapeHtml(p.username)+(p.isMuted?' 🔇':'')+(p.isStreaming?' 🖥️':'');c.appendChild(d)}});const cnt=document.getElementById('voice-count-'+currentVoiceChannelId);if(cnt){cnt.textContent=ps.length;cnt.style.display=ps.length>0?'inline-block':'none'}});
-        socket.on('voice_existing_users',async({users})=>{for(const u of users){try{const pc=createPeerConnection(u.socketId);peerConnections[u.socketId].username=u.username;peerConnections[u.socketId].isOfferer=true;const offer=await pc.createOffer();await pc.setLocalDescription(offer);socket.emit('webrtc_offer',{targetSocketId:u.socketId,offer,isScreenShare:false})}catch(e){}}});
-        socket.on('webrtc_offer',async({fromSocketId,fromUsername,offer})=>{try{const pc=createPeerConnection(fromSocketId);peerConnections[fromSocketId].username=fromUsername;await pc.setRemoteDescription(new RTCSessionDescription(offer));const answer=await pc.createAnswer();await pc.setLocalDescription(answer);socket.emit('webrtc_answer',{targetSocketId:fromSocketId,answer})}catch(e){}});
-        socket.on('webrtc_answer',async({fromSocketId,answer})=>{try{const p=peerConnections[fromSocketId];if(p&&p.pc.signalingState!=='stable')await p.pc.setRemoteDescription(new RTCSessionDescription(answer))}catch(e){}});
-        socket.on('webrtc_ice_candidate',async({fromSocketId,candidate})=>{try{const p=peerConnections[fromSocketId];if(p&&candidate)await p.pc.addIceCandidate(new RTCIceCandidate(candidate))}catch(e){}});
+        socket.on('voice_participants',ps=>{
+            document.querySelectorAll('.voice-participants').forEach(el=>el.innerHTML='');
+            document.querySelectorAll('.voice-count').forEach(el=>{el.textContent='0';el.style.display='none'});
+            ps.forEach(p=>{
+                const c=document.getElementById('voice-participants-'+currentVoiceChannelId);
+                if(c){
+                    const canKick=(IS_OWNER||IS_GLOBAL_ADMIN)&&p.username!==CURRENT_USER;
+                    const d=document.createElement('div');
+                    d.className='voice-user';
+                    d.innerHTML='<div class="voice-user-avatar">'+escapeHtml(p.username.charAt(0).toUpperCase())+'</div>'
+                        +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escapeHtml(p.username)+(p.isMuted?' 🔇':'')+(p.isStreaming?' 🖥️':'')+'</span>'
+                        +(canKick?'<button class="channel-icon-btn" style="opacity:0.6;" onclick="kickFromVoice(\\''+p.socketId+'\\')" title="Kick from voice">👢</button>':'');
+                    c.appendChild(d);
+                }
+            });
+            const cnt=document.getElementById('voice-count-'+currentVoiceChannelId);
+            if(cnt){cnt.textContent=ps.length;cnt.style.display=ps.length>0?'inline-block':'none'}
+        });
+
+        window.kickFromVoice=(targetSocketId)=>{
+            if(!confirm('Kick this user from voice?'))return;
+            socket.emit('kick_from_voice',{targetSocketId,kickedBy:CURRENT_USER});
+        };
+
+        socket.on('you_were_kicked',({by})=>{
+            showToast('You were kicked from voice by '+by,'error');
+            window.leaveVoice();
+        });
+
+        socket.on('voice_existing_users',async({users})=>{
+            for(const u of users){
+                try{
+                    const pc=createPeerConnection(u.socketId);
+                    peerConnections[u.socketId].username=u.username;
+                    peerConnections[u.socketId].isOfferer=true;
+                    const offer=await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    socket.emit('webrtc_offer',{targetSocketId:u.socketId,offer,isScreenShare:false});
+                }catch(e){}
+            }
+        });
+
+        socket.on('webrtc_offer',async({fromSocketId,fromUsername,offer})=>{
+            try{
+                const pc=createPeerConnection(fromSocketId);
+                peerConnections[fromSocketId].username=fromUsername;
+                await pc.setRemoteDescription(new RTCSessionDescription(offer));
+                const answer=await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                socket.emit('webrtc_answer',{targetSocketId:fromSocketId,answer});
+            }catch(e){}
+        });
+
+        socket.on('webrtc_answer',async({fromSocketId,answer})=>{
+            try{const p=peerConnections[fromSocketId];if(p&&p.pc.signalingState!=='stable')await p.pc.setRemoteDescription(new RTCSessionDescription(answer))}catch(e){}
+        });
+
+        socket.on('webrtc_ice_candidate',async({fromSocketId,candidate})=>{
+            try{const p=peerConnections[fromSocketId];if(p&&candidate)await p.pc.addIceCandidate(new RTCIceCandidate(candidate))}catch(e){}
+        });
+
         socket.on('user_left_voice',({socketId})=>removePeer(socketId));
+
         const firstText=document.querySelector('.channel-item');
         if(firstText){const fid=parseInt(firstText.dataset.id);switchChannel(fid,firstText.querySelector('.channel-name').textContent,firstText.dataset.visibility||'public','','text')}
         </script>
@@ -863,6 +1145,7 @@ app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
 app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) => {
     try { const t = req.params.username; const s = await pool.query('SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC', [t]); const content = s.rows.length === 0 ? '<div class="empty"><div class="empty-icon">◈</div><div class="empty-title">No scripts</div></div>' : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;">${s.rows.map(renderScriptCard).join('')}</div>`; res.send(renderLayout({ title: t, pageTitle: `${t}'s Scripts`, pageSubtitle: `${s.rows.length} scripts`, content, user: req.session.user, activeNav: 'admin', actions: `<a href="/admin" class="btn btn-ghost">← All Users</a>` })); } catch (e) { res.status(500).send('Error'); }
 });
+
 // ==================== SOCKET.IO ====================
 const voiceRooms = new Map();
 
@@ -915,7 +1198,7 @@ io.on('connection', (socket) => {
         } catch (e) { console.error(e); }
     });
 
-    // VOICE EVENTS
+    // ==================== VOICE ====================
     socket.on('join_voice', async (data) => {
         try {
             const { voiceChannelId, username, role } = data;
@@ -942,7 +1225,6 @@ io.on('connection', (socket) => {
     socket.on('leave_voice', () => {
         if (!socket.voiceChannelId) return;
         const vcId = socket.voiceChannelId;
-        socket.leave('voice_' + vcId);
         const r = voiceRooms.get(vcId);
         if (r) {
             r.delete(socket.id);
@@ -950,7 +1232,41 @@ io.on('connection', (socket) => {
             else io.to('voice_' + vcId).emit('voice_participants', Array.from(r.values()));
         }
         socket.to('voice_' + vcId).emit('user_left_voice', { socketId: socket.id });
+        socket.leave('voice_' + vcId);
         socket.voiceChannelId = null;
+        socket.voiceUsername = null;
+    });
+
+    socket.on('kick_from_voice', (data) => {
+        const { targetSocketId, kickedBy } = data;
+        const targetSocket = io.sockets.sockets.get(targetSocketId);
+        if (!targetSocket) return;
+
+        if (!socket.voiceChannelId) return;
+        const r = voiceRooms.get(socket.voiceChannelId);
+        if (!r || !r.has(socket.id)) return;
+
+        const kicker = r.get(socket.id);
+        const target = r.get(targetSocketId);
+        if (!target) return;
+
+        const canKick = ['OWNER', 'ADMIN'].includes(kicker.role);
+        if (!canKick) return;
+
+        targetSocket.emit('you_were_kicked', { by: kickedBy, from: socket.voiceChannelId });
+
+        if (targetSocket.voiceChannelId) {
+            const tVcId = targetSocket.voiceChannelId;
+            const tR = voiceRooms.get(tVcId);
+            if (tR) {
+                tR.delete(targetSocketId);
+                if (tR.size === 0) voiceRooms.delete(tVcId);
+                else io.to('voice_' + tVcId).emit('voice_participants', Array.from(tR.values()));
+            }
+            targetSocket.to('voice_' + tVcId).emit('user_left_voice', { socketId: targetSocketId });
+            targetSocket.leave('voice_' + tVcId);
+            targetSocket.voiceChannelId = null;
+        }
     });
 
     socket.on('webrtc_offer', (d) => {
@@ -983,7 +1299,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // FRIEND EVENTS
+    // ==================== FRIENDS ====================
     socket.on('send_friend_request', async (data) => {
         try {
             const { from, to } = data;
@@ -1068,7 +1384,8 @@ io.on('connection', (socket) => {
 
 // ==================== START ====================
 server.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v35.0 — Discord-Style Voice`);
-    console.log(`🎤 Mic Test: ikaw lang makakarinig`);
-    console.log(`🖥️ Screen Share: maliit lang, Discord-style`);
+    console.log(`✅ ${BRAND_NAME} v36.0 — Roles + Kick + Voice Fix`);
+    console.log(`👑 Owner/Admin can kick members`);
+    console.log(`👢 Kick from server & voice`);
+    console.log(`🎤 Mic Test + Deafen + Screen Share`);
 });
