@@ -240,7 +240,8 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .voice-join-btn{background:var(--accent-dim);border:1px solid rgba(255,59,59,0.3);color:var(--accent);padding:6px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
 .voice-join-btn:hover{background:var(--accent);color:#fff}
 .voice-participants{display:flex;flex-direction:column;gap:3px}
-.voice-user{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);font-weight:600;padding:3px 0}
+.voice-user{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);font-weight:600;padding:3px 4px;border-radius:6px}
+.voice-user:hover{background:var(--bg-3)}
 .voice-user-avatar{width:18px;height:18px;border-radius:6px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:800;flex-shrink:0}
 .chat-sidebar-footer{padding:12px;border-top:1px solid var(--border-0)}
 .chat-main{display:flex;flex-direction:column;min-width:0}
@@ -270,74 +271,46 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .voice-min-btn:hover{color:var(--accent);background:var(--bg-3)}
 .voice-panel.fullscreen #voicePanelName{font-size:18px!important;font-weight:800!important}
 
-.voice-videos{
-    padding:10px;
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(90px,1fr));
-    gap:8px;
-    max-height:280px;
-    overflow-y:auto;
-    align-content:start;
-    justify-content:center;
-}
-.voice-tile{
-    position:relative;
-    background:#000;
-    border-radius:10px;
-    overflow:hidden;
-    aspect-ratio:1;
-    border:1px solid var(--border-0);
-    max-width:130px;
-    width:100%;
-    justify-self:center;
-    cursor:pointer;
-    transition:transform 0.15s,box-shadow 0.15s;
-}
-.voice-tile:hover{transform:scale(1.05);box-shadow:0 0 0 2px var(--accent-glow)}
-.voice-tile video{width:100%;height:100%;object-fit:cover;display:block}
-.voice-tile-label{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.75);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Main View — DITO LANG ANG ISA LANG VIEW */
+.voice-body{padding:12px;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 160px);overflow-y:auto}
+.voice-panel:not(.fullscreen) .voice-body{max-height:420px}
+.voice-main-view{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:16/9;border:1px solid var(--border-0);width:100%;display:flex;align-items:center;justify-content:center}
+.voice-panel.fullscreen .voice-main-view{max-height:70vh}
+.voice-main-view video{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1)}
+.voice-main-view video.screen-mode{object-fit:contain;transform:none;background:#000}
+.voice-main-view video.avatar-mode{display:none}
+.voice-main-avatar{position:absolute;inset:0;background:linear-gradient(135deg,#2a1414,#1a0808);display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px}
+.voice-main-avatar.show{display:flex}
+.voice-main-avatar-circle{width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:38px;color:#fff;border:4px solid rgba(255,255,255,0.1)}
+.voice-main-avatar-name{font-size:16px;font-weight:700;color:#fff}
+.voice-main-avatar-status{font-size:12px;color:var(--text-2);font-weight:600}
+.voice-main-label{position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.8);color:#fff;font-size:11px;font-weight:800;padding:5px 11px;border-radius:8px;display:flex;align-items:center;gap:6px;backdrop-filter:blur(8px)}
+.voice-main-label.live::before{content:'';width:7px;height:7px;border-radius:50%;background:#23a55a;animation:pulse 1.2s infinite}
+.voice-main-back{position:absolute;top:10px;right:10px;background:rgba(255,59,59,0.9);color:#fff;font-size:11px;font-weight:800;padding:6px 12px;border-radius:8px;cursor:pointer;border:none;font-family:inherit;display:none;align-items:center;gap:5px;backdrop-filter:blur(8px)}
+.voice-main-back.show{display:flex}
+.voice-main-back:hover{background:rgba(220,38,38,1)}
 
-.voice-tile-screen{
-    grid-column:1/-1;
-    aspect-ratio:16/9;
-    max-width:100%;
-    width:100%;
-    max-height:200px;
-    justify-self:stretch;
-}
-.voice-tile-screen video{object-fit:contain;background:#000}
-
-.voice-panel.fullscreen .voice-videos{
-    grid-template-columns:repeat(auto-fill,minmax(140px,1fr))!important;
-    max-height:calc(100vh - 160px)!important;
-    padding:20px!important;
-    gap:14px!important;
-    align-content:start!important;
-}
-.voice-panel.fullscreen .voice-tile{
-    aspect-ratio:1!important;
-    border-radius:14px!important;
-    max-width:180px!important;
-    justify-self:center!important;
-}
-.voice-panel.fullscreen .voice-tile-screen{
-    grid-column:1/-1!important;
-    aspect-ratio:16/9!important;
-    max-width:100%!important;
-    max-height:55vh!important;
-    justify-self:stretch!important;
-}
-.voice-panel.fullscreen .voice-tile-screen video{object-fit:contain!important}
-.voice-panel.fullscreen .voice-tile-label{font-size:11px!important;padding:4px 9px!important}
-.voice-panel.fullscreen .voice-controls{padding:16px 24px!important;background:rgba(0,0,0,0.5)!important}
-.voice-panel.fullscreen .voice-ctrl-btn{width:54px!important;height:54px!important;font-size:22px!important}
+/* Participant tiles — lahat ng users (kasama ikaw) */
+.voice-participants-strip{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 6px 2px;min-height:70px;scrollbar-width:thin}
+.voice-tile{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:1;border:2px solid var(--border-0);min-width:80px;max-width:100px;width:100px;cursor:pointer;transition:all 0.15s;flex-shrink:0}
+.voice-tile:hover{transform:translateY(-3px);border-color:var(--accent-glow);box-shadow:0 4px 16px rgba(255,59,59,0.3)}
+.voice-tile.active-focus{border-color:var(--red-1);box-shadow:0 0 0 3px var(--accent-glow)}
+.voice-tile.active-focus::after{content:'👁';position:absolute;top:3px;left:3px;background:var(--red-1);color:#fff;font-size:10px;width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center}
+.voice-tile video{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.voice-tile-avatar{position:absolute;inset:0;background:linear-gradient(135deg,#2a1414,#1a0808);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:26px;color:#fff;font-family:'Space Grotesk',sans-serif}
+.voice-tile-label{position:absolute;bottom:3px;left:3px;right:3px;background:rgba(0,0,0,0.8);color:#fff;font-size:9px;font-weight:700;padding:3px 5px;border-radius:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.voice-tile-muted-badge{position:absolute;top:3px;right:3px;background:rgba(220,38,38,0.95);color:#fff;font-size:10px;font-weight:800;padding:2px 5px;border-radius:5px}
+.voice-tile-stream-badge{position:absolute;top:3px;right:3px;background:rgba(255,59,59,0.95);color:#fff;font-size:8px;font-weight:800;padding:2px 5px;border-radius:5px;text-transform:uppercase;letter-spacing:0.5px;animation:pulse 1.2s infinite}
+.voice-tile-self-badge{position:absolute;bottom:3px;right:3px;background:rgba(74,158,255,0.9);color:#fff;font-size:8px;font-weight:800;padding:2px 5px;border-radius:5px}
+.voice-tile-kick{position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.8);color:#fff;font-size:11px;width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;font-family:inherit;z-index:3;opacity:0;transition:opacity 0.15s}
+.voice-tile:hover .voice-tile-kick{opacity:1}
+.voice-tile-kick:hover{background:rgba(220,38,38,0.95)}
 
 .voice-controls{padding:12px 16px;border-top:1px solid var(--border-0);display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .voice-ctrl-btn{width:46px;height:46px;border-radius:12px;background:var(--bg-2);border:1px solid var(--border-0);color:var(--text-0);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
 .voice-ctrl-btn:hover{background:var(--bg-3);border-color:var(--border-1)}
 .voice-ctrl-leave{background:rgba(255,59,59,0.15);border-color:rgba(255,59,59,0.3);color:var(--accent)}
-.mic-test-active{background:linear-gradient(135deg,#00ff88,#00cc66)!important;color:#000!important;animation:pulse-mic 1s infinite}
-@keyframes pulse-mic{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,0.7)}50%{box-shadow:0 0 0 12px rgba(0,255,136,0)}}
+.voice-panel.fullscreen .voice-ctrl-btn{width:54px;height:54px;font-size:22px}
 .deafen-active{background:rgba(220,38,38,0.25)!important;border-color:rgba(220,38,38,0.5)!important;color:#ff5555!important}
 
 @media(max-width:900px){
@@ -354,12 +327,8 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
     .chat-sidebar.mobile-open{transform:translateX(0)}
     .chat-mobile-toggle{display:flex}
     .voice-panel{bottom:12px;right:12px;left:12px;width:auto}
-    .voice-videos{grid-template-columns:repeat(auto-fill,minmax(80px,1fr));max-height:220px}
-    .voice-tile{max-width:110px}
-    .voice-tile-screen{max-height:160px}
-    .voice-panel.fullscreen .voice-videos{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))!important;padding:10px!important}
-    .voice-panel.fullscreen .voice-tile{max-width:140px!important}
-    .voice-panel.fullscreen .voice-tile-screen{max-height:40vh!important}
+    .voice-tile{min-width:65px;max-width:80px;width:80px}
+    .voice-panel.fullscreen .voice-ctrl-btn{width:48px;height:48px;font-size:20px}
 }
 @media(max-width:768px){
     .content{padding:18px}
@@ -510,34 +479,23 @@ app.post('/api/servers/join', requireLogin, async (req, res) => {
     try { const { invite_code } = req.body; const r = await pool.query('SELECT * FROM servers WHERE invite_code = $1', [invite_code]); if (r.rows.length === 0) return res.status(404).json({ error: 'Invalid code' }); const srv = r.rows[0]; const ex = await pool.query('SELECT * FROM server_members WHERE server_id = $1 AND username = $2', [srv.id, req.session.user.username]); if (ex.rows.length === 0) await pool.query('INSERT INTO server_members (server_id, username) VALUES ($1, $2)', [srv.id, req.session.user.username]); res.json(srv); } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// KICK MEMBER FROM SERVER
 app.post('/api/servers/:id/kick', requireLogin, async (req, res) => {
     try {
         const serverId = parseInt(req.params.id);
         const { targetUser } = req.body;
         const me = req.session.user.username;
         const isGlobalAdmin = req.session.user.role === 'ADMIN';
-
         const srvR = await pool.query('SELECT * FROM servers WHERE id = $1', [serverId]);
         if (srvR.rows.length === 0) return res.status(404).json({ error: 'Server not found' });
         const srv = srvR.rows[0];
         const isOwner = srv.owner === me;
-
         if (!isOwner && !isGlobalAdmin) return res.status(403).json({ error: 'Only owner/admin can kick' });
         if (targetUser === me) return res.status(400).json({ error: 'Cannot kick yourself' });
         if (targetUser === srv.owner) return res.status(400).json({ error: 'Cannot kick owner' });
-
-        // Check target member role
-        const targetMember = await pool.query('SELECT * FROM server_members WHERE server_id = $1 AND username = $2', [serverId, targetUser]);
-        if (targetMember.rows.length === 0) return res.status(404).json({ error: 'User not in server' });
-
         await pool.query('DELETE FROM server_members WHERE server_id = $1 AND username = $2', [serverId, targetUser]);
         await pool.query('DELETE FROM channels WHERE server_id = $1 AND created_by = $2 AND owner_only = TRUE', [serverId, targetUser]);
-
-        // Notify kicked user
         const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === targetUser);
         if (targetSocket) {
-            // Remove from voice if there
             if (targetSocket.voiceChannelId) {
                 const tVcId = targetSocket.voiceChannelId;
                 const tR = voiceRooms.get(tVcId);
@@ -551,7 +509,6 @@ app.post('/api/servers/:id/kick', requireLogin, async (req, res) => {
             }
             targetSocket.emit('you_were_kicked_from_server', { serverId, by: me });
         }
-
         io.emit('server_member_kicked', { serverId, username: targetUser });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -617,7 +574,6 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             return true;
         });
 
-        // Build members list with role badges + kick buttons
         const membersHtml = membersR.rows.map(m => {
             const isGlobalAdminM = m.global_role === 'ADMIN';
             const isOwnerM = m.role === 'OWNER';
@@ -683,7 +639,19 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                     <button onclick="minimizeVoice()" class="voice-min-btn" title="Minimize">−</button>
                 </div>
             </div>
-            <div id="voiceVideos" class="voice-videos"></div>
+            <div class="voice-body">
+                <div class="voice-main-view" id="voiceMainView">
+                    <video id="voiceMainVideo" autoplay playsinline muted></video>
+                    <div class="voice-main-avatar" id="voiceMainAvatar">
+                        <div class="voice-main-avatar-circle" id="voiceMainAvatarCircle">?</div>
+                        <div class="voice-main-avatar-name" id="voiceMainAvatarName">User</div>
+                        <div class="voice-main-avatar-status" id="voiceMainAvatarStatus">No screen sharing</div>
+                    </div>
+                    <div class="voice-main-label" id="voiceMainLabel">👤 You</div>
+                    <button class="voice-main-back" id="voiceMainBack" onclick="focusSelf()">← Back to You</button>
+                </div>
+                <div id="voiceParticipantsStrip" class="voice-participants-strip"></div>
+            </div>
             <div class="voice-controls">
                 <button id="muteBtn" onclick="toggleMute()" class="voice-ctrl-btn" title="Mute">🎤</button>
                 <button id="deafBtn" onclick="toggleDeafen()" class="voice-ctrl-btn" title="Deafen">🎧</button>
@@ -733,6 +701,8 @@ app.get('/server/:id', requireLogin, async (req, res) => {
         let isMuted=false, isDeafened=false, isSharing=false;
         let micTestActive=false;
         let micTestAudio=null;
+        let viewingSocketId=null; // null = ikaw, socketId = ibang user
+        const voiceStreams = {}; // socketId -> { audio, video, username, isStreaming, isMuted }
         const iceServers={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]};
         const messagesEl=document.getElementById('chatMessages');
         const form=document.getElementById('chatForm');
@@ -781,22 +751,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             else badge.style.display='none';
             if(window.innerWidth<=900)document.getElementById('chatSidebar').classList.remove('mobile-open');
         }
-        function renderMessage(msg,isNew){
-            const isOwn=msg.username===CURRENT_USER;
-            const isA=msg.role==='ADMIN';
-            const div=document.createElement('div');
-            div.className='chat-message';
-            div.dataset.id=msg.id;
-            if(isNew)div.style.animation='msgIn 0.3s ease';
-            const av=isA?'linear-gradient(135deg,#ffaa00,#ff6600)':'linear-gradient(135deg,var(--red-1),var(--red-2))';
-            const rb=isA?'<span style="font-size:9px;font-weight:800;color:#ffaa00;background:rgba(255,170,0,0.12);padding:2px 6px;border-radius:5px;margin-left:6px;">♛ ADMIN</span>':'';
-            div.innerHTML='<div class="msg-avatar" style="background:'+av+';">'+escapeHtml(msg.username.charAt(0).toUpperCase())+'</div>'
-                +'<div class="msg-body"><div class="msg-meta"><span class="msg-username" style="color:'+(isOwn?'var(--accent-bright)':'var(--text-0)')+';">'+(isOwn?'You':escapeHtml(msg.username))+'</span>'+rb+'<span class="msg-time">'+formatTime(msg.created_at)+'</span></div>'
-                +'<div class="msg-content">'+escapeHtml(msg.message)+'</div>'
-                +(IS_GLOBAL_ADMIN&&!isOwn?'<button class="msg-delete" onclick="deleteMsg('+msg.id+')">🗑</button>':'')
-                +'</div>';
-            return div;
-        }
+        function renderMessage(msg,isNew){const isOwn=msg.username===CURRENT_USER;const isA=msg.role==='ADMIN';const div=document.createElement('div');div.className='chat-message';div.dataset.id=msg.id;if(isNew)div.style.animation='msgIn 0.3s ease';const av=isA?'linear-gradient(135deg,#ffaa00,#ff6600)':'linear-gradient(135deg,var(--red-1),var(--red-2))';const rb=isA?'<span style="font-size:9px;font-weight:800;color:#ffaa00;background:rgba(255,170,0,0.12);padding:2px 6px;border-radius:5px;margin-left:6px;">♛ ADMIN</span>':'';div.innerHTML='<div class="msg-avatar" style="background:'+av+';">'+escapeHtml(msg.username.charAt(0).toUpperCase())+'</div><div class="msg-body"><div class="msg-meta"><span class="msg-username" style="color:'+(isOwn?'var(--accent-bright)':'var(--text-0)')+';">'+(isOwn?'You':escapeHtml(msg.username))+'</span>'+rb+'<span class="msg-time">'+formatTime(msg.created_at)+'</span></div><div class="msg-content">'+escapeHtml(msg.message)+'</div>'+(IS_GLOBAL_ADMIN&&!isOwn?'<button class="msg-delete" onclick="deleteMsg('+msg.id+')">🗑</button>':'')+'</div>';return div}
         socket.on('chat_history',msgs=>{messagesEl.innerHTML='';if(msgs.length===0){messagesEl.innerHTML='<div style="text-align:center;color:var(--text-3);padding:60px 20px;"><div style="font-size:48px;margin-bottom:12px;">👋</div><div style="font-size:15px;font-weight:700;color:var(--text-2);">Welcome!</div></div>';return}msgs.forEach(m=>messagesEl.appendChild(renderMessage(m)));messagesEl.scrollTop=messagesEl.scrollHeight});
         socket.on('new_message',msg=>{messagesEl.appendChild(renderMessage(msg,true));messagesEl.scrollTop=messagesEl.scrollHeight});
         socket.on('message_deleted',({messageId})=>{const el=messagesEl.querySelector('[data-id="'+messageId+'"]');if(el){el.style.opacity='0';setTimeout(()=>el.remove(),300)}});
@@ -841,12 +796,19 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                     });
                 }catch(e){return showToast('Mic denied','error')}
                 currentVoiceChannelId=channelId;
+                viewingSocketId=null;
                 document.getElementById('voicePanelName').textContent=channelName;
                 document.getElementById('voicePanel').style.display='flex';
                 document.getElementById('voicePanel').classList.add('fullscreen');
                 document.body.style.overflow='hidden';
-                document.getElementById('voiceVideos').innerHTML='';
-                addVideoTile('self','You',localStream,false,true);
+                // Clear
+                document.getElementById('voiceParticipantsStrip').innerHTML='';
+                document.getElementById('voiceMainVideo').srcObject=localStream;
+                document.getElementById('voiceMainVideo').classList.remove('screen-mode');
+                document.getElementById('voiceMainLabel').textContent='👤 You';
+                document.getElementById('voiceMainLabel').classList.remove('live');
+                document.getElementById('voiceMainBack').classList.remove('show');
+                document.getElementById('voiceMainAvatar').classList.remove('show');
                 socket.emit('join_voice',{voiceChannelId:channelId,username:CURRENT_USER,role:CURRENT_ROLE});
                 showToast('Joined voice','success');
             }catch(e){showToast('Failed','error')}
@@ -857,13 +819,16 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}
             Object.values(peerConnections).forEach(({pc})=>{try{pc.close()}catch(e){}});
             peerConnections={};
+            Object.keys(voiceStreams).forEach(k=>delete voiceStreams[k]);
+            document.querySelectorAll('audio[data-audio-for]').forEach(el=>el.remove());
             socket.emit('leave_voice');
             currentVoiceChannelId=null;
-            isSharing=false;isMuted=false;isDeafened=false;
+            isSharing=false;isMuted=false;isDeafened=false;viewingSocketId=null;
             document.getElementById('voicePanel').style.display='none';
             document.getElementById('voicePanel').classList.remove('fullscreen');
             document.body.style.overflow='';
-            document.getElementById('voiceVideos').innerHTML='';
+            document.getElementById('voiceParticipantsStrip').innerHTML='';
+            document.getElementById('voiceMainVideo').srcObject=null;
             document.getElementById('muteBtn').textContent='🎤';
             document.getElementById('shareBtn').textContent='🖥️';
             document.getElementById('shareBtn').style.background='';
@@ -888,8 +853,8 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             const btn=document.getElementById('deafBtn');
             btn.textContent=isDeafened?'🔇':'🎧';
             if(isDeafened)btn.classList.add('deafen-active');else btn.classList.remove('deafen-active');
-            document.querySelectorAll('#voiceVideos video').forEach(v=>{
-                if(v.dataset.tile!=='self'){v.muted=isDeafened;}
+            document.querySelectorAll('#voiceMainVideo, .voice-tile video, audio[data-audio-for]').forEach(v=>{
+                v.muted=isDeafened;
             });
             if(isDeafened&&!isMuted){
                 isMuted=true;
@@ -922,7 +887,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                 micTestAudio={audioCtx,source,gainNode};
                 micTestActive=true;
                 btn.classList.add('mic-test-active');
-                showToast('🎙️ Mic Test ON — ikaw lang makakarinig','success');
+                showToast('🎙️ Mic Test ON','success');
             }catch(e){showToast('Mic denied','error')}
         };
 
@@ -936,8 +901,13 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                 isSharing=false;
                 document.getElementById('shareBtn').textContent='🖥️';
                 document.getElementById('shareBtn').style.background='';
-                const st=document.querySelector('[data-tile="self-screen"]');
-                if(st)st.remove();
+                // Restore main view sa sarili mo
+                if(viewingSocketId===null){
+                    document.getElementById('voiceMainVideo').srcObject=localStream;
+                    document.getElementById('voiceMainVideo').classList.remove('screen-mode');
+                    document.getElementById('voiceMainLabel').textContent='👤 You';
+                    document.getElementById('voiceMainLabel').classList.remove('live');
+                }
                 socket.emit('toggle_stream',{isStreaming:false});
                 for(const [sid,{pc}] of Object.entries(peerConnections)){
                     try{
@@ -955,7 +925,13 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                 isSharing=true;
                 document.getElementById('shareBtn').textContent='⏹️';
                 document.getElementById('shareBtn').style.background='linear-gradient(135deg,var(--red-1),var(--red-2))';
-                addVideoTile('self-screen','Your Screen',screenStream,true,true);
+                // Show screen in main view kung sarili mo
+                if(viewingSocketId===null){
+                    document.getElementById('voiceMainVideo').srcObject=screenStream;
+                    document.getElementById('voiceMainVideo').classList.add('screen-mode');
+                    document.getElementById('voiceMainLabel').textContent='🖥️ Your Screen';
+                    document.getElementById('voiceMainLabel').classList.add('live');
+                }
                 socket.emit('toggle_stream',{isStreaming:true});
                 screenStream.getVideoTracks()[0].onended=()=>{if(isSharing)window.toggleShareScreen()};
                 for(const [sid,{pc}] of Object.entries(peerConnections)){
@@ -971,7 +947,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             }
         };
 
-        window.minimizeVoice=()=>{const v=document.getElementById('voiceVideos');v.style.display=v.style.display==='none'?'grid':'none'};
+        window.minimizeVoice=()=>{const v=document.querySelector('.voice-body');v.style.display=v.style.display==='none'?'flex':'none'};
 
         function createPeerConnection(sid){
             if(peerConnections[sid])return peerConnections[sid].pc;
@@ -983,14 +959,33 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                 const rs=e.streams[0];
                 const isV=e.track.kind==='video';
                 const meta=peerConnections[sid];
+                const uname=meta?.username||'User';
+                if(!voiceStreams[sid])voiceStreams[sid]={audio:null,video:null,username:uname,isStreaming:false,isMuted:false};
                 if(isV){
-                    const tid=sid+'-screen';
-                    if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User')+"'s Screen",rs,true,false);
+                    voiceStreams[sid].video=rs;
+                    voiceStreams[sid].isStreaming=true;
+                    // Kung ito ang currently viewed, update main view
+                    if(viewingSocketId===sid)showFocusedUser(sid,uname);
+                    // Update tile badge
+                    const tile=document.querySelector('.voice-tile[data-tile="'+sid+'"]');
+                    if(tile){
+                        const sb=tile.querySelector('.voice-tile-stream-badge');
+                        if(sb)sb.style.display='block';
+                    }
                 } else {
-                    const tid=sid+'-audio';
-                    if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User'),rs,false,false);
-                    const vid=document.querySelector('[data-tile="'+tid+'"] video');
-                    if(vid){vid.volume=1.0;}
+                    voiceStreams[sid].audio=rs;
+                    // Auto play audio
+                    let audioEl=document.querySelector('audio[data-audio-for="'+sid+'"]');
+                    if(!audioEl){
+                        audioEl=document.createElement('audio');
+                        audioEl.dataset.audioFor=sid;
+                        audioEl.autoplay=true;
+                        audioEl.playsInline=true;
+                        document.body.appendChild(audioEl);
+                    }
+                    audioEl.srcObject=rs;
+                    audioEl.volume=1.0;
+                    audioEl.muted=isDeafened;
                 }
             };
             pc.onconnectionstatechange=()=>{if(['disconnected','failed','closed'].includes(pc.connectionState))removePeer(sid)};
@@ -1000,31 +995,160 @@ app.get('/server/:id', requireLogin, async (req, res) => {
 
         function removePeer(sid){
             if(peerConnections[sid]){try{peerConnections[sid].pc.close()}catch(e){}delete peerConnections[sid]}
-            document.querySelector('[data-tile="'+sid+'-screen"]')?.remove();
-            document.querySelector('[data-tile="'+sid+'-audio"]')?.remove();
+            delete voiceStreams[sid];
+            document.querySelector('audio[data-audio-for="'+sid+'"]')?.remove();
+            const tile=document.querySelector('.voice-tile[data-tile="'+sid+'"]');
+            if(tile)tile.remove();
+            // Kung ito ang viewed, balik sa sarili
+            if(viewingSocketId===sid)focusSelf();
         }
 
-        function addVideoTile(id,label,stream,isScreen,isSelf){
-            const videos=document.getElementById('voiceVideos');
-            if(document.querySelector('[data-tile="'+id+'"]'))return;
+        // ==================== PARTICIPANT TILES ====================
+        function renderSelfTile(){
+            const strip=document.getElementById('voiceParticipantsStrip');
+            let tile=document.querySelector('.voice-tile[data-tile="self"]');
+            if(!tile){
+                tile=document.createElement('div');
+                tile.className='voice-tile';
+                tile.dataset.tile='self';
+                tile.onclick=()=>focusSelf();
+                tile.innerHTML=`
+                    <video autoplay playsinline muted></video>
+                    <div class="voice-tile-avatar" style="display:none;">${escapeHtml(CURRENT_USER.charAt(0).toUpperCase())}</div>
+                    <div class="voice-tile-label">You</div>
+                    <div class="voice-tile-self-badge">YOU</div>
+                `;
+                strip.insertBefore(tile,strip.firstChild);
+            }
+            const v=tile.querySelector('video');
+            v.srcObject=isSharing?screenStream:localStream;
+            if(viewingSocketId===null)tile.classList.add('active-focus');
+            else tile.classList.remove('active-focus');
+        }
+
+        function renderParticipantTile(p){
+            const sid=p.socketId;
+            if(document.querySelector('.voice-tile[data-tile="'+sid+'"]'))return;
+            const canKick=(IS_OWNER||IS_GLOBAL_ADMIN)&&p.username!==CURRENT_USER;
             const tile=document.createElement('div');
-            tile.className='voice-tile'+(isScreen?' voice-tile-screen':'');
-            tile.dataset.tile=id;
-            const v=document.createElement('video');
-            v.autoplay=true;v.playsInline=true;v.muted=isSelf;
-            v.srcObject=stream;
-            v.dataset.tile=id;
-            if(isScreen){v.style.objectFit='contain';v.style.background='#000'}
-            const l=document.createElement('div');
-            l.className='voice-tile-label';
-            l.textContent=label;
-            tile.appendChild(v);
-            tile.appendChild(l);
-            if(isScreen)videos.insertBefore(tile,videos.firstChild);
-            else videos.appendChild(tile);
+            tile.className='voice-tile';
+            tile.dataset.tile=sid;
+            tile.onclick=(e)=>{
+                if(e.target.classList.contains('voice-tile-kick'))return;
+                focusUser(sid,p.username);
+            };
+            tile.innerHTML=`
+                <video autoplay playsinline muted></video>
+                <div class="voice-tile-avatar">${escapeHtml(p.username.charAt(0).toUpperCase())}</div>
+                <div class="voice-tile-stream-badge" style="display:${p.isStreaming?'block':'none'}">● LIVE</div>
+                ${p.isMuted?`<div class="voice-tile-muted-badge">🔇</div>`:''}
+                <div class="voice-tile-label">${escapeHtml(p.username)}</div>
+                ${canKick?`<button class="voice-tile-kick" onclick="event.stopPropagation();kickFromVoice('${sid}','${p.username.replace(/'/g,"\\'")}')" title="Kick from voice">👢</button>`:''}
+            `;
+            document.getElementById('voiceParticipantsStrip').appendChild(tile);
+            const vs=voiceStreams[sid];
+            if(vs&&vs.video){
+                const v=tile.querySelector('video');
+                v.srcObject=vs.video;
+                const av=tile.querySelector('.voice-tile-avatar');
+                if(av)av.style.display='none';
+            }
         }
 
+        function updateParticipantTile(sid,p){
+            const tile=document.querySelector('.voice-tile[data-tile="'+sid+'"]');
+            if(!tile)return;
+            const sb=tile.querySelector('.voice-tile-stream-badge');
+            if(sb)sb.style.display=p.isStreaming?'block':'none';
+            const mb=tile.querySelector('.voice-tile-muted-badge');
+            if(p.isMuted&&!mb){
+                const nm=document.createElement('div');
+                nm.className='voice-tile-muted-badge';
+                nm.textContent='🔇';
+                tile.appendChild(nm);
+            } else if(!p.isMuted&&mb){mb.remove();}
+            const vs=voiceStreams[sid];
+            if(vs&&vs.video){
+                const v=tile.querySelector('video');
+                if(v&&!v.srcObject)v.srcObject=vs.video;
+                const av=tile.querySelector('.voice-tile-avatar');
+                if(av)av.style.display='none';
+            }
+        }
+
+        // ==================== FOCUS (DISCORD STYLE) ====================
+        function showFocusedUser(sid,username){
+            const vs=voiceStreams[sid];
+            const mainVideo=document.getElementById('voiceMainVideo');
+            const mainLabel=document.getElementById('voiceMainLabel');
+            const mainBack=document.getElementById('voiceMainBack');
+            const mainAvatar=document.getElementById('voiceMainAvatar');
+
+            // Update view label
+            if(vs && vs.video){
+                // May screen share — ipakita
+                const combined=new MediaStream();
+                if(vs.audio)vs.audio.getAudioTracks().forEach(t=>combined.addTrack(t));
+                vs.video.getVideoTracks().forEach(t=>combined.addTrack(t));
+                mainVideo.srcObject=combined;
+                mainVideo.muted=isDeafened;
+                mainVideo.volume=1.0;
+                mainVideo.classList.add('screen-mode');
+                mainVideo.style.display='block';
+                mainAvatar.classList.remove('show');
+                mainLabel.textContent='🖥️ '+username+"'s Screen";
+                mainLabel.classList.add('live');
+                mainBack.classList.add('show');
+            } else {
+                // Walang screen share — ipakita avatar
+                mainVideo.srcObject=null;
+                mainVideo.style.display='none';
+                mainAvatar.classList.add('show');
+                document.getElementById('voiceMainAvatarCircle').textContent=username.charAt(0).toUpperCase();
+                document.getElementById('voiceMainAvatarName').textContent=username;
+                document.getElementById('voiceMainAvatarStatus').textContent='Not sharing screen';
+                mainLabel.textContent='👤 '+username;
+                mainLabel.classList.remove('live');
+                mainBack.classList.add('show');
+            }
+            // Highlight tile
+            document.querySelectorAll('.voice-tile').forEach(t=>t.classList.remove('active-focus'));
+            const tile=document.querySelector('.voice-tile[data-tile="'+sid+'"]');
+            if(tile)tile.classList.add('active-focus');
+        }
+
+        window.focusUser=(sid,username)=>{
+            viewingSocketId=sid;
+            showFocusedUser(sid,username);
+            const vs=voiceStreams[sid];
+            showToast(vs&&vs.video?'Watching '+username+"'s screen":username+' is not sharing screen','success');
+        };
+
+        window.focusSelf=()=>{
+            viewingSocketId=null;
+            const mainVideo=document.getElementById('voiceMainVideo');
+            const mainLabel=document.getElementById('voiceMainLabel');
+            const mainBack=document.getElementById('voiceMainBack');
+            const mainAvatar=document.getElementById('voiceMainAvatar');
+
+            mainVideo.style.display='block';
+            mainVideo.srcObject=isSharing?screenStream:localStream;
+            mainVideo.muted=true; // sarili mo muted
+            mainVideo.classList.toggle('screen-mode',isSharing);
+            mainAvatar.classList.remove('show');
+            mainLabel.textContent=isSharing?'🖥️ Your Screen':'👤 You';
+            mainLabel.classList.toggle('live',isSharing);
+            mainBack.classList.remove('show');
+
+            document.querySelectorAll('.voice-tile').forEach(t=>t.classList.remove('active-focus'));
+            const selfTile=document.querySelector('.voice-tile[data-tile="self"]');
+            if(selfTile)selfTile.classList.add('active-focus');
+            showToast('Back to your view','success');
+        };
+
+        // ==================== VOICE PARTICIPANTS UPDATE ====================
         socket.on('voice_participants',ps=>{
+            // Sidebar participants
             document.querySelectorAll('.voice-participants').forEach(el=>el.innerHTML='');
             document.querySelectorAll('.voice-count').forEach(el=>{el.textContent='0';el.style.display='none'});
             ps.forEach(p=>{
@@ -1035,16 +1159,36 @@ app.get('/server/:id', requireLogin, async (req, res) => {
                     d.className='voice-user';
                     d.innerHTML='<div class="voice-user-avatar">'+escapeHtml(p.username.charAt(0).toUpperCase())+'</div>'
                         +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escapeHtml(p.username)+(p.isMuted?' 🔇':'')+(p.isStreaming?' 🖥️':'')+'</span>'
-                        +(canKick?'<button class="channel-icon-btn" style="opacity:0.6;" onclick="kickFromVoice(\\''+p.socketId+'\\')" title="Kick from voice">👢</button>':'');
+                        +(canKick?'<button class="channel-icon-btn" style="opacity:0.6;" onclick="event.stopPropagation();kickFromVoice(\\''+p.socketId+'\\',\\''+p.username.replace(/'/g,"\\\\'")+'\\')" title="Kick from voice">👢</button>':'');
                     c.appendChild(d);
                 }
             });
             const cnt=document.getElementById('voice-count-'+currentVoiceChannelId);
             if(cnt){cnt.textContent=ps.length;cnt.style.display=ps.length>0?'inline-block':'none'}
+
+            // Strip — self tile palagi, tapos ibang users
+            renderSelfTile();
+            const others=ps.filter(p=>p.socketId!==socket.id);
+            // Remove tiles na wala na
+            document.querySelectorAll('.voice-tile').forEach(t=>{
+                if(t.dataset.tile==='self')return;
+                if(!others.find(p=>p.socketId===t.dataset.tile))t.remove();
+            });
+            // Add/update
+            others.forEach(p=>{
+                if(document.querySelector('.voice-tile[data-tile="'+p.socketId+'"]'))updateParticipantTile(p.socketId,p);
+                else renderParticipantTile(p);
+            });
+            // Update viewed user kung streaming pa
+            if(viewingSocketId){
+                const vp=ps.find(p=>p.socketId===viewingSocketId);
+                if(!vp){focusSelf();}
+                else showFocusedUser(viewingSocketId,vp.username);
+            }
         });
 
-        window.kickFromVoice=(targetSocketId)=>{
-            if(!confirm('Kick this user from voice?'))return;
+        window.kickFromVoice=(targetSocketId,username)=>{
+            if(!confirm('Kick '+(username||'this user')+' from voice?'))return;
             socket.emit('kick_from_voice',{targetSocketId,kickedBy:CURRENT_USER});
         };
 
@@ -1053,6 +1197,7 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             window.leaveVoice();
         });
 
+        // ==================== WEBRTC SIGNALING ====================
         socket.on('voice_existing_users',async({users})=>{
             for(const u of users){
                 try{
@@ -1085,7 +1230,9 @@ app.get('/server/:id', requireLogin, async (req, res) => {
             try{const p=peerConnections[fromSocketId];if(p&&candidate)await p.pc.addIceCandidate(new RTCIceCandidate(candidate))}catch(e){}
         });
 
-        socket.on('user_left_voice',({socketId})=>removePeer(socketId));
+        socket.on('user_left_voice',({socketId})=>{
+            removePeer(socketId);
+        });
 
         const firstText=document.querySelector('.channel-item');
         if(firstText){const fid=parseInt(firstText.dataset.id);switchChannel(fid,firstText.querySelector('.channel-name').textContent,firstText.dataset.visibility||'public','','text')}
@@ -1198,7 +1345,7 @@ io.on('connection', (socket) => {
         } catch (e) { console.error(e); }
     });
 
-    // ==================== VOICE ====================
+    // VOICE
     socket.on('join_voice', async (data) => {
         try {
             const { voiceChannelId, username, role } = data;
@@ -1241,20 +1388,15 @@ io.on('connection', (socket) => {
         const { targetSocketId, kickedBy } = data;
         const targetSocket = io.sockets.sockets.get(targetSocketId);
         if (!targetSocket) return;
-
         if (!socket.voiceChannelId) return;
         const r = voiceRooms.get(socket.voiceChannelId);
         if (!r || !r.has(socket.id)) return;
-
         const kicker = r.get(socket.id);
         const target = r.get(targetSocketId);
         if (!target) return;
-
         const canKick = ['OWNER', 'ADMIN'].includes(kicker.role);
         if (!canKick) return;
-
         targetSocket.emit('you_were_kicked', { by: kickedBy, from: socket.voiceChannelId });
-
         if (targetSocket.voiceChannelId) {
             const tVcId = targetSocket.voiceChannelId;
             const tR = voiceRooms.get(tVcId);
@@ -1272,15 +1414,12 @@ io.on('connection', (socket) => {
     socket.on('webrtc_offer', (d) => {
         io.to(d.targetSocketId).emit('webrtc_offer', { fromSocketId: socket.id, fromUsername: socket.voiceUsername, offer: d.offer, isScreenShare: d.isScreenShare });
     });
-
     socket.on('webrtc_answer', (d) => {
         io.to(d.targetSocketId).emit('webrtc_answer', { fromSocketId: socket.id, answer: d.answer });
     });
-
     socket.on('webrtc_ice_candidate', (d) => {
         io.to(d.targetSocketId).emit('webrtc_ice_candidate', { fromSocketId: socket.id, candidate: d.candidate });
     });
-
     socket.on('toggle_mute', (d) => {
         if (!socket.voiceChannelId) return;
         const r = voiceRooms.get(socket.voiceChannelId);
@@ -1289,7 +1428,6 @@ io.on('connection', (socket) => {
             io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values()));
         }
     });
-
     socket.on('toggle_stream', (d) => {
         if (!socket.voiceChannelId) return;
         const r = voiceRooms.get(socket.voiceChannelId);
@@ -1297,74 +1435,6 @@ io.on('connection', (socket) => {
             r.get(socket.id).isStreaming = d.isStreaming;
             io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(r.values()));
         }
-    });
-
-    // ==================== FRIENDS ====================
-    socket.on('send_friend_request', async (data) => {
-        try {
-            const { from, to } = data;
-            if (!from || !to || from === to) return socket.emit('friend_error', { error: "Invalid request" });
-            let targetUser = null;
-            if (to.includes('#')) {
-                const [name, tag] = to.split('#');
-                const r = await pool.query('SELECT username FROM users WHERE LOWER(username) = LOWER($1) AND tag = $2', [name, tag]);
-                if (r.rows.length > 0) targetUser = r.rows[0].username;
-            } else {
-                const r = await pool.query('SELECT username FROM users WHERE LOWER(username) = LOWER($1)', [to]);
-                if (r.rows.length > 0) targetUser = r.rows[0].username;
-            }
-            if (!targetUser) return socket.emit('friend_error', { error: 'User not found' });
-            const existing = await pool.query('SELECT * FROM friends WHERE (user1 = $1 AND user2 = $2) OR (user1 = $2 AND user2 = $1)', [from, targetUser]);
-            if (existing.rows.length > 0) {
-                if (existing.rows[0].status === 'accepted') return socket.emit('friend_error', { error: 'Already friends' });
-                return socket.emit('friend_error', { error: 'Request already sent' });
-            }
-            const sorted = [from, targetUser].sort();
-            await pool.query('INSERT INTO friends (user1, user2, status, requested_by) VALUES ($1, $2, $3, $4)', [sorted[0], sorted[1], 'pending', from]);
-            const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === targetUser);
-            if (targetSocket) targetSocket.emit('friend_request_received', { from });
-            socket.emit('friend_request_sent', { to: targetUser });
-        } catch (e) { console.error(e); socket.emit('friend_error', { error: 'Failed' }); }
-    });
-
-    socket.on('accept_friend_request', async (data) => {
-        try {
-            const { user, from } = data;
-            const sorted = [user, from].sort();
-            await pool.query('UPDATE friends SET status = $1 WHERE user1 = $2 AND user2 = $3', ['accepted', sorted[0], sorted[1]]);
-            const fromSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === from);
-            if (fromSocket) fromSocket.emit('friend_request_accepted', { by: user });
-            socket.emit('friend_list_updated');
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('decline_friend_request', async (data) => {
-        try {
-            const { user, from } = data;
-            const sorted = [user, from].sort();
-            await pool.query('DELETE FROM friends WHERE user1 = $1 AND user2 = $2', [sorted[0], sorted[1]]);
-            socket.emit('friend_list_updated');
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('remove_friend', async (data) => {
-        try {
-            const { user, friend } = data;
-            const sorted = [user, friend].sort();
-            await pool.query('DELETE FROM friends WHERE user1 = $1 AND user2 = $2', [sorted[0], sorted[1]]);
-            socket.emit('friend_list_updated');
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('send_dm', async (data) => {
-        try {
-            const { from, to, message } = data;
-            if (!message || !message.trim()) return;
-            const r = await pool.query('INSERT INTO dm_messages (from_user, to_user, message) VALUES ($1, $2, $3) RETURNING *', [from, to, message.trim().substring(0, 1000)]);
-            const toSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === to);
-            if (toSocket) toSocket.emit('new_dm', r.rows[0]);
-            socket.emit('new_dm', r.rows[0]);
-        } catch (e) { console.error(e); }
     });
 
     socket.on('disconnect', () => {
@@ -1384,8 +1454,9 @@ io.on('connection', (socket) => {
 
 // ==================== START ====================
 server.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v36.0 — Roles + Kick + Voice Fix`);
-    console.log(`👑 Owner/Admin can kick members`);
-    console.log(`👢 Kick from server & voice`);
-    console.log(`🎤 Mic Test + Deafen + Screen Share`);
+    console.log(`✅ ${BRAND_NAME} v39.0 — Discord-Style Focus View`);
+    console.log(`👤 Default: sarili mo lang ang nakikita mo`);
+    console.log(`👆 Click user → papalitan ng screen nila`);
+    console.log(`👆 Click "You" → babalik sa sarili mo`);
+    console.log(`👢 Kick: server + voice (Owner/Admin)`);
 });
