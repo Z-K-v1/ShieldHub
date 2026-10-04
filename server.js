@@ -258,32 +258,87 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
 .chat-input-area{padding:16px 20px;border-top:1px solid var(--border-0);background:var(--bg-0)}
 .chat-input-area form{display:flex;gap:10px;align-items:center}
 .chat-input-area input{flex:1;margin:0;background:var(--bg-2);border-color:transparent}
-/* Voice Panel */
-.voice-panel{position:fixed;bottom:24px;right:24px;width:380px;max-width:calc(100vw - 32px);background:rgba(15,8,8,0.95);backdrop-filter:blur(30px);border:1px solid var(--border-1);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,0.7);z-index:9998;display:flex;flex-direction:column;overflow:hidden;transition:all 0.3s}
+
+/* ==================== VOICE PANEL (DISCORD STYLE) ==================== */
+.voice-panel{position:fixed;bottom:24px;right:24px;width:420px;max-width:calc(100vw - 32px);background:rgba(15,8,8,0.95);backdrop-filter:blur(30px);border:1px solid var(--border-1);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,0.7);z-index:9998;display:flex;flex-direction:column;overflow:hidden;transition:all 0.3s}
 .voice-panel.fullscreen{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:100vw!important;border-radius:0!important;z-index:10000!important;bottom:0!important;right:0!important}
-.voice-panel.fullscreen .voice-videos{grid-template-columns:repeat(auto-fit,minmax(400px,1fr))!important;max-height:calc(100vh - 140px)!important;padding:20px!important;gap:16px!important}
-.voice-panel.fullscreen .voice-tile{aspect-ratio:16/9!important;border-radius:16px!important}
-.voice-panel.fullscreen .voice-tile-screen{grid-column:1/-1!important;aspect-ratio:16/9!important}
-.voice-panel.fullscreen .voice-panel-header{padding:16px 24px!important;background:rgba(0,0,0,0.5)!important}
-.voice-panel.fullscreen .voice-controls{padding:16px 24px!important;background:rgba(0,0,0,0.5)!important}
-.voice-panel.fullscreen .voice-ctrl-btn{width:54px!important;height:54px!important;font-size:22px!important}
-.voice-panel.fullscreen #voicePanelName{font-size:18px!important;font-weight:800!important}
 .voice-panel-header{padding:12px 16px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between}
+.voice-panel.fullscreen .voice-panel-header{padding:16px 24px!important;background:rgba(0,0,0,0.5)!important}
 .voice-live-dot{width:8px;height:8px;border-radius:50%;background:var(--red-1);box-shadow:0 0 12px var(--accent-glow);animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .voice-min-btn{width:28px;height:28px;border-radius:6px;color:var(--text-2);font-size:16px;background:var(--bg-2);border:1px solid var(--border-0);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .voice-min-btn:hover{color:var(--accent);background:var(--bg-3)}
-.voice-videos{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:320px;overflow-y:auto}
-.voice-tile{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:1;border:1px solid var(--border-0)}
-.voice-tile-screen{grid-column:span 2;aspect-ratio:16/10}
+.voice-panel.fullscreen #voicePanelName{font-size:18px!important;font-weight:800!important}
+
+/* Video Grid — Discord Style */
+.voice-videos{
+    padding:10px;
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(90px,1fr));
+    gap:8px;
+    max-height:280px;
+    overflow-y:auto;
+    align-content:start;
+    justify-content:center;
+}
+.voice-tile{
+    position:relative;
+    background:#000;
+    border-radius:10px;
+    overflow:hidden;
+    aspect-ratio:1;
+    border:1px solid var(--border-0);
+    max-width:130px;
+    width:100%;
+    justify-self:center;
+}
 .voice-tile video{width:100%;height:100%;object-fit:cover;display:block}
-.voice-tile-label{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.75);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px}
+.voice-tile-label{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.75);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Screen Share — Discord Style (malaki pero hindi sobra) */
+.voice-tile-screen{
+    grid-column:1/-1;
+    aspect-ratio:16/9;
+    max-width:100%;
+    width:100%;
+    max-height:200px;
+    justify-self:stretch;
+}
+.voice-tile-screen video{object-fit:contain;background:#000}
+
+/* Fullscreen mode */
+.voice-panel.fullscreen .voice-videos{
+    grid-template-columns:repeat(auto-fill,minmax(140px,1fr))!important;
+    max-height:calc(100vh - 160px)!important;
+    padding:20px!important;
+    gap:14px!important;
+    align-content:start!important;
+}
+.voice-panel.fullscreen .voice-tile{
+    aspect-ratio:1!important;
+    border-radius:14px!important;
+    max-width:180px!important;
+    justify-self:center!important;
+}
+.voice-panel.fullscreen .voice-tile-screen{
+    grid-column:1/-1!important;
+    aspect-ratio:16/9!important;
+    max-width:100%!important;
+    max-height:55vh!important;
+    justify-self:stretch!important;
+}
+.voice-panel.fullscreen .voice-tile-screen video{object-fit:contain!important}
+.voice-panel.fullscreen .voice-tile-label{font-size:11px!important;padding:4px 9px!important}
+.voice-panel.fullscreen .voice-controls{padding:16px 24px!important;background:rgba(0,0,0,0.5)!important}
+.voice-panel.fullscreen .voice-ctrl-btn{width:54px!important;height:54px!important;font-size:22px!important}
+
 .voice-controls{padding:12px 16px;border-top:1px solid var(--border-0);display:flex;gap:10px;justify-content:center}
 .voice-ctrl-btn{width:46px;height:46px;border-radius:12px;background:var(--bg-2);border:1px solid var(--border-0);color:var(--text-0);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
 .voice-ctrl-btn:hover{background:var(--bg-3);border-color:var(--border-1)}
 .voice-ctrl-leave{background:rgba(255,59,59,0.15);border-color:rgba(255,59,59,0.3);color:var(--accent)}
 .mic-test-active{background:linear-gradient(135deg,#00ff88,#00cc66)!important;color:#000!important;animation:pulse-mic 1s infinite}
 @keyframes pulse-mic{0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,0.7)}50%{box-shadow:0 0 0 12px rgba(0,255,136,0)}}
+
 @media(max-width:900px){
     .sidebar{transform:translateX(-100%);width:280px}
     .sidebar.open{transform:translateX(0)}
@@ -298,7 +353,12 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;resize:vertical
     .chat-sidebar.mobile-open{transform:translateX(0)}
     .chat-mobile-toggle{display:flex}
     .voice-panel{bottom:12px;right:12px;left:12px;width:auto}
-    .voice-panel.fullscreen .voice-videos{grid-template-columns:1fr!important;padding:10px!important}
+    .voice-videos{grid-template-columns:repeat(auto-fill,minmax(80px,1fr));max-height:220px}
+    .voice-tile{max-width:110px}
+    .voice-tile-screen{max-height:160px}
+    .voice-panel.fullscreen .voice-videos{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))!important;padding:10px!important}
+    .voice-panel.fullscreen .voice-tile{max-width:140px!important}
+    .voice-panel.fullscreen .voice-tile-screen{max-height:40vh!important}
 }
 @media(max-width:768px){
     .content{padding:18px}
@@ -665,16 +725,80 @@ app.get('/server/:id', requireLogin, async (req, res) => {
         window.openRename=(id,name)=>{document.getElementById('renameChannelInput').value=name;document.getElementById('renameChannelModal').dataset.channelId=id;document.getElementById('renameChannelModal').style.display='flex'};
         window.saveRename=async()=>{const id=document.getElementById('renameChannelModal').dataset.channelId;const name=document.getElementById('renameChannelInput').value.trim();if(!name)return;const r=await fetch('/api/channels/'+id+'/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});const d=await r.json();if(d.success){showToast('Renamed!','success');closeModal('renameChannelModal')}else showToast(d.error,'error')};
         window.joinVoice=async(channelId,channelName)=>{try{if(currentVoiceChannelId===channelId)return;if(currentVoiceChannelId)window.leaveVoice();try{localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false})}catch(e){return showToast('Mic denied','error')}currentVoiceChannelId=channelId;document.getElementById('voicePanelName').textContent=channelName;document.getElementById('voicePanel').style.display='flex';document.getElementById('voicePanel').classList.add('fullscreen');document.body.style.overflow='hidden';document.getElementById('voiceVideos').innerHTML='';addVideoTile('self','You',localStream,false,true);socket.emit('join_voice',{voiceChannelId:channelId,username:CURRENT_USER,role:CURRENT_ROLE});showToast('Joined','success')}catch(e){showToast('Failed','error')}};
-        window.leaveVoice=()=>{if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}Object.values(peerConnections).forEach(({pc})=>{try{pc.close()}catch(e){}});peerConnections={};socket.emit('leave_voice');currentVoiceChannelId=null;isSharing=false;isMuted=false;document.getElementById('voicePanel').style.display='none';document.getElementById('voicePanel').classList.remove('fullscreen');document.body.style.overflow='';document.getElementById('voiceVideos').innerHTML='';document.getElementById('muteBtn').textContent='🎤';document.getElementById('shareBtn').textContent='🖥️';if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}micTestActive=false;const mBtn=document.getElementById('micTestBtn');if(mBtn)mBtn.classList.remove('mic-test-active')};
+        window.leaveVoice=()=>{if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}Object.values(peerConnections).forEach(({pc})=>{try{pc.close()}catch(e){}});peerConnections={};socket.emit('leave_voice');currentVoiceChannelId=null;isSharing=false;isMuted=false;document.getElementById('voicePanel').style.display='none';document.getElementById('voicePanel').classList.remove('fullscreen');document.body.style.overflow='';document.getElementById('voiceVideos').innerHTML='';document.getElementById('muteBtn').textContent='🎤';document.getElementById('shareBtn').textContent='🖥️';document.getElementById('shareBtn').style.background='';if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}micTestActive=false;const mBtn=document.getElementById('micTestBtn');if(mBtn)mBtn.classList.remove('mic-test-active')};
         window.toggleMute=()=>{if(!localStream)return;isMuted=!isMuted;localStream.getAudioTracks().forEach(t=>t.enabled=!isMuted);document.getElementById('muteBtn').textContent=isMuted?'🔇':'🎤';socket.emit('toggle_mute',{isMuted})};
         window.toggleMicTest=async()=>{const btn=document.getElementById('micTestBtn');if(micTestActive){micTestActive=false;if(micTestAudio){try{micTestAudio.disconnect()}catch(e){}micTestAudio=null}if(window._micTestStream){window._micTestStream.getTracks().forEach(t=>t.stop());window._micTestStream=null}btn.classList.remove('mic-test-active');showToast('Mic test OFF','success');return}try{const testStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true},video:false});window._micTestStream=testStream;const audioCtx=new(window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaStreamSource(testStream);const gainNode=audioCtx.createGain();gainNode.gain.value=1;source.connect(gainNode);gainNode.connect(audioCtx.destination);micTestAudio={audioCtx,source,gainNode};micTestActive=true;btn.classList.add('mic-test-active');showToast('🎧 Mic Test ON — ikaw lang makakarinig','success')}catch(e){showToast('Mic denied','error')}};
         window.toggleFullscreenVoice=()=>{const panel=document.getElementById('voicePanel');panel.classList.toggle('fullscreen');document.body.style.overflow=panel.classList.contains('fullscreen')?'hidden':''};
         document.addEventListener('keydown',e=>{if(e.key==='Escape'){const p=document.getElementById('voicePanel');if(p&&p.classList.contains('fullscreen')){window.toggleFullscreenVoice()}}});
-        window.toggleShareScreen=async()=>{if(!currentVoiceChannelId)return;if(isSharing){if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}isSharing=false;document.getElementById('shareBtn').textContent='🖥️';document.getElementById('shareBtn').style.background='';document.querySelector('[data-tile="self-screen"]')?.remove();for(const [sid,{pc}] of Object.entries(peerConnections)){try{const offer=await pc.createOffer();await pc.setLocalDescription(offer);socket.emit('webrtc_offer',{targetSocketId:sid,offer,isScreenShare:false})}catch(e){}}}else{try{screenStream=await navigator.mediaDevices.getDisplayMedia({video:{cursor:'always'},audio:false})}catch(e){return}isSharing=true;document.getElementById('shareBtn').textContent='⏹️';document.getElementById('shareBtn').style.background='linear-gradient(135deg,var(--red-1),var(--red-2))';addVideoTile('self-screen','Your Screen',screenStream,true,true);screenStream.getVideoTracks()[0].onended=()=>{if(isSharing)window.toggleShareScreen()};for(const [sid,{pc}] of Object.entries(peerConnections)){try{const vt=screenStream.getVideoTracks()[0];const s=pc.getSenders().find(s=>s.track&&s.track.kind==='video');if(s)await s.replaceTrack(vt);else pc.addTrack(vt,screenStream);const offer=await pc.createOffer();await pc.setLocalDescription(offer);socket.emit('webrtc_offer',{targetSocketId:sid,offer,isScreenShare:true})}catch(e){}}}};
+
+        // ==================== SCREEN SHARE (DISCORD STYLE) ====================
+        window.toggleShareScreen=async()=>{
+            if(!currentVoiceChannelId)return;
+            if(isSharing){
+                if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}
+                isSharing=false;
+                document.getElementById('shareBtn').textContent='🖥️';
+                document.getElementById('shareBtn').style.background='';
+                const st=document.querySelector('[data-tile="self-screen"]');
+                if(st)st.remove();
+                for(const [sid,{pc}] of Object.entries(peerConnections)){
+                    try{
+                        const s=pc.getSenders().find(s=>s.track&&s.track.kind==='video');
+                        if(s)await s.replaceTrack(null);
+                        const offer=await pc.createOffer();
+                        await pc.setLocalDescription(offer);
+                        socket.emit('webrtc_offer',{targetSocketId:sid,offer,isScreenShare:false});
+                    }catch(e){}
+                }
+            } else {
+                try{
+                    screenStream=await navigator.mediaDevices.getDisplayMedia({video:{cursor:'always'},audio:false});
+                }catch(e){return}
+                isSharing=true;
+                document.getElementById('shareBtn').textContent='⏹️';
+                document.getElementById('shareBtn').style.background='linear-gradient(135deg,var(--red-1),var(--red-2))';
+                addVideoTile('self-screen','Your Screen',screenStream,true,true);
+                screenStream.getVideoTracks()[0].onended=()=>{if(isSharing)window.toggleShareScreen()};
+                for(const [sid,{pc}] of Object.entries(peerConnections)){
+                    try{
+                        const vt=screenStream.getVideoTracks()[0];
+                        const s=pc.getSenders().find(s=>s.track&&s.track.kind==='video');
+                        if(s)await s.replaceTrack(vt);else pc.addTrack(vt,screenStream);
+                        const offer=await pc.createOffer();
+                        await pc.setLocalDescription(offer);
+                        socket.emit('webrtc_offer',{targetSocketId:sid,offer,isScreenShare:true});
+                    }catch(e){}
+                }
+            }
+        };
+
         window.minimizeVoice=()=>{const v=document.getElementById('voiceVideos');v.style.display=v.style.display==='none'?'grid':'none'};
         function createPeerConnection(sid){if(peerConnections[sid])return peerConnections[sid].pc;const pc=new RTCPeerConnection(iceServers);if(localStream)localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));if(screenStream)screenStream.getVideoTracks().forEach(t=>pc.addTrack(t,screenStream));pc.onicecandidate=e=>{if(e.candidate)socket.emit('webrtc_ice_candidate',{targetSocketId:sid,candidate:e.candidate})};pc.ontrack=e=>{const rs=e.streams[0];const isV=e.track.kind==='video';const meta=peerConnections[sid];if(isV){const tid=sid+'-screen';if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User')+"'s Screen",rs,true,false)}else{const tid=sid+'-audio';if(!document.querySelector('[data-tile="'+tid+'"]'))addVideoTile(tid,(meta?.username||'User'),rs,false,false)}};pc.onconnectionstatechange=()=>{if(['disconnected','failed','closed'].includes(pc.connectionState))removePeer(sid)};peerConnections[sid]={pc,username:null,isOfferer:false};return pc}
         function removePeer(sid){if(peerConnections[sid]){try{peerConnections[sid].pc.close()}catch(e){}delete peerConnections[sid]}document.querySelector('[data-tile="'+sid+'-screen"]')?.remove();document.querySelector('[data-tile="'+sid+'-audio"]')?.remove()}
-        function addVideoTile(id,label,stream,isScreen,isSelf){const videos=document.getElementById('voiceVideos');const tile=document.createElement('div');tile.className='voice-tile'+(isScreen?' voice-tile-screen':'');tile.dataset.tile=id;const v=document.createElement('video');v.autoplay=true;v.playsInline=true;v.muted=isSelf;v.srcObject=stream;const l=document.createElement('div');l.className='voice-tile-label';l.textContent=label;tile.appendChild(v);tile.appendChild(l);videos.appendChild(tile)}
+
+        // Discord-style video tile: screen share naka-pin sa taas, camera tiles sa ibaba
+        function addVideoTile(id,label,stream,isScreen,isSelf){
+            const videos=document.getElementById('voiceVideos');
+            if(document.querySelector('[data-tile="'+id+'"]'))return;
+            const tile=document.createElement('div');
+            tile.className='voice-tile'+(isScreen?' voice-tile-screen':'');
+            tile.dataset.tile=id;
+            const v=document.createElement('video');
+            v.autoplay=true;v.playsInline=true;v.muted=isSelf;
+            v.srcObject=stream;
+            if(isScreen){v.style.objectFit='contain';v.style.background='#000'}
+            const l=document.createElement('div');
+            l.className='voice-tile-label';
+            l.textContent=label;
+            tile.appendChild(v);
+            tile.appendChild(l);
+            if(isScreen){
+                videos.insertBefore(tile,videos.firstChild);
+            } else {
+                videos.appendChild(tile);
+            }
+        }
+
         socket.on('voice_participants',ps=>{document.querySelectorAll('.voice-participants').forEach(el=>el.innerHTML='');document.querySelectorAll('.voice-count').forEach(el=>{el.textContent='0';el.style.display='none'});ps.forEach(p=>{const c=document.getElementById('voice-participants-'+currentVoiceChannelId);if(c){const d=document.createElement('div');d.className='voice-user';d.innerHTML='<div class="voice-user-avatar">'+escapeHtml(p.username.charAt(0).toUpperCase())+'</div>'+escapeHtml(p.username)+(p.isMuted?' 🔇':'')+(p.isStreaming?' 🖥️':'');c.appendChild(d)}});const cnt=document.getElementById('voice-count-'+currentVoiceChannelId);if(cnt){cnt.textContent=ps.length;cnt.style.display=ps.length>0?'inline-block':'none'}});
         socket.on('voice_existing_users',async({users})=>{for(const u of users){try{const pc=createPeerConnection(u.socketId);peerConnections[u.socketId].username=u.username;peerConnections[u.socketId].isOfferer=true;const offer=await pc.createOffer();await pc.setLocalDescription(offer);socket.emit('webrtc_offer',{targetSocketId:u.socketId,offer,isScreenShare:false})}catch(e){}}});
         socket.on('webrtc_offer',async({fromSocketId,fromUsername,offer})=>{try{const pc=createPeerConnection(fromSocketId);peerConnections[fromSocketId].username=fromUsername;await pc.setRemoteDescription(new RTCSessionDescription(offer));const answer=await pc.createAnswer();await pc.setLocalDescription(answer);socket.emit('webrtc_answer',{targetSocketId:fromSocketId,answer})}catch(e){}});
@@ -944,7 +1068,7 @@ io.on('connection', (socket) => {
 
 // ==================== START ====================
 server.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v34.0 — Full Screen Voice + Mic Test`);
+    console.log(`✅ ${BRAND_NAME} v35.0 — Discord-Style Voice`);
     console.log(`🎤 Mic Test: ikaw lang makakarinig`);
-    console.log(`🖥️ Voice: Full screen layout`);
+    console.log(`🖥️ Screen Share: maliit lang, Discord-style`);
 });
