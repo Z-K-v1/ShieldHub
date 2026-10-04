@@ -24,36 +24,95 @@ async function initDB() {
         await pool.query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, role VARCHAR(20) DEFAULT 'USER', display_name VARCHAR(50), tag VARCHAR(4), bio VARCHAR(200) DEFAULT '', created_at TIMESTAMP DEFAULT NOW());`);
         await pool.query(`CREATE TABLE IF NOT EXISTS scripts (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, slug VARCHAR(100) NOT NULL DEFAULT 'Script', version VARCHAR(50) NOT NULL DEFAULT 'V1', real_content TEXT NOT NULL, public_content TEXT NOT NULL, token VARCHAR(64) UNIQUE NOT NULL, owner VARCHAR(50) NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
         await pool.query(`CREATE TABLE IF NOT EXISTS "session" ("sid" VARCHAR NOT NULL COLLATE "default", "sess" JSON NOT NULL, "expire" TIMESTAMP(6) NOT NULL, CONSTRAINT "session_pkey" PRIMARY KEY ("sid"));`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS channels (id SERIAL PRIMARY KEY, name VARCHAR(50) UNIQUE NOT NULL, description VARCHAR(200) DEFAULT '', created_by VARCHAR(50) NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS chat_messages (id SERIAL PRIMARY KEY, channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE, username VARCHAR(50) NOT NULL, role VARCHAR(20) DEFAULT 'USER', message TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS voice_channels (id SERIAL PRIMARY KEY, name VARCHAR(50) NOT NULL, created_by VARCHAR(50) NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
+
+        // Discord-style servers
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS servers (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                owner VARCHAR(50) NOT NULL,
+                invite_code VARCHAR(16) UNIQUE NOT NULL,
+                icon VARCHAR(10) DEFAULT '🎮',
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+        `);
+
+        // Server members
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS server_members (
+                id SERIAL PRIMARY KEY,
+                server_id INTEGER REFERENCES servers(id) ON DELETE CASCADE,
+                username VARCHAR(50) NOT NULL,
+                role VARCHAR(20) DEFAULT 'MEMBER',
+                joined_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(server_id, username)
+            );
+        `);
+
+        // Channels (per server)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS channels (
+                id SERIAL PRIMARY KEY,
+                server_id INTEGER REFERENCES servers(id) ON DELETE CASCADE,
+                name VARCHAR(50) NOT NULL,
+                type VARCHAR(10) DEFAULT 'text',
+                created_by VARCHAR(50) NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+        `);
+
+        // Chat messages
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id SERIAL PRIMARY KEY,
+                channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+                username VARCHAR(50) NOT NULL,
+                role VARCHAR(20) DEFAULT 'USER',
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+        `);
+
+        // Friends
         await pool.query(`CREATE TABLE IF NOT EXISTS friends (id SERIAL PRIMARY KEY, user1 VARCHAR(50) NOT NULL, user2 VARCHAR(50) NOT NULL, status VARCHAR(20) DEFAULT 'pending', requested_by VARCHAR(50) NOT NULL, created_at TIMESTAMP DEFAULT NOW(), UNIQUE(user1, user2));`);
         await pool.query(`CREATE TABLE IF NOT EXISTS dm_messages (id SERIAL PRIMARY KEY, from_user VARCHAR(50) NOT NULL, to_user VARCHAR(50) NOT NULL, message TEXT NOT NULL, read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT NOW());`);
 
+        // Migrations
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(50);`);
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tag VARCHAR(4);`);
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio VARCHAR(200) DEFAULT '';`);
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS slug VARCHAR(100) DEFAULT 'Script';`);
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS version VARCHAR(50) DEFAULT 'V1';`);
+        await pool.query(`ALTER TABLE channels ADD COLUMN IF NOT EXISTS server_id INTEGER REFERENCES servers(id) ON DELETE CASCADE;`);
+        await pool.query(`ALTER TABLE channels ADD COLUMN IF NOT EXISTS type VARCHAR(10) DEFAULT 'text';`);
         await pool.query(`UPDATE scripts SET slug = LOWER(REPLACE(name, ' ', '_')) WHERE slug = 'Script' OR slug IS NULL;`);
         await pool.query(`UPDATE scripts SET version = 'V1' WHERE version IS NULL;`);
 
+        // Generate tags for users without one
         const noTag = await pool.query(`SELECT id FROM users WHERE tag IS NULL`);
         for (const u of noTag.rows) {
             const tag = Math.floor(1000 + Math.random() * 9000).toString();
             await pool.query(`UPDATE users SET tag = $1, display_name = username WHERE id = $2`, [tag, u.id]);
         }
 
-        const genCheck = await pool.query(`SELECT * FROM channels WHERE name = 'general'`);
-        if (genCheck.rows.length === 0) await pool.query(`INSERT INTO channels (name, description, created_by) VALUES ('general', 'General discussion', 'system')`);
-
-        const vcCheck = await pool.query(`SELECT * FROM voice_channels LIMIT 1`);
-        if (vcCheck.rows.length === 0) {
-            await pool.query(`INSERT INTO voice_channels (name, created_by) VALUES ('Lounge', 'system')`);
-            await pool.query(`INSERT INTO voice_channels (name, created_by) VALUES ('Meeting Room', 'system')`);
+        // Create default server if none
+        const srvCheck = await pool.query('SELECT * FROM servers LIMIT 1');
+        if (srvCheck.rows.length === 0) {
+            const invite = crypto.randomBytes(6).toString('hex');
+            const newServer = await pool.query(
+                'INSERT INTO servers (name, owner, invite_code, icon) VALUES ($1, $2, $3, $4) RETURNING *',
+                ['Zyrox-Kido', 'system', invite, '⭐']
+            );
+            const sid = newServer.rows[0].id;
+            await pool.query('INSERT INTO channels (server_id, name, type, created_by) VALUES ($1, $2, $3, $4)', [sid, 'general', 'text', 'system']);
+            await pool.query('INSERT INTO channels (server_id, name, type, created_by) VALUES ($1, $2, $3, $4)', [sid, 'welcome', 'text', 'system']);
+            await pool.query('INSERT INTO channels (server_id, name, type, created_by) VALUES ($1, $2, $3, $4)', [sid, 'Lounge', 'voice', 'system']);
+            await pool.query('INSERT INTO channels (server_id, name, type, created_by) VALUES ($1, $2, $3, $4)', [sid, 'Meeting Room', 'voice', 'system']);
+            console.log('🌟 Default server created');
         }
 
         console.log('✅ DB ready');
+
         const adminPass = process.env.ADMIN_PASSWORD;
         if (adminPass) {
             const ex = await pool.query('SELECT * FROM users WHERE username = $1', ['Z-K']);
@@ -195,6 +254,7 @@ a{color:inherit;text-decoration:none}button{font-family:inherit;cursor:pointer;b
 .badge-version{background:rgba(184,85,255,0.12);color:#c490ff;border-color:rgba(184,85,255,0.25)}
 .badge-admin{background:rgba(255,170,0,0.12);color:#ffbb44;border-color:rgba(255,170,0,0.25)}
 .badge-user{background:var(--accent-dim);color:var(--accent-bright);border-color:rgba(255,59,59,0.25)}
+.badge-owner{background:rgba(74,158,255,0.12);color:#7cc0ff;border-color:rgba(74,158,255,0.25)}
 .script-card-url{background:var(--bg-0);border:1px solid var(--border-0);border-radius:10px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--accent-bright);word-break:break-all;line-height:1.6}
 .script-card-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:6px}
 .script-card-actions .btn{flex:1;min-width:calc(50% - 5px)}
@@ -258,7 +318,6 @@ select{cursor:pointer;background-image:url("data:image/svg+xml;charset=UTF-8,%3c
 @media(max-width:480px){.content{padding:14px}.topbar{padding:0 14px;height:58px}.page-title{font-size:22px}.card{padding:18px;border-radius:14px}.stat{padding:16px}.stat-value{font-size:22px}.script-card{padding:16px}.script-card-actions .btn{flex:1;min-width:100%}.script-card-actions{flex-direction:column}.stats-row{grid-template-columns:1fr;gap:10px}input,textarea,select{font-size:16px;padding:12px 14px}textarea{min-height:220px;font-size:12px}.login-card{padding:30px 22px}.login-logo{width:58px;height:58px;font-size:22px}.login-title{font-size:20px}.toast{left:14px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));font-size:13px}}
 `;
 
-// ==================== TOAST SCRIPT ====================
 const TOAST_SCRIPT = `
 function showToast(message, type='success'){const e=document.querySelector('.toast');if(e)e.remove();const t=document.createElement('div');t.className='toast '+type;t.textContent=message;document.body.appendChild(t);setTimeout(()=>{t.classList.add('hiding');setTimeout(()=>t.remove(),300)},2400)}
 function copyText(text,btn){navigator.clipboard.writeText(text).then(()=>{if(btn){const o=btn.innerHTML;btn.innerHTML='✓ Copied';setTimeout(()=>btn.innerHTML=o,1400)}showToast('Copied','success')}).catch(()=>showToast('Failed','error'))}
@@ -267,7 +326,6 @@ function toggleSidebar(){document.querySelector('.sidebar').classList.toggle('op
 document.querySelectorAll('.nav-item').forEach(i=>{i.addEventListener('click',()=>{if(window.innerWidth<=900){document.querySelector('.sidebar').classList.remove('open');document.querySelector('.overlay').classList.remove('active');document.body.style.overflow=''}})});
 `;
 
-// ==================== LAYOUT ====================
 function renderLayout({ title, pageTitle, pageSubtitle, content, user, activeNav, actions }) {
     const isAdmin = user.role === 'ADMIN';
     return `<!DOCTYPE html><html lang="en"><head>${getHtmlHead(title)}<style>${LAYOUT_STYLES}</style></head><body>
@@ -278,8 +336,8 @@ function renderLayout({ title, pageTitle, pageSubtitle, content, user, activeNav
                 <div class="nav-section-label">Workspace</div>
                 <a href="/" class="nav-item ${activeNav === 'dashboard' ? 'active' : ''}"><span class="nav-icon">◈</span> Dashboard</a>
                 <a href="/create" class="nav-item ${activeNav === 'create' ? 'active' : ''}"><span class="nav-icon">✦</span> Create Script</a>
+                <a href="/servers" class="nav-item ${activeNav === 'servers' ? 'active' : ''}"><span class="nav-icon">🏠</span> Servers</a>
                 <a href="/friends" class="nav-item ${activeNav === 'friends' ? 'active' : ''}"><span class="nav-icon">👥</span> Friends</a>
-                <a href="/chat" class="nav-item ${activeNav === 'chat' ? 'active' : ''}"><span class="nav-icon">💬</span> Chat</a>
                 ${isAdmin ? `<div class="nav-section-label">Administration</div><a href="/admin" class="nav-item ${activeNav === 'admin' ? 'active' : ''}"><span class="nav-icon">♛</span> Admin Panel</a>` : ''}
             </nav>
             <div class="sidebar-footer">
@@ -302,7 +360,6 @@ function renderLayout({ title, pageTitle, pageSubtitle, content, user, activeNav
     </body></html>`;
 }
 
-// ==================== SCRIPT CARD ====================
 function renderScriptCard(s) {
     const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
     const slug = s.slug || 'Script';
@@ -319,889 +376,3 @@ function renderScriptCard(s) {
         </div>
     </div>`;
 }
-
-// ==================== AUTH ====================
-app.get('/login', (req, res) => {
-    res.send(`<!DOCTYPE html><html lang="en"><head>${getHtmlHead('Login')}<style>${LAYOUT_STYLES}</style></head><body>
-    <div class="login-wrap"><div class="login-card">
-        <div class="login-brand"><div class="login-logo">ZK</div><div class="login-title">Welcome back</div><div class="login-sub">Sign in to continue to ${BRAND_SHORT}</div></div>
-        <form action="/login" method="POST"><input type="text" name="username" placeholder="Username" required autofocus><input type="password" name="password" placeholder="Password" required><button type="submit" class="btn btn-primary">Sign In →</button></form>
-        <div class="login-msg error">${req.query.error ? 'Invalid credentials' : ''}</div>
-        <div class="login-msg success">${req.query.registered ? 'Account created! Please sign in.' : ''}</div>
-        <a href="/register" class="login-link">Create an account →</a>
-    </div></div></body></html>`);
-});
-app.post('/login', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        const result = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]);
-        if (result.rows.length === 0) return res.redirect('/login?error=1');
-        const user = result.rows[0];
-        if (user.password !== password) return res.redirect('/login?error=1');
-        req.session.user = { username: user.username, role: user.role };
-        res.redirect('/');
-    } catch (e) { res.redirect('/login?error=1'); }
-});
-
-app.get('/register', (req, res) => {
-    res.send(`<!DOCTYPE html><html lang="en"><head>${getHtmlHead('Register')}<style>${LAYOUT_STYLES}</style></head><body>
-    <div class="login-wrap"><div class="login-card">
-        <div class="login-brand"><div class="login-logo">ZK</div><div class="login-title">Create account</div><div class="login-sub">Join ${BRAND_SHORT}</div></div>
-        <form action="/register" method="POST"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><input type="password" name="confirmPassword" placeholder="Confirm password" required><button type="submit" class="btn btn-primary">Create Account →</button></form>
-        <div class="login-msg error">${req.query.error || ''}</div>
-        <a href="/login" class="login-link">← Back to sign in</a>
-    </div></div></body></html>`);
-});
-app.post('/register', async (req, res) => {
-    try {
-        const { username, password, confirmPassword } = req.body;
-        if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match');
-        if (username.length < 2 || password.length < 4) return res.redirect('/register?error=Min 2 chars name, 4 chars password');
-        const ex = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]);
-        if (ex.rows.length > 0) return res.redirect('/register?error=Username taken');
-        const role = username === 'Z-K' ? 'ADMIN' : 'USER';
-        const tag = Math.floor(1000 + Math.random() * 9000).toString();
-        await pool.query('INSERT INTO users (username, password, role, display_name, tag) VALUES ($1, $2, $3, $4, $5)', [username, password, role, username, tag]);
-        res.redirect('/login?registered=1');
-    } catch (e) { res.redirect('/register?error=Server error'); }
-});
-app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/login'); });
-
-// ==================== DASHBOARD ====================
-app.get('/', requireLogin, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC', [req.session.user.username]);
-        const myScripts = result.rows;
-        const isAdmin = req.session.user.role === 'ADMIN';
-        const statsHtml = `<div class="stats-row"><div class="stat"><div class="stat-icon">◈</div><div class="stat-label">Total Scripts</div><div class="stat-value">${myScripts.length}</div></div><div class="stat"><div class="stat-icon">${isAdmin ? '♛' : '★'}</div><div class="stat-label">Account Role</div><div class="stat-value stat-value-sm">${isAdmin ? 'Admin' : 'Member'}</div></div><div class="stat"><div class="stat-icon">◉</div><div class="stat-label">Username</div><div class="stat-value stat-value-sm">${req.session.user.username}</div></div></div>`;
-        const scriptsHtml = myScripts.length === 0
-            ? `<div class="empty"><div class="empty-icon">◈</div><div class="empty-title">No scripts yet</div><div class="empty-desc">Create your first script to get started</div><a href="/create" class="btn btn-primary">✦ Create Script</a></div>`
-            : `<div class="scripts-grid">${myScripts.map(renderScriptCard).join('')}</div>`;
-        res.send(renderLayout({ title: 'Dashboard', pageTitle: 'Dashboard', pageSubtitle: 'Manage your Lua scripts', content: statsHtml + scriptsHtml, user: req.session.user, activeNav: 'dashboard', actions: `<a href="/create" class="btn btn-primary">✦ New Script</a>` }));
-    } catch (e) { res.status(500).send('Error'); }
-});
-
-app.get('/create', requireLogin, (req, res) => {
-    const content = `<div class="card" style="max-width:920px"><form action="/create" method="POST"><div class="form-row"><div class="form-group"><label class="form-label">Script Name</label><input type="text" name="name" placeholder="e.g., God Mode" required autofocus></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>${versionDropdown('V1')}</select></div></div><div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" placeholder="-- Paste your Lua script here..." required></textarea></div><div style="display:flex;gap:12px;flex-wrap:wrap;"><button type="submit" class="btn btn-primary">💾 Save Script</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div>`;
-    res.send(renderLayout({ title: 'Create Script', pageTitle: 'Create Script', pageSubtitle: 'Add a new Lua script', content, user: req.session.user, activeNav: 'create' }));
-});
-app.post('/create', requireLogin, async (req, res) => {
-    try {
-        const { name, version, content } = req.body;
-        const slug = makeSlug(name);
-        const ver = version || 'V1';
-        const token = crypto.randomBytes(16).toString('hex');
-        await pool.query('INSERT INTO scripts (name, slug, version, real_content, public_content, token, owner) VALUES ($1, $2, $3, $4, $5, $6, $7)', [name, slug, ver, content, obfuscateScript(content), token, req.session.user.username]);
-        res.redirect('/');
-    } catch (e) { res.status(500).send('Error: ' + e.message); }
-});
-
-app.get('/edit/:token', requireLogin, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
-        if (result.rows.length === 0) return res.status(404).send("Not found");
-        const script = result.rows[0];
-        const isAdmin = req.session.user.role === 'ADMIN';
-        if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
-        const escaped = script.real_content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const content = `<div class="card" style="max-width:920px"><form action="/edit/${script.token}" method="POST"><div class="form-row"><div class="form-group"><label class="form-label">Script Name</label><input type="text" name="name" value="${script.name}" required></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>${versionDropdown(script.version)}</select></div></div><div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required>${escaped}</textarea></div><div style="display:flex;gap:12px;flex-wrap:wrap;"><button type="submit" class="btn btn-primary">💾 Save Changes</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div>`;
-        res.send(renderLayout({ title: 'Edit Script', pageTitle: `Edit: ${script.name}`, pageSubtitle: 'Update your script', content, user: req.session.user, activeNav: 'dashboard' }));
-    } catch (e) { res.status(500).send('Error'); }
-});
-app.post('/edit/:token', requireLogin, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
-        if (result.rows.length === 0) return res.status(404).send("Not found");
-        const script = result.rows[0];
-        const isAdmin = req.session.user.role === 'ADMIN';
-        if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Access Denied");
-        const slug = makeSlug(req.body.name);
-        const ver = req.body.version || 'V1';
-        await pool.query('UPDATE scripts SET name = $1, slug = $2, version = $3, real_content = $4, public_content = $5 WHERE token = $6', [req.body.name, slug, ver, req.body.content, obfuscateScript(req.body.content), req.params.token]);
-        res.redirect('/');
-    } catch (e) { res.status(500).send('Error'); }
-});
-
-app.get('/view/:slug/:version/:token', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
-        if (result.rows.length === 0) return res.status(404).send("Not found");
-        const script = result.rows[0];
-        const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-        const prettyUrl = `${baseUrl}/raw/${script.slug}/${script.version}/${script.token}`;
-        const loadstring = `loadstring(game:HttpGet("${prettyUrl}"))()`;
-        res.send(`<!DOCTYPE html><html lang="en"><head>${getHtmlHead(script.name)}<style>${LAYOUT_STYLES}</style></head><body>
-        <div class="login-wrap"><div class="login-card" style="width:640px;text-align:center;">
-            <div class="login-brand"><div class="login-logo">ZK</div><div class="login-title">${script.name}</div><div class="login-sub" style="margin-top:10px;"><span class="badge badge-version">${script.version}</span></div></div>
-            <div style="background:var(--bg-0);border:1px solid var(--border-0);border-radius:12px;padding:18px;margin-bottom:18px;text-align:left;"><div style="font-size:10px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:12px;">Loadstring</div><div id="lsBox" style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--accent-bright);word-break:break-all;line-height:1.8;">${loadstring}</div></div>
-            <button class="btn btn-primary btn-block" style="padding:15px;" onclick="copyText(document.getElementById('lsBox').innerText, this)">📋 Copy Loadstring</button>
-            <div style="margin-top:24px;font-size:11px;color:var(--text-3);font-weight:600;">Protected by ${BRAND_NAME}</div>
-        </div></div><script>${TOAST_SCRIPT}</script></body></html>`);
-    } catch (e) { res.status(500).send('Error'); }
-});
-
-app.get('/raw/:slug/:version/:token', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
-        if (result.rows.length === 0) return res.status(403).send("-- Denied --");
-        const script = result.rows[0];
-        if (script.slug !== req.params.slug || script.version !== req.params.version) return res.status(403).send("-- Denied --");
-        const ua = req.headers['user-agent'] || '';
-        for (const b of ['Mozilla', 'Chrome', 'Safari', 'Firefox', 'Edge', 'curl', 'wget', 'Postman']) if (ua.includes(b)) return res.status(403).send("-- Protected --");
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.send(script.public_content);
-    } catch (e) { res.status(500).send("-- Server Error --"); }
-});
-
-app.get('/delete/:token', requireLogin, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
-        if (result.rows.length === 0) return res.redirect('/');
-        const script = result.rows[0];
-        const isAdmin = req.session.user.role === 'ADMIN';
-        if (script.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied");
-        await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]);
-        if (isAdmin && script.owner !== req.session.user.username) return res.redirect('/admin/user/' + encodeURIComponent(script.owner));
-        res.redirect('/');
-    } catch (e) { res.status(500).send('Error'); }
-});
-
-// ==================== FRIEND APIs ====================
-app.get('/api/profile', requireLogin, async (req, res) => {
-    try {
-        const r = await pool.query('SELECT username, display_name, tag, bio, role, created_at FROM users WHERE username = $1', [req.session.user.username]);
-        if (r.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-        res.json(r.rows[0]);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.post('/api/profile/update', requireLogin, async (req, res) => {
-    try {
-        const { display_name, bio } = req.body;
-        await pool.query('UPDATE users SET display_name = $1, bio = $2 WHERE username = $3', [(display_name || req.session.user.username).substring(0, 50), (bio || '').substring(0, 200), req.session.user.username]);
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/friends', requireLogin, async (req, res) => {
-    try {
-        const me = req.session.user.username;
-        const friends = await pool.query(`SELECT f.*, CASE WHEN f.user1 = $1 THEN f.user2 ELSE f.user1 END as friend_name FROM friends f WHERE (f.user1 = $1 OR f.user2 = $1) AND f.status = 'accepted'`, [me]);
-        const pending = await pool.query(`SELECT f.*, f.requested_by, CASE WHEN f.user1 = $1 THEN f.user2 ELSE f.user1 END as other_name FROM friends f WHERE (f.user1 = $1 OR f.user2 = $1) AND f.status = 'pending'`, [me]);
-        const outgoing = pending.rows.filter(p => p.requested_by === me);
-        const incoming = pending.rows.filter(p => p.requested_by !== me);
-        const getProfile = async (username) => {
-            const r = await pool.query('SELECT username, display_name, tag, bio, role FROM users WHERE username = $1', [username]);
-            return r.rows[0] || { username, display_name: username, tag: '????', bio: '', role: 'USER' };
-        };
-        const friendList = []; for (const f of friends.rows) friendList.push(await getProfile(f.friend_name));
-        const incomingList = []; for (const f of incoming) incomingList.push(await getProfile(f.other_name));
-        const outgoingList = []; for (const f of outgoing) outgoingList.push(await getProfile(f.other_name));
-        res.json({ friends: friendList, incoming: incomingList, outgoing: outgoingList });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/dm/:username', requireLogin, async (req, res) => {
-    try {
-        const me = req.session.user.username;
-        const other = req.params.username;
-        const result = await pool.query(`SELECT * FROM dm_messages WHERE (from_user = $1 AND to_user = $2) OR (from_user = $2 AND to_user = $1) ORDER BY created_at ASC LIMIT 100`, [me, other]);
-        await pool.query('UPDATE dm_messages SET read = TRUE WHERE from_user = $1 AND to_user = $2', [other, me]);
-        res.json(result.rows);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/search-users', requireLogin, async (req, res) => {
-    try {
-        const q = (req.query.q || '').trim();
-        if (q.length < 2) return res.json([]);
-        const result = await pool.query(`SELECT username, display_name, tag, role FROM users WHERE (LOWER(username) LIKE LOWER($1) OR LOWER(display_name) LIKE LOWER($1)) AND username != $2 LIMIT 10`, ['%' + q + '%', req.session.user.username]);
-        res.json(result.rows);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-app.get('/api/voice-channels', requireLogin, async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM voice_channels ORDER BY created_at ASC');
-        res.json(result.rows);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// ==================== FRIENDS PAGE ====================
-app.get('/friends', requireLogin, (req, res) => {
-    const me = req.session.user.username;
-    const content = `
-    <div class="friends-layout">
-        <div class="friends-sidebar" id="friendsSidebar">
-            <button class="friend-tab active" data-tab="all" onclick="switchFriendTab('all')"><span>👥</span> All Friends</button>
-            <button class="friend-tab" data-tab="pending" onclick="switchFriendTab('pending')"><span>📬</span> Pending <span id="pendingBadge" class="friend-badge" style="display:none;">0</span></button>
-            <button class="friend-tab" data-tab="add" onclick="switchFriendTab('add')"><span>➕</span> Add Friend</button>
-            <div style="padding:14px;">
-                <div style="font-size:10px;font-weight:800;color:var(--text-3);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Your Profile</div>
-                <div class="friend-profile-mini">
-                    <div class="friend-avatar">${me.charAt(0).toUpperCase()}</div>
-                    <div style="min-width:0;flex:1;">
-                        <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="myDisplayName">${me}</div>
-                        <div style="font-size:11px;color:var(--text-3);font-weight:600;" id="myTag">#----</div>
-                    </div>
-                </div>
-                <button onclick="openProfileModal()" class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px;">Edit Profile</button>
-            </div>
-        </div>
-        <div class="friends-main">
-            <div class="friends-header">
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <button class="chat-mobile-toggle" onclick="toggleFriendsSidebar()">☰</button>
-                    <span id="friendsTitle" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;">All Friends</span>
-                </div>
-            </div>
-            <div id="friendsContent" class="friends-content"><div style="text-align:center;color:var(--text-3);padding:40px;">Loading...</div></div>
-        </div>
-    </div>
-
-    <div id="profileModal" class="modal-overlay" style="display:none;"><div class="modal-card"><div class="modal-header"><h3 style="font-size:18px;font-weight:700;">Edit Profile</h3><button onclick="closeProfileModal()" class="modal-close">×</button></div><div class="modal-body"><label class="form-label">Display Name</label><input type="text" id="editDisplayName" maxlength="50" placeholder="Your name"><label class="form-label" style="margin-top:14px;">Bio</label><input type="text" id="editBio" maxlength="200" placeholder="Tell us about yourself"><div style="margin-top:16px;padding:12px;background:var(--bg-2);border-radius:10px;"><div style="font-size:10px;font-weight:800;color:var(--text-3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Your ID</div><div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--accent-bright);" id="myFullId">...</div></div></div><div class="modal-footer"><button onclick="closeProfileModal()" class="btn btn-ghost">Cancel</button><button onclick="saveProfile()" class="btn btn-primary">Save</button></div></div></div>
-
-    <div id="dmModal" class="modal-overlay" style="display:none;"><div class="modal-card" style="width:520px;"><div class="modal-header"><h3 style="font-size:16px;font-weight:700;" id="dmTitle">DM</h3><button onclick="closeDM()" class="modal-close">×</button></div><div id="dmMessages" style="padding:16px 22px;max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;"></div><div style="padding:14px 22px;border-top:1px solid var(--border-0);"><form id="dmForm" style="display:flex;gap:10px;"><input type="text" id="dmInput" placeholder="Type a message..." maxlength="1000" style="flex:1;"><button type="submit" class="btn btn-primary">➤</button></form></div></div></div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-    const socket = io();
-    const me = ${JSON.stringify(req.session.user.username)};
-    let currentTab = 'all';
-    let currentDM = null;
-    let friendsData = { friends: [], incoming: [], outgoing: [] };
-    socket.emit('register_user', { username: me });
-    function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML}
-
-    async function loadFriends() {
-        try { const r = await fetch('/api/friends'); friendsData = await r.json(); updatePendingBadge(); renderTab(currentTab); } catch (e) { console.error(e); }
-    }
-    function updatePendingBadge() {
-        const badge = document.getElementById('pendingBadge');
-        const count = friendsData.incoming.length;
-        if (count > 0) { badge.textContent = count; badge.style.display = 'inline-block'; } else badge.style.display = 'none';
-    }
-    function switchFriendTab(tab) {
-        currentTab = tab;
-        document.querySelectorAll('.friend-tab').forEach(el => el.classList.remove('active'));
-        document.querySelector('.friend-tab[data-tab="' + tab + '"]').classList.add('active');
-        const titles = { all: 'All Friends', pending: 'Pending Requests', add: 'Add Friend' };
-        document.getElementById('friendsTitle').textContent = titles[tab];
-        renderTab(tab);
-    }
-    function renderTab(tab) {
-        const content = document.getElementById('friendsContent');
-        if (tab === 'all') {
-            if (friendsData.friends.length === 0) { content.innerHTML = '<div class="empty"><div class="empty-icon">👥</div><div class="empty-title">No friends yet</div></div>'; return; }
-            content.innerHTML = friendsData.friends.map(f => \`<div class="friend-row"><div class="friend-avatar">\${escapeHtml((f.display_name || f.username).charAt(0).toUpperCase())}</div><div style="flex:1;min-width:0;"><div class="friend-name">\${escapeHtml(f.display_name || f.username)}</div><div class="friend-tag">@\${escapeHtml(f.username)}#\${f.tag || '????'}</div></div><button onclick="openDM('\${escapeHtml(f.username)}')" class="btn btn-primary btn-sm">💬 DM</button><button onclick="removeFriend('\${escapeHtml(f.username)}')" class="btn btn-danger btn-sm">Remove</button></div>\`).join('');
-        } else if (tab === 'pending') {
-            let html = '';
-            if (friendsData.incoming.length > 0) {
-                html += '<div style="font-size:11px;font-weight:800;color:var(--text-3);letter-spacing:1px;text-transform:uppercase;padding:8px 0;">📬 Incoming</div>';
-                html += friendsData.incoming.map(f => \`<div class="friend-row"><div class="friend-avatar">\${escapeHtml((f.display_name || f.username).charAt(0).toUpperCase())}</div><div style="flex:1;min-width:0;"><div class="friend-name">\${escapeHtml(f.display_name || f.username)}</div><div class="friend-tag">@\${escapeHtml(f.username)}#\${f.tag || '????'}</div></div><button onclick="acceptFriend('\${escapeHtml(f.username)}')" class="btn btn-primary btn-sm">✓ Accept</button><button onclick="declineFriend('\${escapeHtml(f.username)}')" class="btn btn-ghost btn-sm">✕</button></div>\`).join('');
-            }
-            if (friendsData.outgoing.length > 0) {
-                html += '<div style="font-size:11px;font-weight:800;color:var(--text-3);letter-spacing:1px;text-transform:uppercase;padding:16px 0 8px 0;">📤 Sent</div>';
-                html += friendsData.outgoing.map(f => \`<div class="friend-row" style="opacity:0.7;"><div class="friend-avatar">\${escapeHtml((f.display_name || f.username).charAt(0).toUpperCase())}</div><div style="flex:1;"><div class="friend-name">\${escapeHtml(f.display_name || f.username)}</div><div class="friend-tag">Waiting...</div></div></div>\`).join('');
-            }
-            if (!html) html = '<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">No pending requests</div></div>';
-            content.innerHTML = html;
-        } else if (tab === 'add') {
-            content.innerHTML = \`<div style="max-width:600px;margin:0 auto;"><div style="font-size:14px;color:var(--text-2);margin-bottom:16px;">Enter username or ID (Zyrox#1234) to send friend request</div><div style="display:flex;gap:10px;"><input type="text" id="friendInput" placeholder="Username or ID..." style="flex:1;"><button onclick="sendFriendReq()" class="btn btn-primary">Send Request</button></div><div style="margin-top:20px;"><div style="font-size:11px;font-weight:800;color:var(--text-3);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Search Results</div><div id="searchResults"></div></div></div>\`;
-            const inp = document.getElementById('friendInput');
-            let timer;
-            inp.addEventListener('input', () => {
-                clearTimeout(timer);
-                timer = setTimeout(async () => {
-                    const q = inp.value.trim();
-                    if (q.length < 2) return document.getElementById('searchResults').innerHTML = '';
-                    const r = await fetch('/api/search-users?q=' + encodeURIComponent(q));
-                    const results = await r.json();
-                    const el = document.getElementById('searchResults');
-                    if (results.length === 0) return el.innerHTML = '<div style="color:var(--text-3);font-size:13px;">No users found</div>';
-                    el.innerHTML = results.map(u => \`<div class="friend-row" style="margin-bottom:8px;"><div class="friend-avatar">\${escapeHtml((u.display_name || u.username).charAt(0).toUpperCase())}</div><div style="flex:1;"><div class="friend-name">\${escapeHtml(u.display_name || u.username)}</div><div class="friend-tag">@\${escapeHtml(u.username)}#\${u.tag || '????'}</div></div><button onclick="quickAdd('\${escapeHtml(u.username)}')" class="btn btn-primary btn-sm">+ Add</button></div>\`).join('');
-                }, 300);
-            });
-            inp.addEventListener('keypress', e => { if (e.key === 'Enter') sendFriendReq(); });
-        }
-    }
-    window.sendFriendReq = () => { const v = document.getElementById('friendInput').value.trim(); if (!v) return; socket.emit('send_friend_request', { from: me, to: v }); document.getElementById('friendInput').value = ''; };
-    window.quickAdd = (username) => socket.emit('send_friend_request', { from: me, to: username });
-    window.acceptFriend = (username) => socket.emit('accept_friend_request', { user: me, from: username });
-    window.declineFriend = (username) => socket.emit('decline_friend_request', { user: me, from: username });
-    window.removeFriend = (username) => { if (confirm('Remove ' + username + '?')) socket.emit('remove_friend', { user: me, friend: username }); };
-    window.openDM = async (username) => {
-        currentDM = username;
-        document.getElementById('dmTitle').textContent = 'DM with ' + username;
-        document.getElementById('dmModal').style.display = 'flex';
-        const r = await fetch('/api/dm/' + encodeURIComponent(username));
-        const messages = await r.json();
-        const box = document.getElementById('dmMessages');
-        box.innerHTML = messages.length === 0 ? '<div style="text-align:center;color:var(--text-3);font-size:13px;padding:20px;">Start the conversation!</div>' : messages.map(m => {
-            const isMine = m.from_user === me;
-            return \`<div style="display:flex;\${isMine ? 'justify-content:flex-end;' : ''}"><div style="max-width:75%;background:\${isMine ? 'linear-gradient(135deg,var(--red-1),var(--red-2))' : 'var(--bg-2)'};color:\${isMine ? '#fff' : 'var(--text-0)'};padding:10px 14px;border-radius:12px;font-size:13.5px;">\${escapeHtml(m.message)}</div></div>\`;
-        }).join('');
-        box.scrollTop = box.scrollHeight;
-    };
-    window.closeDM = () => { document.getElementById('dmModal').style.display = 'none'; currentDM = null; };
-    document.getElementById('dmForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const msg = document.getElementById('dmInput').value.trim();
-        if (!msg || !currentDM) return;
-        socket.emit('send_dm', { from: me, to: currentDM, message: msg });
-        document.getElementById('dmInput').value = '';
-    });
-    window.openProfileModal = async () => {
-        const r = await fetch('/api/profile');
-        const p = await r.json();
-        document.getElementById('editDisplayName').value = p.display_name || me;
-        document.getElementById('editBio').value = p.bio || '';
-        document.getElementById('myFullId').textContent = '@' + p.username + '#' + (p.tag || '????');
-        document.getElementById('profileModal').style.display = 'flex';
-    };
-    window.closeProfileModal = () => document.getElementById('profileModal').style.display = 'none';
-    window.saveProfile = async () => {
-        const display_name = document.getElementById('editDisplayName').value.trim();
-        const bio = document.getElementById('editBio').value.trim();
-        await fetch('/api/profile/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ display_name, bio }) });
-        showToast('Profile updated!', 'success');
-        closeProfileModal();
-        loadMyProfile();
-    };
-    async function loadMyProfile() {
-        const r = await fetch('/api/profile');
-        const p = await r.json();
-        document.getElementById('myDisplayName').textContent = p.display_name || me;
-        document.getElementById('myTag').textContent = '#' + (p.tag || '????');
-    }
-    window.toggleFriendsSidebar = () => document.querySelector('.friends-sidebar').classList.toggle('mobile-open');
-    socket.on('friend_request_sent', ({ to }) => showToast('Request sent to ' + to, 'success'));
-    socket.on('friend_error', ({ error }) => showToast(error, 'error'));
-    socket.on('friend_request_received', ({ from }) => { showToast(from + ' sent you a friend request!', 'success'); loadFriends(); });
-    socket.on('friend_request_accepted', ({ by }) => { showToast(by + ' accepted your request!', 'success'); loadFriends(); });
-    socket.on('friend_list_updated', () => loadFriends());
-    socket.on('new_dm', (msg) => {
-        if (currentDM && ((msg.from_user === me && msg.to_user === currentDM) || (msg.from_user === currentDM && msg.to_user === me))) openDM(currentDM);
-        else if (msg.to_user === me) showToast('New message from ' + msg.from_user, 'success');
-    });
-    loadMyProfile();
-    loadFriends();
-    </script>
-
-    <style>
-    .friends-layout{display:grid;grid-template-columns:260px 1fr;background:linear-gradient(180deg,var(--bg-1),var(--bg-0));border:1px solid var(--border-0);border-radius:16px;overflow:hidden;min-height:calc(100vh - 220px);position:relative}
-    .friends-sidebar{background:var(--bg-0);border-right:1px solid var(--border-0);padding:12px;display:flex;flex-direction:column;gap:4px}
-    .friend-tab{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;background:transparent;border:none;color:var(--text-1);font-weight:700;font-size:13.5px;cursor:pointer;text-align:left;transition:all 0.2s;font-family:inherit}
-    .friend-tab:hover{background:var(--bg-2);color:var(--text-0)}
-    .friend-tab.active{background:var(--accent-dim);color:var(--accent)}
-    .friend-tab span:first-child{font-size:15px}
-    .friend-badge{background:var(--accent);color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:auto}
-    .friend-profile-mini{display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-2);border-radius:10px}
-    .friend-avatar{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff;flex-shrink:0;box-shadow:0 2px 12px var(--accent-glow)}
-    .friends-main{display:flex;flex-direction:column;min-width:0}
-    .friends-header{padding:16px 24px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between;background:var(--bg-0)}
-    .friends-content{flex:1;padding:24px;overflow-y:auto}
-    .friend-row{display:flex;align-items:center;gap:14px;padding:14px 16px;background:linear-gradient(180deg,var(--bg-1),var(--bg-0));border:1px solid var(--border-0);border-radius:12px;margin-bottom:8px;transition:all 0.2s}
-    .friend-row:hover{border-color:var(--border-1);transform:translateX(2px)}
-    .friend-name{font-weight:700;font-size:14px;color:var(--text-0)}
-    .friend-tag{font-size:11.5px;color:var(--text-3);font-weight:600;font-family:'JetBrains Mono',monospace}
-    .chat-mobile-toggle{display:none;background:var(--bg-2);border:1px solid var(--border-0);color:var(--text-1);font-size:16px;width:34px;height:34px;border-radius:9px;cursor:pointer;align-items:center;justify-content:center}
-    @media(max-width:768px){
-        .friends-layout{grid-template-columns:1fr}
-        .friends-sidebar{position:absolute;top:0;left:0;bottom:0;width:260px;z-index:10;transform:translateX(-100%);transition:transform 0.3s}
-        .friends-sidebar.mobile-open{transform:translateX(0);box-shadow:20px 0 60px rgba(0,0,0,0.8)}
-        .chat-mobile-toggle{display:flex}
-        .friends-content{padding:16px}
-        .friend-row{flex-wrap:wrap;gap:10px}
-        .friend-row .btn{flex:1;min-width:calc(50% - 5px)}
-    }
-    </style>`;
-    res.send(renderLayout({ title: 'Friends', pageTitle: 'Friends', pageSubtitle: 'Manage your friends & DMs', content, user: req.session.user, activeNav: 'friends' }));
-});
-
-// ==================== CHAT PAGE ====================
-app.get('/chat', requireLogin, async (req, res) => {
-    try {
-        const isAdmin = req.session.user.role === 'ADMIN';
-        const channelsResult = await pool.query('SELECT * FROM channels ORDER BY name ASC');
-        const channels = channelsResult.rows;
-        const voiceChannelsResult = await pool.query('SELECT * FROM voice_channels ORDER BY created_at ASC');
-        const voiceChannels = voiceChannelsResult.rows;
-
-        const chatContent = `
-        <div class="chat-layout">
-            <div class="chat-sidebar" id="chatSidebar">
-                <div class="chat-sidebar-header"><div style="display:flex;align-items:center;gap:10px;"><div style="width:10px;height:10px;border-radius:50%;background:var(--red-1);box-shadow:0 0 12px var(--accent-glow);animation:pulse 2s infinite;"></div><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;">Zyrox-Kido</span></div></div>
-                <div class="chat-channels-list">
-                    <div class="channel-group-label">💬 TEXT CHANNELS</div>
-                    <div id="channelsList">${channels.map(c => `<div class="channel-item" data-id="${c.id}" data-name="${c.name}" onclick="switchChannel(${c.id}, '${c.name}')"><span class="channel-hash">#</span><span class="channel-name">${c.name}</span></div>`).join('')}</div>
-                    <div class="channel-group-label" style="margin-top:16px;">🔊 VOICE CHANNELS</div>
-                    <div id="voiceChannelsList">${voiceChannels.map(vc => `<div class="voice-channel-item" data-id="${vc.id}" data-name="${vc.name}"><div class="voice-item-header"><span class="voice-icon">🔊</span><span class="voice-name">${vc.name}</span><span class="voice-count" id="voice-count-${vc.id}" style="display:none;">0</span></div><div class="voice-participants" id="voice-participants-${vc.id}"></div><button class="voice-join-btn" onclick="joinVoice(${vc.id}, '${vc.name.replace(/'/g, "\\'")}')">Join Voice</button></div>`).join('')}</div>
-                </div>
-                <div class="chat-sidebar-footer"><div class="chat-user-info"><div class="user-avatar ${isAdmin ? 'user-avatar-admin' : ''}">${req.session.user.username.charAt(0).toUpperCase()}</div><div class="user-meta"><div class="user-name">${req.session.user.username}</div><div class="user-role">${isAdmin ? '♛ Admin' : 'Member'}</div></div></div></div>
-            </div>
-            <div class="chat-main">
-                <div class="chat-header"><div style="display:flex;align-items:center;gap:8px;"><button class="chat-mobile-toggle" onclick="toggleChatSidebar()">☰</button><span style="color:var(--text-2);font-size:18px;">#</span><span id="currentChannelName" style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;">general</span></div></div>
-                <div id="chatMessages" class="chat-messages"><div style="text-align:center;color:var(--text-3);font-size:13px;padding:20px 0;">Loading...</div></div>
-                <div class="chat-input-area"><form id="chatForm"><input type="text" id="chatInput" placeholder="Message #general" maxlength="500" autocomplete="off"><button type="submit" class="btn btn-primary"><span style="font-size:16px;">➤</span></button></form><div style="font-size:10.5px;color:var(--text-3);margin-top:8px;text-align:right;" id="charCount">0/500</div></div>
-            </div>
-        </div>
-
-        <div id="voicePanel" class="voice-panel" style="display:none;">
-            <div class="voice-panel-header"><div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;"><div class="voice-live-dot"></div><span id="voicePanelName" style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Voice</span></div><button onclick="minimizeVoice()" class="voice-min-btn">−</button></div>
-            <div id="voiceVideos" class="voice-videos"></div>
-            <div class="voice-controls"><button id="muteBtn" onclick="toggleMute()" class="voice-ctrl-btn">🎤</button><button id="shareBtn" onclick="toggleShareScreen()" class="voice-ctrl-btn">🖥️</button><button onclick="leaveVoice()" class="voice-ctrl-btn voice-ctrl-leave">📞</button></div>
-        </div>
-
-        <script src="/socket.io/socket.io.js"></script>
-        <script>
-        const socket = io();
-        const messagesEl = document.getElementById('chatMessages');
-        const form = document.getElementById('chatForm');
-        const input = document.getElementById('chatInput');
-        const charCount = document.getElementById('charCount');
-        const currentUser = ${JSON.stringify(req.session.user.username)};
-        const currentRole = ${JSON.stringify(req.session.user.role)};
-        const isAdmin = currentRole === 'ADMIN';
-        let currentChannelId = null;
-        let localStream = null, screenStream = null;
-        let peerConnections = {};
-        let currentVoiceChannelId = null;
-        let isMuted = false, isSharing = false;
-        const iceServers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
-        socket.emit('register_user', { username: currentUser });
-
-        function escapeHtml(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML}
-        function formatTime(ts){const d=new Date(ts);const now=new Date();const isToday=d.toDateString()===now.toDateString();if(isToday)return 'Today at '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' at '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
-        function switchChannel(id,name){currentChannelId=id;document.getElementById('currentChannelName').textContent=name;input.placeholder='Message #'+name;document.querySelectorAll('.channel-item').forEach(el=>el.classList.remove('active'));const a=document.querySelector('.channel-item[data-id="'+id+'"]');if(a)a.classList.add('active');messagesEl.innerHTML='<div style="text-align:center;color:var(--text-3);padding:20px 0;">Loading...</div>';socket.emit('switch_channel',{channelId:id});if(window.innerWidth<=768)document.getElementById('chatSidebar').classList.remove('mobile-open')}
-        function toggleChatSidebar(){document.getElementById('chatSidebar').classList.toggle('mobile-open')}
-        function renderMessage(msg,isNew=false){const isOwn=msg.username===currentUser;const isA=msg.role==='ADMIN';const div=document.createElement('div');div.className='chat-message';div.dataset.id=msg.id;if(isNew)div.style.animation='msgIn 0.3s ease';const av=isA?'linear-gradient(135deg,#ffaa00,#ff6600)':'linear-gradient(135deg,var(--red-1),var(--red-2))';const rb=isA?'<span style="font-size:9px;font-weight:800;color:#ffaa00;background:rgba(255,170,0,0.12);padding:2px 6px;border-radius:5px;margin-left:6px;">ADMIN</span>':'';div.innerHTML='<div class="msg-avatar" style="background:'+av+';">'+escapeHtml(msg.username.charAt(0).toUpperCase())+'</div><div class="msg-body"><div class="msg-meta"><span class="msg-username" style="color:'+(isOwn?'var(--accent-bright)':'var(--text-0)')+';">'+(isOwn?'You':escapeHtml(msg.username))+'</span>'+rb+'<span class="msg-time">'+formatTime(msg.created_at)+'</span></div><div class="msg-content">'+escapeHtml(msg.message)+'</div>'+(isAdmin&&!isOwn?'<button class="msg-delete" onclick="deleteMsg('+msg.id+')">🗑 Delete</button>':'')+'</div>';return div}
-        socket.on('chat_history',msgs=>{messagesEl.innerHTML='';if(msgs.length===0){messagesEl.innerHTML='<div style="text-align:center;color:var(--text-3);padding:60px 20px;"><div style="font-size:48px;margin-bottom:12px;">👋</div><div style="font-size:15px;font-weight:700;color:var(--text-2);">Welcome!</div></div>';return}msgs.forEach(m=>messagesEl.appendChild(renderMessage(m)));messagesEl.scrollTop=messagesEl.scrollHeight});
-        socket.on('new_message',msg=>{messagesEl.appendChild(renderMessage(msg,true));messagesEl.scrollTop=messagesEl.scrollHeight});
-        socket.on('message_deleted',({messageId})=>{const el=messagesEl.querySelector('[data-id="'+messageId+'"]');if(el){el.style.opacity='0';setTimeout(()=>el.remove(),300)}});
-        form.addEventListener('submit',e=>{e.preventDefault();const msg=input.value.trim();if(!msg||!currentChannelId)return;socket.emit('send_message',{username:currentUser,role:currentRole,message:msg,channelId:currentChannelId});input.value='';charCount.textContent='0/500'});
-        input.addEventListener('input',()=>charCount.textContent=input.value.length+'/500');
-        window.deleteMsg=id=>{if(confirm('Delete?'))socket.emit('delete_message',{messageId:id,role:currentRole,channelId:currentChannelId})};
-
-        // VOICE + SCREEN SHARE
-        window.joinVoice = async (channelId, channelName) => {
-            try {
-                if (currentVoiceChannelId === channelId) return;
-                if (currentVoiceChannelId) window.leaveVoice();
-                try { localStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }); } catch (e) { return showToast('Mic access denied', 'error'); }
-                currentVoiceChannelId = channelId;
-                document.getElementById('voicePanelName').textContent = channelName;
-                document.getElementById('voicePanel').style.display = 'flex';
-                document.getElementById('voiceVideos').innerHTML = '';
-                addVideoTile('self', 'You', localStream, false, true);
-                socket.emit('join_voice', { voiceChannelId: channelId, username: currentUser, role: currentRole });
-                showToast('Joined ' + channelName, 'success');
-            } catch (e) { console.error(e); showToast('Failed', 'error'); }
-        };
-        window.leaveVoice = () => {
-            if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-            if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
-            Object.values(peerConnections).forEach(({ pc }) => { try { pc.close(); } catch(e){} });
-            peerConnections = {};
-            socket.emit('leave_voice');
-            currentVoiceChannelId = null; isSharing = false; isMuted = false;
-            document.getElementById('voicePanel').style.display = 'none';
-            document.getElementById('voiceVideos').innerHTML = '';
-            document.getElementById('muteBtn').textContent = '🎤';
-            document.getElementById('shareBtn').textContent = '🖥️';
-            document.getElementById('shareBtn').style.background = '';
-        };
-        window.toggleMute = () => { if (!localStream) return; isMuted = !isMuted; localStream.getAudioTracks().forEach(t => t.enabled = !isMuted); document.getElementById('muteBtn').textContent = isMuted ? '🔇' : '🎤'; showToast(isMuted ? 'Muted' : 'Unmuted', 'success'); };
-        window.toggleShareScreen = async () => {
-            if (!currentVoiceChannelId) return;
-            if (isSharing) {
-                if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
-                isSharing = false;
-                document.getElementById('shareBtn').textContent = '🖥️';
-                document.getElementById('shareBtn').style.background = '';
-                document.querySelector('[data-tile="self-screen"]')?.remove();
-                for (const [sid, { pc }] of Object.entries(peerConnections)) {
-                    try { const offer = await pc.createOffer(); await pc.setLocalDescription(offer); socket.emit('webrtc_offer', { targetSocketId: sid, offer, isScreenShare: false }); } catch(e){}
-                }
-            } else {
-                try { screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'always' }, audio: false }); } catch (e) { return showToast('Cancelled', 'error'); }
-                isSharing = true;
-                document.getElementById('shareBtn').textContent = '⏹️';
-                document.getElementById('shareBtn').style.background = 'linear-gradient(135deg, var(--red-1), var(--red-2))';
-                addVideoTile('self-screen', 'Your Screen', screenStream, true, true);
-                screenStream.getVideoTracks()[0].onended = () => { if (isSharing) window.toggleShareScreen(); };
-                for (const [sid, { pc }] of Object.entries(peerConnections)) {
-                    try {
-                        const vt = screenStream.getVideoTracks()[0];
-                        const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
-                        if (s) await s.replaceTrack(vt); else pc.addTrack(vt, screenStream);
-                        const offer = await pc.createOffer(); await pc.setLocalDescription(offer); socket.emit('webrtc_offer', { targetSocketId: sid, offer, isScreenShare: true });
-                    } catch(e){}
-                }
-            }
-        };
-        window.minimizeVoice = () => { const v = document.getElementById('voiceVideos'); v.style.display = v.style.display === 'none' ? 'grid' : 'none'; };
-        function createPeerConnection(sid) {
-            if (peerConnections[sid]) return peerConnections[sid].pc;
-            const pc = new RTCPeerConnection(iceServers);
-            if (localStream) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-            if (screenStream) screenStream.getVideoTracks().forEach(t => pc.addTrack(t, screenStream));
-            pc.onicecandidate = e => { if (e.candidate) socket.emit('webrtc_ice_candidate', { targetSocketId: sid, candidate: e.candidate }); };
-            pc.ontrack = e => {
-                const rs = e.streams[0]; const isV = e.track.kind === 'video'; const meta = peerConnections[sid];
-                if (isV) { const tid = sid + '-screen'; if (!document.querySelector('[data-tile="' + tid + '"]')) addVideoTile(tid, (meta?.username || 'User') + "'s Screen", rs, true, false, sid); }
-                else { const tid = sid + '-audio'; if (!document.querySelector('[data-tile="' + tid + '"]')) addVideoTile(tid, (meta?.username || 'User'), rs, false, false, sid); }
-            };
-            pc.onconnectionstatechange = () => { if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) removePeer(sid); };
-            peerConnections[sid] = { pc, username: null, isOfferer: false };
-            return pc;
-        }
-        function removePeer(sid) { if (peerConnections[sid]) { try { peerConnections[sid].pc.close(); } catch(e){} delete peerConnections[sid]; } document.querySelector('[data-tile="' + sid + '-screen"]')?.remove(); document.querySelector('[data-tile="' + sid + '-audio"]')?.remove(); }
-        function addVideoTile(id, label, stream, isScreen, isSelf, targetSocketId) {
-            const videos = document.getElementById('voiceVideos');
-            const tile = document.createElement('div');
-            tile.className = 'voice-tile' + (isScreen ? ' voice-tile-screen' : '');
-            tile.dataset.tile = id;
-            const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.muted = isSelf; v.srcObject = stream;
-            const l = document.createElement('div'); l.className = 'voice-tile-label'; l.textContent = label;
-            tile.appendChild(v); tile.appendChild(l); videos.appendChild(tile);
-        }
-        socket.on('voice_participants', (ps) => {
-            document.querySelectorAll('.voice-participants').forEach(el => el.innerHTML = '');
-            document.querySelectorAll('.voice-count').forEach(el => { el.textContent = '0'; el.style.display = 'none'; });
-            ps.forEach(p => {
-                const c = document.getElementById('voice-participants-' + currentVoiceChannelId);
-                if (c) { const d = document.createElement('div'); d.className = 'voice-user'; d.innerHTML = '<div class="voice-user-avatar">' + escapeHtml(p.username.charAt(0).toUpperCase()) + '</div>' + escapeHtml(p.username) + (p.isMuted ? ' 🔇' : '') + (p.isStreaming ? ' 🖥️' : ''); c.appendChild(d); }
-            });
-            const cnt = document.getElementById('voice-count-' + currentVoiceChannelId);
-            if (cnt) { cnt.textContent = ps.length; cnt.style.display = ps.length > 0 ? 'inline-block' : 'none'; }
-        });
-        socket.on('voice_existing_users', async ({ users }) => {
-            for (const u of users) {
-                try {
-                    const pc = createPeerConnection(u.socketId);
-                    peerConnections[u.socketId].username = u.username;
-                    peerConnections[u.socketId].isOfferer = true;
-                    const offer = await pc.createOffer(); await pc.setLocalDescription(offer); socket.emit('webrtc_offer', { targetSocketId: u.socketId, offer, isScreenShare: false });
-                } catch(e){}
-            }
-        });
-        socket.on('webrtc_offer', async ({ fromSocketId, fromUsername, offer }) => {
-            try {
-                const pc = createPeerConnection(fromSocketId);
-                peerConnections[fromSocketId].username = fromUsername;
-                await pc.setRemoteDescription(new RTCSessionDescription(offer));
-                const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
-                socket.emit('webrtc_answer', { targetSocketId: fromSocketId, answer });
-            } catch(e){}
-        });
-        socket.on('webrtc_answer', async ({ fromSocketId, answer }) => { try { const p = peerConnections[fromSocketId]; if (p && p.pc.signalingState !== 'stable') await p.pc.setRemoteDescription(new RTCSessionDescription(answer)); } catch(e){} });
-        socket.on('webrtc_ice_candidate', async ({ fromSocketId, candidate }) => { try { const p = peerConnections[fromSocketId]; if (p && candidate) await p.pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e){} });
-        socket.on('user_left_voice', ({ socketId }) => removePeer(socketId));
-
-        socket.emit('join_chat', { username: currentUser, role: currentRole, channelId: 1 });
-        currentChannelId = 1;
-        const fc = document.querySelector('.channel-item[data-id="1"]');
-        if (fc) fc.classList.add('active');
-        </script>
-
-        <style>
-        @keyframes msgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-        .chat-layout{display:grid;grid-template-columns:260px 1fr;background:linear-gradient(180deg,var(--bg-1),var(--bg-0));border:1px solid var(--border-0);border-radius:16px;overflow:hidden;height:calc(100vh - 220px);min-height:500px;position:relative}
-        .chat-sidebar{background:var(--bg-0);border-right:1px solid var(--border-0);display:flex;flex-direction:column}
-        .chat-sidebar-header{padding:16px 18px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between}
-        .chat-channels-list{flex:1;overflow-y:auto;padding:10px 8px}
-        .channel-group-label{font-size:10px;font-weight:800;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;padding:8px 12px 6px 12px}
-        .channel-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;cursor:pointer;color:var(--text-2);font-size:13.5px;font-weight:600;margin-bottom:2px;position:relative}
-        .channel-item:hover{background:var(--bg-2);color:var(--text-0)}
-        .channel-item.active{background:var(--accent-dim);color:var(--accent)}
-        .channel-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:60%;background:var(--accent);border-radius:0 3px 3px 0}
-        .channel-hash{color:var(--text-3);font-size:16px;font-weight:700}
-        .channel-item.active .channel-hash{color:var(--accent)}
-        .channel-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .voice-channel-item{flex-direction:column;align-items:stretch;gap:6px;padding:9px 12px;background:var(--bg-2);border-radius:10px;margin-bottom:6px}
-        .voice-item-header{display:flex;align-items:center;gap:8px;padding:4px 0}
-        .voice-icon{font-size:14px}
-        .voice-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;color:var(--text-1)}
-        .voice-count{background:var(--accent);color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px}
-        .voice-join-btn{background:var(--accent-dim);border:1px solid rgba(255,59,59,0.3);color:var(--accent);padding:6px 12px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.2s;font-family:inherit}
-        .voice-join-btn:hover{background:var(--accent);color:#fff;transform:translateY(-1px)}
-        .voice-participants{display:flex;flex-direction:column;gap:3px;margin-left:4px;margin-bottom:4px}
-        .voice-user{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);font-weight:600;padding:3px 0}
-        .voice-user-avatar{width:18px;height:18px;border-radius:6px;background:linear-gradient(135deg,var(--red-1),var(--red-2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:800}
-        .chat-sidebar-footer{padding:12px;border-top:1px solid var(--border-0)}
-        .chat-user-info{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;background:var(--bg-2)}
-        .chat-main{display:flex;flex-direction:column;min-width:0}
-        .chat-header{padding:16px 24px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between;background:var(--bg-0)}
-        .chat-mobile-toggle{display:none;background:var(--bg-2);border:1px solid var(--border-0);color:var(--text-1);font-size:16px;width:32px;height:32px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center;margin-right:4px}
-        .chat-messages{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
-        .chat-message{display:flex;gap:12px;align-items:flex-start}
-        .msg-avatar{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;flex-shrink:0;box-shadow:0 2px 12px rgba(255,59,59,0.25)}
-        .msg-body{flex:1;min-width:0}
-        .msg-meta{display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap}
-        .msg-username{font-weight:700;font-size:13.5px}
-        .msg-time{font-size:11px;color:var(--text-3);font-weight:600}
-        .msg-content{font-size:14px;line-height:1.55;color:var(--text-0);word-wrap:break-word}
-        .msg-delete{background:none;border:none;color:var(--text-3);font-size:10.5px;cursor:pointer;margin-top:6px;padding:0;font-weight:600}
-        .msg-delete:hover{color:var(--accent)}
-        .chat-input-area{padding:16px 20px;border-top:1px solid var(--border-0);background:var(--bg-0)}
-        .chat-input-area form{display:flex;gap:10px;align-items:center}
-        .chat-input-area input{flex:1;margin:0;background:var(--bg-2);border-color:transparent}
-        .chat-input-area input:focus{background:var(--bg-1);border-color:var(--accent)}
-        .chat-input-area .btn{padding:13px 20px;flex-shrink:0}
-        .voice-panel{position:fixed;bottom:24px;right:24px;width:380px;max-width:calc(100vw - 32px);background:rgba(15,8,8,0.95);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border:1px solid var(--border-1);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,0.7);z-index:9998;display:flex;flex-direction:column;overflow:hidden}
-        .voice-panel-header{padding:12px 16px;border-bottom:1px solid var(--border-0);display:flex;align-items:center;justify-content:space-between;gap:10px}
-        .voice-live-dot{width:8px;height:8px;border-radius:50%;background:var(--red-1);box-shadow:0 0 12px var(--accent-glow);animation:pulse 1.5s infinite;flex-shrink:0}
-        .voice-min-btn{width:24px;height:24px;border-radius:6px;background:transparent;border:1px solid var(--border-0);color:var(--text-2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-        .voice-videos{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:320px;overflow-y:auto}
-        .voice-tile{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:1;border:1px solid var(--border-0)}
-        .voice-tile-screen{grid-column:span 2;aspect-ratio:16/10}
-        .voice-tile video{width:100%;height:100%;object-fit:cover;display:block}
-        .voice-tile-label{position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.75);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;max-width:calc(100% - 8px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .voice-controls{padding:12px 16px;border-top:1px solid var(--border-0);display:flex;gap:10px;justify-content:center}
-        .voice-ctrl-btn{width:46px;height:46px;border-radius:12px;background:var(--bg-2);border:1px solid var(--border-0);color:var(--text-0);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
-        .voice-ctrl-btn:hover{background:var(--bg-3);border-color:var(--border-1);transform:translateY(-2px)}
-        .voice-ctrl-leave{background:rgba(255,59,59,0.15);border-color:rgba(255,59,59,0.3);color:var(--accent)}
-        @media(max-width:768px){
-            .chat-layout{grid-template-columns:1fr;height:calc(100vh - 180px)}
-            .chat-sidebar{position:absolute;top:0;left:0;bottom:0;width:260px;z-index:10;transform:translateX(-100%);transition:transform 0.3s}
-            .chat-sidebar.mobile-open{transform:translateX(0);box-shadow:20px 0 60px rgba(0,0,0,0.8)}
-            .chat-mobile-toggle{display:flex}
-            .chat-messages{padding:16px}
-            .chat-input-area{padding:14px 16px}
-            .msg-avatar{width:36px;height:36px;font-size:14px}
-            .voice-panel{bottom:12px;right:12px;left:12px;width:auto}
-            .voice-videos{max-height:240px}
-        }
-        </style>`;
-
-        res.send(renderLayout({ title: 'Chat', pageTitle: 'Chat', pageSubtitle: 'Talk with other members', content: chatContent, user: req.session.user, activeNav: 'chat' }));
-    } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
-});
-
-// ==================== ADMIN ====================
-app.get('/admin', requireLogin, requireAdmin, async (req, res) => {
-    try {
-        const usersResult = await pool.query('SELECT id, username, role, created_at, display_name, tag FROM users ORDER BY created_at DESC');
-        const users = usersResult.rows;
-        const scriptsCountResult = await pool.query('SELECT owner, COUNT(*) as count FROM scripts GROUP BY owner');
-        const scriptsCount = {};
-        scriptsCountResult.rows.forEach(r => { scriptsCount[r.owner] = r.count; });
-        let rows = '';
-        users.forEach(u => {
-            const count = scriptsCount[u.username] || 0;
-            const isA = u.role === 'ADMIN';
-            rows += `<a href="/admin/user/${encodeURIComponent(u.username)}" class="user-row"><div class="user-avatar ${isA ? 'user-avatar-admin' : ''}">${u.username.charAt(0)}</div><div class="user-row-info"><div class="user-row-name">${u.username} <span class="badge ${isA ? 'badge-admin' : 'badge-user'}">${u.role}</span></div><div class="user-row-meta">Joined ${new Date(u.created_at).toLocaleDateString()} · ${count} script${count !== 1 ? 's' : ''}</div></div><span class="btn btn-ghost btn-sm">View →</span></a>`;
-        });
-        const content = rows || `<div class="empty"><div class="empty-icon">◉</div><div class="empty-title">No users yet</div></div>`;
-        res.send(renderLayout({ title: 'Admin', pageTitle: 'Admin Panel', pageSubtitle: `${users.length} user${users.length !== 1 ? 's' : ''} total`, content, user: req.session.user, activeNav: 'admin' }));
-    } catch (e) { res.status(500).send('Error'); }
-});
-
-app.get('/admin/user/:username', requireLogin, requireAdmin, async (req, res) => {
-    try {
-        const targetUser = req.params.username;
-        const userResult = await pool.query('SELECT * FROM users WHERE username = $1', [targetUser]);
-        if (userResult.rows.length === 0) return res.status(404).send('Not found');
-        const targetUserData = userResult.rows[0];
-        const scriptsResult = await pool.query('SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC', [targetUser]);
-        const userScripts = scriptsResult.rows;
-        const infoCard = `<div class="card" style="margin-bottom:22px;"><div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;"><div class="user-avatar ${targetUserData.role === 'ADMIN' ? 'user-avatar-admin' : ''}" style="width:56px;height:56px;border-radius:16px;font-size:22px;">${targetUser.charAt(0)}</div><div style="flex:1;"><div style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">${targetUser} <span class="badge ${targetUserData.role === 'ADMIN' ? 'badge-admin' : 'badge-user'}">${targetUserData.role}</span></div><div style="font-size:12.5px;color:var(--text-2);margin-top:4px;">Joined ${new Date(targetUserData.created_at).toLocaleDateString()}</div></div></div></div>`;
-        const scriptsHtml = userScripts.length === 0
-            ? `<div class="empty"><div class="empty-icon">◈</div><div class="empty-title">No scripts</div></div>`
-            : `<div class="scripts-grid">${userScripts.map(renderScriptCard).join('')}</div>`;
-        res.send(renderLayout({ title: `${targetUser}'s Scripts`, pageTitle: `${targetUser}'s Scripts`, pageSubtitle: `${userScripts.length} script${userScripts.length !== 1 ? 's' : ''}`, content: infoCard + scriptsHtml, user: req.session.user, activeNav: 'admin', actions: `<a href="/admin" class="btn btn-ghost">← All Users</a>` }));
-    } catch (e) { res.status(500).send('Error'); }
-});
-
-// ==================== SOCKET.IO ====================
-const voiceRooms = new Map();
-
-io.on('connection', (socket) => {
-    console.log('🔗 Connected:', socket.id);
-
-    socket.on('register_user', ({ username }) => { socket.username = username; });
-
-    socket.on('join_chat', async (data) => {
-        try {
-            const { username, role, channelId } = data;
-            socket.username = username; socket.role = role; socket.channelId = channelId;
-            socket.join('channel_' + channelId);
-            const result = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50', [channelId]);
-            socket.emit('chat_history', result.rows.reverse());
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('switch_channel', async (data) => {
-        try {
-            const { channelId } = data;
-            if (socket.channelId) socket.leave('channel_' + socket.channelId);
-            socket.channelId = channelId;
-            socket.join('channel_' + channelId);
-            const result = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 50', [channelId]);
-            socket.emit('chat_history', result.rows.reverse());
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('send_message', async (data) => {
-        try {
-            const { username, role, message, channelId } = data;
-            if (!message || message.trim().length === 0) return;
-            const result = await pool.query('INSERT INTO chat_messages (channel_id, username, role, message) VALUES ($1, $2, $3, $4) RETURNING *', [channelId, username, role, message.trim().substring(0, 500)]);
-            io.to('channel_' + channelId).emit('new_message', result.rows[0]);
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('delete_message', async (data) => {
-        try {
-            const { messageId, role, channelId } = data;
-            if (role !== 'ADMIN') return;
-            await pool.query('DELETE FROM chat_messages WHERE id = $1', [messageId]);
-            io.to('channel_' + channelId).emit('message_deleted', { messageId });
-        } catch (e) { console.error(e); }
-    });
-
-    // FRIEND EVENTS
-    socket.on('send_friend_request', async (data) => {
-        try {
-            const { from, to } = data;
-            if (!from || !to || from === to) return socket.emit('friend_error', { error: "Invalid request" });
-            let targetUser = null;
-            if (to.includes('#')) {
-                const [name, tag] = to.split('#');
-                const r = await pool.query('SELECT username FROM users WHERE LOWER(username) = LOWER($1) AND tag = $2', [name, tag]);
-                if (r.rows.length > 0) targetUser = r.rows[0].username;
-            } else {
-                const r = await pool.query('SELECT username FROM users WHERE LOWER(username) = LOWER($1)', [to]);
-                if (r.rows.length > 0) targetUser = r.rows[0].username;
-            }
-            if (!targetUser) return socket.emit('friend_error', { error: 'User not found' });
-            if (targetUser === from) return socket.emit('friend_error', { error: "Can't add yourself" });
-            const existing = await pool.query('SELECT * FROM friends WHERE (user1 = $1 AND user2 = $2) OR (user1 = $2 AND user2 = $1)', [from, targetUser]);
-            if (existing.rows.length > 0) {
-                if (existing.rows[0].status === 'accepted') return socket.emit('friend_error', { error: 'Already friends' });
-                return socket.emit('friend_error', { error: 'Request already sent' });
-            }
-            const sorted = [from, targetUser].sort();
-            await pool.query('INSERT INTO friends (user1, user2, status, requested_by) VALUES ($1, $2, $3, $4)', [sorted[0], sorted[1], 'pending', from]);
-            const targetSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === targetUser);
-            if (targetSocket) targetSocket.emit('friend_request_received', { from });
-            socket.emit('friend_request_sent', { to: targetUser });
-        } catch (e) { console.error(e); socket.emit('friend_error', { error: 'Failed' }); }
-    });
-
-    socket.on('accept_friend_request', async (data) => {
-        try {
-            const { user, from } = data;
-            const sorted = [user, from].sort();
-            await pool.query('UPDATE friends SET status = $1 WHERE user1 = $2 AND user2 = $3', ['accepted', sorted[0], sorted[1]]);
-            const fromSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === from);
-            if (fromSocket) fromSocket.emit('friend_request_accepted', { by: user });
-            socket.emit('friend_list_updated');
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('decline_friend_request', async (data) => {
-        try {
-            const { user, from } = data;
-            const sorted = [user, from].sort();
-            await pool.query('DELETE FROM friends WHERE user1 = $1 AND user2 = $2', [sorted[0], sorted[1]]);
-            socket.emit('friend_list_updated');
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('remove_friend', async (data) => {
-        try {
-            const { user, friend } = data;
-            const sorted = [user, friend].sort();
-            await pool.query('DELETE FROM friends WHERE user1 = $1 AND user2 = $2', [sorted[0], sorted[1]]);
-            socket.emit('friend_list_updated');
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('send_dm', async (data) => {
-        try {
-            const { from, to, message } = data;
-            if (!message || message.trim().length === 0) return;
-            const result = await pool.query('INSERT INTO dm_messages (from_user, to_user, message) VALUES ($1, $2, $3) RETURNING *', [from, to, message.trim().substring(0, 1000)]);
-            const toSocket = Array.from(io.sockets.sockets.values()).find(s => s.username === to);
-            if (toSocket) toSocket.emit('new_dm', result.rows[0]);
-            socket.emit('new_dm', result.rows[0]);
-        } catch (e) { console.error(e); }
-    });
-
-    // VOICE EVENTS
-    socket.on('join_voice', async (data) => {
-        try {
-            const { voiceChannelId, username, role } = data;
-            if (socket.voiceChannelId) {
-                socket.leave('voice_' + socket.voiceChannelId);
-                const prevRoom = voiceRooms.get(socket.voiceChannelId);
-                if (prevRoom) {
-                    prevRoom.delete(socket.id);
-                    if (prevRoom.size === 0) voiceRooms.delete(socket.voiceChannelId);
-                    else io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(prevRoom.values()));
-                }
-            }
-            socket.voiceChannelId = voiceChannelId;
-            socket.voiceUsername = username;
-            socket.voiceRole = role;
-            socket.join('voice_' + voiceChannelId);
-            if (!voiceRooms.has(voiceChannelId)) voiceRooms.set(voiceChannelId, new Map());
-            voiceRooms.get(voiceChannelId).set(socket.id, { socketId: socket.id, username, role, isStreaming: false, isMuted: false });
-            const participants = Array.from(voiceRooms.get(voiceChannelId).values());
-            io.to('voice_' + voiceChannelId).emit('voice_participants', participants);
-            socket.emit('voice_existing_users', { users: participants.filter(p => p.socketId !== socket.id), self: socket.id });
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('leave_voice', async () => {
-        try {
-            if (!socket.voiceChannelId) return;
-            const vcId = socket.voiceChannelId;
-            socket.leave('voice_' + vcId);
-            const room = voiceRooms.get(vcId);
-            if (room) {
-                room.delete(socket.id);
-                if (room.size === 0) voiceRooms.delete(vcId);
-                else io.to('voice_' + vcId).emit('voice_participants', Array.from(room.values()));
-            }
-            socket.to('voice_' + vcId).emit('user_left_voice', { socketId: socket.id });
-            socket.voiceChannelId = null;
-        } catch (e) { console.error(e); }
-    });
-
-    socket.on('webrtc_offer', (data) => { io.to(data.targetSocketId).emit('webrtc_offer', { fromSocketId: socket.id, fromUsername: socket.voiceUsername, offer: data.offer, isScreenShare: data.isScreenShare }); });
-    socket.on('webrtc_answer', (data) => { io.to(data.targetSocketId).emit('webrtc_answer', { fromSocketId: socket.id, answer: data.answer }); });
-    socket.on('webrtc_ice_candidate', (data) => { io.to(data.targetSocketId).emit('webrtc_ice_candidate', { fromSocketId: socket.id, candidate: data.candidate }); });
-    socket.on('toggle_mute', (data) => {
-        if (!socket.voiceChannelId) return;
-        const room = voiceRooms.get(socket.voiceChannelId);
-        if (room && room.has(socket.id)) { room.get(socket.id).isMuted = data.isMuted; io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(room.values())); }
-    });
-    socket.on('toggle_stream', (data) => {
-        if (!socket.voiceChannelId) return;
-        const room = voiceRooms.get(socket.voiceChannelId);
-        if (room && room.has(socket.id)) { room.get(socket.id).isStreaming = data.isStreaming; io.to('voice_' + socket.voiceChannelId).emit('voice_participants', Array.from(room.values())); }
-    });
-
-    socket.on('disconnect', () => {
-        if (socket.voiceChannelId) {
-            const vcId = socket.voiceChannelId;
-            const room = voiceRooms.get(vcId);
-            if (room) {
-                room.delete(socket.id);
-                if (room.size === 0) voiceRooms.delete(vcId);
-                else io.to('voice_' + vcId).emit('voice_participants', Array.from(room.values()));
-            }
-            socket.to('voice_' + vcId).emit('user_left_voice', { socketId: socket.id });
-        }
-        console.log('❌ Disconnected:', socket.id);
-    });
-});
-
-// ==================== START ====================
-server.listen(PORT, () => {
-    console.log(`✅ ${BRAND_NAME} v30.0 — Friends + Voice + Screen Share`);
-});
