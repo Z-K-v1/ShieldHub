@@ -650,7 +650,7 @@ app.get('/view/:slug/:version/:token', async function(req, res) {
     } catch (e) { res.status(500).send('Error'); }
 });
 
-// ==================== RAW — SMART: Public Works, Whitelist Auto-Kick ====================
+// ==================== RAW — AUTO USER ID CHECK ====================
 app.get('/raw/:slug/:version/:token', async function(req, res) {
     try {
         const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
@@ -659,13 +659,14 @@ app.get('/raw/:slug/:version/:token', async function(req, res) {
         if (s.slug !== req.params.slug || s.version !== req.params.version) return res.status(403).send("-- Denied --");
 
         const accessType = s.access_type || 'public';
-        // KUHAIN ANG USER ID SA IBAT-IBANG POSIBLENG PANGALAN
-        const userId = String(req.query.userId || req.query.userid || req.query.UserId || req.query.USERID || '').trim();
-        const username = String(req.query.username || req.query.Username || '').trim();
+        
+        // KUHAIN ANG USER ID AT USERNAME MULA SA URL (na ipinasa ng Roblox script)
+        const userId = String(req.query.userId || req.query.userid || '').trim();
+        const username = String(req.query.username || '').trim();
 
         console.log(`[RAW] Script: ${s.name} | Access: ${accessType} | UserID: "${userId}" | Username: "${username}"`);
 
-        // PUBLIC — works for everyone, no kick
+        // PUBLIC — walang kick, gagana sa lahat
         if (accessType === 'public') {
             const ua = req.headers['user-agent'] || '';
             for (const b of ['Mozilla', 'Chrome', 'Safari', 'Firefox', 'Edge', 'curl', 'wget']) {
@@ -679,7 +680,7 @@ app.get('/raw/:slug/:version/:token', async function(req, res) {
             return res.send(s.public_content);
         }
 
-        // WHITELIST — check
+        // WHITELIST — check kung nasa listahan
         let allowed = [];
         try { 
             allowed = JSON.parse(s.allowed_ids || '[]').map(String); 
@@ -692,6 +693,7 @@ app.get('/raw/:slug/:version/:token', async function(req, res) {
 
         const isAllowed = userId && allowed.indexOf(userId) !== -1;
 
+        // ✅ ALLOWED — ibigay ang FULL SCRIPT
         if (isAllowed) {
             console.log(`[RAW] ✅ ALLOWED: ${userId}`);
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1, $2, $3, $4, $5)', [s.id, userId, username, true, false]);
@@ -705,13 +707,13 @@ app.get('/raw/:slug/:version/:token', async function(req, res) {
             return res.send(s.public_content);
         }
 
-        // NOT ALLOWED — Kick + Notify
+        // 🚫 NOT ALLOWED — AUTO-KICK
         console.log(`[RAW] 🚫 KICKED: "${userId}" not in whitelist`);
         await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1, $2, $3, $4, $5)', [s.id, userId || 'unknown', username, false, true]);
         io.emit('unauthorized_attempt', { scriptName: s.name, token: s.token, userId: userId || 'unknown', username: username || 'Unknown', timestamp: Date.now() });
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        return res.send("-- [ShieldHub] Access Denied. You are not whitelisted for this script.\n" +
+        return res.send("-- [ShieldHub] Access Denied.\n" +
             "pcall(function()\n" +
             "    local Players = game:GetService('Players')\n" +
             "    local lp = Players.LocalPlayer\n" +
