@@ -659,17 +659,18 @@ app.get('/raw/:slug/:version/:token', async function(req, res) {
         if (s.slug !== req.params.slug || s.version !== req.params.version) return res.status(403).send("-- Denied --");
 
         const accessType = s.access_type || 'public';
-        const userId = String(req.query.userId || req.query.userid || '').trim();
-        const username = String(req.query.username || '').trim();
+        // KUHAIN ANG USER ID SA IBAT-IBANG POSIBLENG PANGALAN
+        const userId = String(req.query.userId || req.query.userid || req.query.UserId || req.query.USERID || '').trim();
+        const username = String(req.query.username || req.query.Username || '').trim();
+
+        console.log(`[RAW] Script: ${s.name} | Access: ${accessType} | UserID: "${userId}" | Username: "${username}"`);
 
         // PUBLIC — works for everyone, no kick
         if (accessType === 'public') {
-            // Browser block
             const ua = req.headers['user-agent'] || '';
             for (const b of ['Mozilla', 'Chrome', 'Safari', 'Firefox', 'Edge', 'curl', 'wget']) {
                 if (ua.includes(b)) return res.status(403).send("-- Protected --");
             }
-            // Log public execution (kung may userId)
             if (userId) {
                 await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1, $2, $3, $4, $5)', [s.id, userId, username, true, false]);
                 io.emit('execution_logged', { scriptName: s.name, token: s.token, userId, username: username || 'Unknown', allowed: true, timestamp: Date.now() });
@@ -680,16 +681,22 @@ app.get('/raw/:slug/:version/:token', async function(req, res) {
 
         // WHITELIST — check
         let allowed = [];
-        try { allowed = JSON.parse(s.allowed_ids || '[]').map(String); } catch(e) { allowed = []; }
+        try { 
+            allowed = JSON.parse(s.allowed_ids || '[]').map(String); 
+        } catch(e) { 
+            allowed = []; 
+        }
+
+        console.log(`[RAW] Allowed IDs: ${JSON.stringify(allowed)}`);
+        console.log(`[RAW] Checking if "${userId}" is in list...`);
 
         const isAllowed = userId && allowed.indexOf(userId) !== -1;
 
         if (isAllowed) {
-            // Log allowed
+            console.log(`[RAW] ✅ ALLOWED: ${userId}`);
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1, $2, $3, $4, $5)', [s.id, userId, username, true, false]);
             io.emit('execution_logged', { scriptName: s.name, token: s.token, userId, username: username || 'Unknown', allowed: true, timestamp: Date.now() });
 
-            // Browser block
             const ua = req.headers['user-agent'] || '';
             for (const b of ['Mozilla', 'Chrome', 'Safari', 'Firefox', 'Edge', 'curl', 'wget']) {
                 if (ua.includes(b)) return res.status(403).send("-- Protected --");
@@ -699,10 +706,10 @@ app.get('/raw/:slug/:version/:token', async function(req, res) {
         }
 
         // NOT ALLOWED — Kick + Notify
+        console.log(`[RAW] 🚫 KICKED: "${userId}" not in whitelist`);
         await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1, $2, $3, $4, $5)', [s.id, userId || 'unknown', username, false, true]);
         io.emit('unauthorized_attempt', { scriptName: s.name, token: s.token, userId: userId || 'unknown', username: username || 'Unknown', timestamp: Date.now() });
 
-        // Return kick script — automatic kick sa Roblox
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         return res.send("-- [ShieldHub] Access Denied. You are not whitelisted for this script.\n" +
             "pcall(function()\n" +
@@ -715,7 +722,7 @@ app.get('/raw/:slug/:version/:token', async function(req, res) {
     } catch (e) { console.error(e); res.status(500).send("-- Error --"); }
 });
 
-// ==================== API — Track Execution (para sa mas advanced na script) ====================
+// ==================== API — Track Execution ====================
 app.post('/api/track-execution', async function(req, res) {
     try {
         const { token, userId, username } = req.body;
