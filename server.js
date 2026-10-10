@@ -279,74 +279,99 @@ app.get('/delete/:token', requireLogin, async function(req, res) {
     try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.redirect('/'); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]); await pool.query('DELETE FROM execution_logs WHERE script_id = $1', [s.id]); res.redirect('/'); } catch (e) { res.status(500).send('Error'); }
 });
 
-// ==================== 🔥 AUTO-INJECT (SERVER-SIDE WHITELIST CHECK) ====================
-// Ang buong whitelist check ay ginagawa sa server.
-// Ang user ay HINDI nakakakita ng ID list, ng kick logic, o ng tunay na script
-// kung hindi siya whitelisted. Ang script na ibinabalik sa whitelisted user
-// ay ang original script LANG — walang nakadikit na protection code.
+// ==================== 🔥 AUTO-INJECT WITH AUTO-DETECT USERID ====================
+// Ang /api/raw ay nagbabalik ng WRAPPER. Ang wrapper mismo ang kukuha ng
+// UserId mula sa Roblox at mag-ve-verify sa /api/verify. Ito ay para hindi
+// na kailangan ipasa ang userId sa loadstring URL.
 app.get('/api/raw', async function(req, res) {
     try {
         const shortId = req.query.id;
-        const userId = req.query.userId || req.query.userid || null;
         if (!shortId) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(400).send("-- Invalid --"); }
 
         const r = await pool.query('SELECT * FROM scripts WHERE short_id = $1 LIMIT 1', [shortId]);
         if (r.rows.length === 0) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(404).send("-- Not found --"); }
         const s = r.rows[0];
         const accessType = s.access_type || 'public';
-        const originalScript = s.real_content;
+        const baseUrl = getBaseUrl();
 
-        // PUBLIC — ibigay agad
+        // PUBLIC — ibigay agad ang totoong script
         if (accessType === 'public') {
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, 'public', '', true, false]);
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-            return res.send(originalScript);
+            return res.send(s.real_content);
         }
 
-        // WHITELIST
+        // WHITELIST — ibalik ang WRAPPER (auto-detect UserId + verify sa server)
+        const wrapper =
+'-- [ShieldHub Protection]\n' +
+'local _sh_userId = tostring(game.Players.LocalPlayer.UserId)\n' +
+'local _sh_username = game.Players.LocalPlayer.Name\n' +
+'local _sh_req = (syn and syn.request) or (http and http.request) or http_request or request\n' +
+'if not _sh_req then\n' +
+'    pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] Executor not supported.") end)\n' +
+'    return\n' +
+'end\n' +
+'local _sh_res = nil\n' +
+'pcall(function()\n' +
+'    _sh_res = _sh_req({\n' +
+'        Url = "' + baseUrl + '/api/verify?id=' + s.short_id + '&userId=" .. _sh_userId .. "&username=" .. _sh_username,\n' +
+'        Method = "GET"\n' +
+'    })\n' +
+'end)\n' +
+'if not _sh_res or not _sh_res.Body or _sh_res.Body == "" or string.find(_sh_res.Body, "ACCESS_DENIED") then\n' +
+'    pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] You are NOT whitelisted for this script.") end)\n' +
+'    return\n' +
+'end\n' +
+'local _sh_fn = loadstring(_sh_res.Body)\n' +
+'if _sh_fn then pcall(_sh_fn) end\n';
+
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        return res.send(wrapper);
+    } catch (e) { console.error(e); res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.status(500).send("-- Error --"); }
+});
+
+// ==================== VERIFY ENDPOINT ====================
+// Ito ang tinatawag ng wrapper. Nagche-check ng UserId laban sa allowed_ids,
+// nagla-log ng attempt, at nagbabalik ng totoong script kung whitelisted.
+app.get('/api/verify', async function(req, res) {
+    try {
+        const shortId = req.query.id;
+        const userId = req.query.userId;
+        const username = req.query.username || '';
+        if (!shortId || !userId) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.send("ACCESS_DENIED"); }
+
+        const r = await pool.query('SELECT * FROM scripts WHERE short_id = $1 LIMIT 1', [shortId]);
+        if (r.rows.length === 0) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.send("ACCESS_DENIED"); }
+        const s = r.rows[0];
+
         let allowedIds = [];
         try { allowedIds = JSON.parse(s.allowed_ids || '[]'); } catch(e) { allowedIds = []; }
         allowedIds = allowedIds.map(x => String(x));
 
-        // Kung walang IDs — walang restriction
+        // Kung walang IDs — payagan lahat
         if (allowedIds.length === 0) {
-            await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, 'no_ids', '', true, false]);
+            await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, String(userId), String(username).substring(0,100), true, false]);
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-            return res.send(originalScript);
-        }
-
-        // Kung walang userId na binigay (e.g. direct browser access) — ibalik ang kick code
-        // para HINDI ma-leak ang totoong script.
-        if (!userId) {
-            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-            return res.send(
-'-- [ShieldHub] Walang User ID na na-detect.\n' +
-'pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] 🚫 Cannot verify your identity. Open this via executor.") end)\n'
-            );
+            return res.send(s.real_content);
         }
 
         const isAllowed = allowedIds.includes(String(userId));
-        const username = req.query.username || req.query.name || '';
 
         // I-log ang attempt
-        await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, String(userId), String(username).substring(0, 100), isAllowed, !isAllowed]);
+        await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, String(userId), String(username).substring(0,100), isAllowed, !isAllowed]);
 
-        // ❌ HINDI WHITELISTED — kick code lang ang ibigay. HINDI isasama ang original script.
         if (!isAllowed) {
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-            return res.send(
-'-- [ShieldHub] 🚫 Access Denied\n' +
-'pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] 🚫 You are NOT whitelisted for this script.") end)\n' +
-'return\n'
-            );
+            return res.send("ACCESS_DENIED");
         }
 
-        // ✅ WHITELISTED — ibigay ang original script. Malinis. Walang trace ng user ID.
+        // ✅ Whitelisted — ibigay ang totoong script
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        return res.send(originalScript);
-    } catch (e) { console.error(e); res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.status(500).send("-- Error --"); }
+        return res.send(s.real_content);
+    } catch (e) { console.error(e); res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.send("ACCESS_DENIED"); }
 });
 
+// Legacy log endpoint (panatilihin para sa compatibility)
 app.post('/api/log-execution', async function(req, res) {
     try {
         const { token, userId, username, allowed } = req.body;
