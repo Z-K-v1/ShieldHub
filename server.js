@@ -227,7 +227,7 @@ app.get('/', requireLogin, async function(req, res) {
 
 // ==================== CREATE / EDIT / DELETE ====================
 app.get('/create', requireLogin, function(req, res) {
-    const content = '<div class="card" style="max-width:900px;"><form method="POST" action="/create" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">📝 Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div><div class="form-group"><label class="form-label">🏷 Version</label><select name="version">' + (() => { let o = ''; for (let i = 1; i <= 50; i++) o += '<option value="V' + i + '">V' + i + '</option>'; return o; })() + '</select></div></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public">🌐 Public (Lahat pwede)</option><option value="whitelist">🔒 Whitelist (May ID check)</option></select></div><div class="form-group" id="idListWrap" style="display:none;"><label class="form-label">👤 Roblox User IDs</label><div id="idList"><div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div></div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button><div style="font-size:12px;color:var(--text3);margin-top:10px;">💡 Ang ID ay HINDI makikita ng player</div></div><input type="hidden" name="access_type" id="accessTypeHidden" value="public"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required placeholder="-- Isulat ang Lua script dito..."></textarea></div><div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">💾 Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div><script>function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}}document.addEventListener("DOMContentLoaded",updateAccessUI);</script>';
+    const content = '<div class="card" style="max-width:900px;"><form method="POST" action="/create" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">📝 Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div><div class="form-group"><label class="form-label">🏷 Version</label><select name="version">' + (() => { let o = ''; for (let i = 1; i <= 50; i++) o += '<option value="V' + i + '">V' + i + '</option>'; return o; })() + '</select></div></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public">🌐 Public (Lahat pwede)</option><option value="whitelist">🔒 Whitelist (May ID check)</option></select></div><div class="form-group" id="idListWrap" style="display:none;"><label class="form-label">👤 Roblox User IDs</label><div id="idList"><div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div></div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button><div style="font-size:12px;color:var(--text3);margin-top:10px;">💡 Ang ID ay HINDI makikita ng player</div></div><input type="hidden" name="access_type" id="accessTypeHidden" value="public"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required placeholder="-- Isulat ang Lua script dito..."></textarea></div><div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">💾 Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div><script>function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}document.addEventListener("DOMContentLoaded",updateAccessUI);</script>';
     res.send(renderLayout({ title: 'Create', pageTitle: 'Create Script', pageSubtitle: 'Add a new Lua script', content: content, user: req.session.user, activeNav: 'create' }));
 });
 app.post('/create', requireLogin, async function(req, res) {
@@ -257,7 +257,7 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
         if (!idsHtml) idsHtml = '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div>';
         const base = getBaseUrl();
         const ls = "loadstring(game:HttpGet('" + base + "/api/raw?id=" + s.short_id + "'))()";
-        const content = '<div class="card" style="max-width:900px;"><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" style="margin-bottom:18px;">🔗 ' + ls + ' 📋</div><form method="POST" action="/edit/' + s.token + '" onsubmit="return prepareSubmit(this)"><div class="form-group"><label class="form-label">📝 Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>🌐 Public</option><option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>🔒 Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:' + (s.access_type === 'whitelist' ? 'block' : 'none') + ';"><label class="form-label">👤 User IDs</label><div id="idList">' + idsHtml + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div><button type="submit" class="btn btn-primary">💾 Save</button></form></div><script>function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}}</script>';
+        const content = '<div class="card" style="max-width:900px;"><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" style="margin-bottom:18px;">🔗 ' + ls + ' 📋</div><form method="POST" action="/edit/' + s.token + '" onsubmit="return prepareSubmit(this)"><div class="form-group"><label class="form-label">📝 Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>🌐 Public</option><option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>🔒 Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:' + (s.access_type === 'whitelist' ? 'block' : 'none') + ';"><label class="form-label">👤 User IDs</label><div id="idList">' + idsHtml + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div><button type="submit" class="btn btn-primary">💾 Save</button></form></div><script>function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}</script>';
         res.send(renderLayout({ title: 'Edit', pageTitle: 'Edit Script', pageSubtitle: s.name, content: content, user: req.session.user, activeNav: 'dashboard' }));
     } catch (e) { res.status(500).send('Error'); }
 });
@@ -279,38 +279,72 @@ app.get('/delete/:token', requireLogin, async function(req, res) {
     try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.redirect('/'); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]); await pool.query('DELETE FROM execution_logs WHERE script_id = $1', [s.id]); res.redirect('/'); } catch (e) { res.status(500).send('Error'); }
 });
 
-// ==================== AUTO-INJECT ====================
+// ==================== 🔥 AUTO-INJECT (SERVER-SIDE WHITELIST CHECK) ====================
+// Ang buong whitelist check ay ginagawa sa server.
+// Ang user ay HINDI nakakakita ng ID list, ng kick logic, o ng tunay na script
+// kung hindi siya whitelisted. Ang script na ibinabalik sa whitelisted user
+// ay ang original script LANG — walang nakadikit na protection code.
 app.get('/api/raw', async function(req, res) {
     try {
         const shortId = req.query.id;
-        if (!shortId) return res.status(400).send("-- Invalid --");
+        const userId = req.query.userId || req.query.userid || null;
+        if (!shortId) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(400).send("-- Invalid --"); }
+
         const r = await pool.query('SELECT * FROM scripts WHERE short_id = $1 LIMIT 1', [shortId]);
-        if (r.rows.length === 0) return res.status(404).send("-- Not found --");
+        if (r.rows.length === 0) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(404).send("-- Not found --"); }
         const s = r.rows[0];
         const accessType = s.access_type || 'public';
         const originalScript = s.real_content;
 
+        // PUBLIC — ibigay agad
         if (accessType === 'public') {
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, 'public', '', true, false]);
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
             return res.send(originalScript);
         }
 
+        // WHITELIST
         let allowedIds = [];
         try { allowedIds = JSON.parse(s.allowed_ids || '[]'); } catch(e) { allowedIds = []; }
+        allowedIds = allowedIds.map(x => String(x));
 
+        // Kung walang IDs — walang restriction
         if (allowedIds.length === 0) {
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, 'no_ids', '', true, false]);
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
             return res.send(originalScript);
         }
 
-        const allowedIdsJson = JSON.stringify(allowedIds);
-        const protectedScript = '-- [ShieldHub Protection]\nlocal _sh_allowed = ' + allowedIdsJson + '\nlocal _sh_userId = tostring(game.Players.LocalPlayer.UserId)\nlocal _sh_username = game.Players.LocalPlayer.Name\nlocal _sh_ok = false\nfor _, id in ipairs(_sh_allowed) do if tostring(id) == _sh_userId then _sh_ok = true break end end\npcall(function() local _sh_req = (syn and syn.request) or (http and http.request) or http_request or request if _sh_req then _sh_req({Url = "' + getBaseUrl() + '/api/log-execution", Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = game:GetService("HttpService"):JSONEncode({token = "' + s.token + '", userId = _sh_userId, username = _sh_username, allowed = _sh_ok})}) end end)\nif not _sh_ok then pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] 🚫 You are NOT whitelisted for this script.") end) return end\n\n' + originalScript;
+        // Kung walang userId na binigay (e.g. direct browser access) — ibalik ang kick code
+        // para HINDI ma-leak ang totoong script.
+        if (!userId) {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            return res.send(
+'-- [ShieldHub] Walang User ID na na-detect.\n' +
+'pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] 🚫 Cannot verify your identity. Open this via executor.") end)\n'
+            );
+        }
 
+        const isAllowed = allowedIds.includes(String(userId));
+        const username = req.query.username || req.query.name || '';
+
+        // I-log ang attempt
+        await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, String(userId), String(username).substring(0, 100), isAllowed, !isAllowed]);
+
+        // ❌ HINDI WHITELISTED — kick code lang ang ibigay. HINDI isasama ang original script.
+        if (!isAllowed) {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            return res.send(
+'-- [ShieldHub] 🚫 Access Denied\n' +
+'pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] 🚫 You are NOT whitelisted for this script.") end)\n' +
+'return\n'
+            );
+        }
+
+        // ✅ WHITELISTED — ibigay ang original script. Malinis. Walang trace ng user ID.
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        return res.send(protectedScript);
-    } catch (e) { console.error(e); res.status(500).send("-- Error --"); }
+        return res.send(originalScript);
+    } catch (e) { console.error(e); res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.status(500).send("-- Error --"); }
 });
 
 app.post('/api/log-execution', async function(req, res) {
