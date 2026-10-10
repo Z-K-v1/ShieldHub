@@ -69,6 +69,40 @@ function getBaseUrl() {
 function makeShortId() { return crypto.randomBytes(5).toString('hex'); }
 function makeInvite() { return crypto.randomBytes(4).toString('hex'); }
 
+// ==================== LOADSTRING BUILDER ====================
+function buildLoadstring(name, version, shortId) {
+    const cleanName = (name || 'SCRIPT').toUpperCase().replace(/[^A-Z0-9_-]/g, '_').substring(0, 30) || 'SCRIPT';
+    const cleanVer = (version || 'V1').toUpperCase().replace(/[^A-Z0-9_]/g, '') || 'V1';
+    const base = getBaseUrl();
+    return "loadstring(game:HttpGet('" + base + "/" + cleanName + "/" + cleanVer + "/id=" + shortId + "'))()";
+}
+
+// ==================== AUTO-DETECT USERID WRAPPER ====================
+function buildWhitelistWrapper(shortId) {
+    const base = getBaseUrl();
+    return '-- [ShieldHub Protection]\n' +
+'local _sh_userId = tostring(game.Players.LocalPlayer.UserId)\n' +
+'local _sh_username = game.Players.LocalPlayer.Name\n' +
+'local _sh_req = (syn and syn.request) or (http and http.request) or http_request or request\n' +
+'if not _sh_req then\n' +
+'    pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] Executor not supported.") end)\n' +
+'    return\n' +
+'end\n' +
+'local _sh_res = nil\n' +
+'pcall(function()\n' +
+'    _sh_res = _sh_req({\n' +
+'        Url = "' + base + '/api/verify?id=' + shortId + '&userId=" .. _sh_userId .. "&username=" .. _sh_username,\n' +
+'        Method = "GET"\n' +
+'    })\n' +
+'end)\n' +
+'if not _sh_res or not _sh_res.Body or _sh_res.Body == "" or string.find(_sh_res.Body, "ACCESS_DENIED") then\n' +
+'    pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] You are NOT whitelisted for this script.") end)\n' +
+'    return\n' +
+'end\n' +
+'local _sh_fn = loadstring(_sh_res.Body)\n' +
+'if _sh_fn then pcall(_sh_fn) end\n';
+}
+
 const LAYOUT_STYLES = `
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#080404;--bg1:#0e0707;--bg2:#160b0b;--bg3:#1f0f0f;--border:rgba(255,255,255,0.06);--border1:rgba(255,255,255,0.1);--text:#fff;--text1:#e0e0e0;--text2:#9a9a9a;--text3:#5a5a5a;--red:#ff3b3b;--red2:#cc0000;--red-dim:rgba(255,59,59,0.12);--purple:#b855ff;--green:#22c55e;--yellow:#ffbb44}
@@ -211,11 +245,10 @@ app.get('/', requireLogin, async function(req, res) {
         if (myScripts.length === 0) {
             scriptsHtml = '<div class="empty"><div class="empty-icon">◈</div><div style="font-size:18px;font-weight:700;margin-bottom:8px;">No scripts yet</div><a href="/create" class="btn btn-primary">✦ Create Script</a></div>';
         } else {
-            const base = getBaseUrl();
             scriptsHtml = '<div class="grid-scripts">';
             for (const s of myScripts) {
                 let count = 0; try { count = JSON.parse(s.allowed_ids || '[]').length; } catch(e) {}
-                const ls = "loadstring(game:HttpGet('" + base + "/api/raw?id=" + s.short_id + "'))()";
+                const ls = buildLoadstring(s.name, s.version, s.short_id);
                 const badge = s.access_type === 'whitelist' ? '<span class="badge badge-yellow">🔒 Whitelist (' + count + ')</span>' : '<span class="badge badge-green">🌐 Public</span>';
                 scriptsHtml += '<div class="card"><div style="display:flex;gap:12px;margin-bottom:14px;"><div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">◈</div><div><div style="font-size:16px;font-weight:800;margin-bottom:6px;">' + s.name + '</div><div style="display:flex;gap:6px;">' + badge + '<span class="badge badge-purple">' + s.version + '</span></div></div></div><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">🔗 ' + ls + ' 📋</div><div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">📋 Loadstring</button><a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">📊 Logs</a><a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">✎ Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name + '\')">🗑</button></div></div>';
             }
@@ -227,7 +260,8 @@ app.get('/', requireLogin, async function(req, res) {
 
 // ==================== CREATE / EDIT / DELETE ====================
 app.get('/create', requireLogin, function(req, res) {
-    const content = '<div class="card" style="max-width:900px;"><form method="POST" action="/create" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">📝 Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div><div class="form-group"><label class="form-label">🏷 Version</label><select name="version">' + (() => { let o = ''; for (let i = 1; i <= 50; i++) o += '<option value="V' + i + '">V' + i + '</option>'; return o; })() + '</select></div></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public">🌐 Public (Lahat pwede)</option><option value="whitelist">🔒 Whitelist (May ID check)</option></select></div><div class="form-group" id="idListWrap" style="display:none;"><label class="form-label">👤 Roblox User IDs</label><div id="idList"><div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div></div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button><div style="font-size:12px;color:var(--text3);margin-top:10px;">💡 Ang ID ay HINDI makikita ng player</div></div><input type="hidden" name="access_type" id="accessTypeHidden" value="public"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required placeholder="-- Isulat ang Lua script dito..."></textarea></div><div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">💾 Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div><script>function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}document.addEventListener("DOMContentLoaded",updateAccessUI);</script>';
+    var verOpts = ''; for (var i = 1; i <= 100; i++) verOpts += '<option value="V' + i + '">';
+    const content = '<div class="card" style="max-width:900px;"><form method="POST" action="/create" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">📝 Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div><div class="form-group"><label class="form-label">🏷 Version</label><input type="text" name="version" list="versionList" value="V1" placeholder="V1" required style="font-family:monospace"><datalist id="versionList">' + verOpts + '</datalist></div></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public">🌐 Public (Lahat pwede)</option><option value="whitelist">🔒 Whitelist (May ID check)</option></select></div><div class="form-group" id="idListWrap" style="display:none;"><label class="form-label">👤 Roblox User IDs</label><div id="idList"><div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div></div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button><div style="font-size:12px;color:var(--text3);margin-top:10px;">💡 Ang ID ay HINDI makikita ng player</div></div><input type="hidden" name="access_type" id="accessTypeHidden" value="public"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required placeholder="-- Isulat ang Lua script dito..."></textarea></div><div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">💾 Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div><script>function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}document.addEventListener("DOMContentLoaded",updateAccessUI);</script>';
     res.send(renderLayout({ title: 'Create', pageTitle: 'Create Script', pageSubtitle: 'Add a new Lua script', content: content, user: req.session.user, activeNav: 'create' }));
 });
 app.post('/create', requireLogin, async function(req, res) {
@@ -255,9 +289,9 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
         let ids = []; try { ids = JSON.parse(s.allowed_ids || '[]'); } catch(e) {}
         let idsHtml = ''; for (const i of ids) idsHtml += '<div class="id-row"><input type="text" class="id-input" value="' + i + '" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div>';
         if (!idsHtml) idsHtml = '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div>';
-        const base = getBaseUrl();
-        const ls = "loadstring(game:HttpGet('" + base + "/api/raw?id=" + s.short_id + "'))()";
-        const content = '<div class="card" style="max-width:900px;"><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" style="margin-bottom:18px;">🔗 ' + ls + ' 📋</div><form method="POST" action="/edit/' + s.token + '" onsubmit="return prepareSubmit(this)"><div class="form-group"><label class="form-label">📝 Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>🌐 Public</option><option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>🔒 Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:' + (s.access_type === 'whitelist' ? 'block' : 'none') + ';"><label class="form-label">👤 User IDs</label><div id="idList">' + idsHtml + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div><button type="submit" class="btn btn-primary">💾 Save</button></form></div><script>function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}</script>';
+        const ls = buildLoadstring(s.name, s.version, s.short_id);
+        let verOpts = ''; for (let i = 1; i <= 100; i++) verOpts += '<option value="V' + i + '">';
+        const content = '<div class="card" style="max-width:900px;"><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" style="margin-bottom:18px;">🔗 ' + ls + ' 📋</div><form method="POST" action="/edit/' + s.token + '" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">📝 Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div><div class="form-group"><label class="form-label">🏷 Version</label><input type="text" name="version" list="versionList" value="' + s.version + '" placeholder="V1" required style="font-family:monospace"><datalist id="versionList">' + verOpts + '</datalist></div></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>🌐 Public</option><option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>🔒 Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:' + (s.access_type === 'whitelist' ? 'block' : 'none') + ';"><label class="form-label">👤 User IDs</label><div id="idList">' + idsHtml + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div><button type="submit" class="btn btn-primary">💾 Save</button></form></div><script>function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}</script>';
         res.send(renderLayout({ title: 'Edit', pageTitle: 'Edit Script', pageSubtitle: s.name, content: content, user: req.session.user, activeNav: 'dashboard' }));
     } catch (e) { res.status(500).send('Error'); }
 });
@@ -279,20 +313,17 @@ app.get('/delete/:token', requireLogin, async function(req, res) {
     try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.redirect('/'); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]); await pool.query('DELETE FROM execution_logs WHERE script_id = $1', [s.id]); res.redirect('/'); } catch (e) { res.status(500).send('Error'); }
 });
 
-// ==================== 🔥 AUTO-INJECT WITH AUTO-DETECT USERID ====================
-// Ang /api/raw ay nagbabalik ng WRAPPER. Ang wrapper mismo ang kukuha ng
-// UserId mula sa Roblox at mag-ve-verify sa /api/verify. Ito ay para hindi
-// na kailangan ipasa ang userId sa loadstring URL.
-app.get('/api/raw', async function(req, res) {
+// ==================== PRETTY URL LOADSTRING ====================
+// Format: /:scriptName/:version/id=:shortId
+// Halimbawa: /LEMON_HUB/V1/id=e15b147ab2
+// Ito ay DIRECT na nag-se-serve ng script (public) o wrapper (whitelist)
+app.get('/:scriptName/:version/id=:shortId', async function(req, res) {
     try {
-        const shortId = req.query.id;
-        if (!shortId) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(400).send("-- Invalid --"); }
-
+        const shortId = req.params.shortId;
         const r = await pool.query('SELECT * FROM scripts WHERE short_id = $1 LIMIT 1', [shortId]);
         if (r.rows.length === 0) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(404).send("-- Not found --"); }
         const s = r.rows[0];
         const accessType = s.access_type || 'public';
-        const baseUrl = getBaseUrl();
 
         // PUBLIC — ibigay agad ang totoong script
         if (accessType === 'public') {
@@ -301,38 +332,38 @@ app.get('/api/raw', async function(req, res) {
             return res.send(s.real_content);
         }
 
-        // WHITELIST — ibalik ang WRAPPER (auto-detect UserId + verify sa server)
-        const wrapper =
-'-- [ShieldHub Protection]\n' +
-'local _sh_userId = tostring(game.Players.LocalPlayer.UserId)\n' +
-'local _sh_username = game.Players.LocalPlayer.Name\n' +
-'local _sh_req = (syn and syn.request) or (http and http.request) or http_request or request\n' +
-'if not _sh_req then\n' +
-'    pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] Executor not supported.") end)\n' +
-'    return\n' +
-'end\n' +
-'local _sh_res = nil\n' +
-'pcall(function()\n' +
-'    _sh_res = _sh_req({\n' +
-'        Url = "' + baseUrl + '/api/verify?id=' + s.short_id + '&userId=" .. _sh_userId .. "&username=" .. _sh_username,\n' +
-'        Method = "GET"\n' +
-'    })\n' +
-'end)\n' +
-'if not _sh_res or not _sh_res.Body or _sh_res.Body == "" or string.find(_sh_res.Body, "ACCESS_DENIED") then\n' +
-'    pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] You are NOT whitelisted for this script.") end)\n' +
-'    return\n' +
-'end\n' +
-'local _sh_fn = loadstring(_sh_res.Body)\n' +
-'if _sh_fn then pcall(_sh_fn) end\n';
+        // WHITELIST — ibalik ang wrapper (auto-detect UserId + verify sa /api/verify)
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        return res.send(buildWhitelistWrapper(s.short_id));
+    } catch (e) { 
+        console.error(e); 
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8'); 
+        return res.status(500).send("-- Error --"); 
+    }
+});
+
+// ==================== API/RAW (legacy — still works) ====================
+app.get('/api/raw', async function(req, res) {
+    try {
+        const shortId = req.query.id;
+        if (!shortId) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(400).send("-- Invalid --"); }
+        const r = await pool.query('SELECT * FROM scripts WHERE short_id = $1 LIMIT 1', [shortId]);
+        if (r.rows.length === 0) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(404).send("-- Not found --"); }
+        const s = r.rows[0];
+        const accessType = s.access_type || 'public';
+
+        if (accessType === 'public') {
+            await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, 'public', '', true, false]);
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            return res.send(s.real_content);
+        }
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        return res.send(wrapper);
+        return res.send(buildWhitelistWrapper(s.short_id));
     } catch (e) { console.error(e); res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.status(500).send("-- Error --"); }
 });
 
-// ==================== VERIFY ENDPOINT ====================
-// Ito ang tinatawag ng wrapper. Nagche-check ng UserId laban sa allowed_ids,
-// nagla-log ng attempt, at nagbabalik ng totoong script kung whitelisted.
+// ==================== VERIFY ENDPOINT (tinatawag ng wrapper) ====================
 app.get('/api/verify', async function(req, res) {
     try {
         const shortId = req.query.id;
@@ -348,7 +379,6 @@ app.get('/api/verify', async function(req, res) {
         try { allowedIds = JSON.parse(s.allowed_ids || '[]'); } catch(e) { allowedIds = []; }
         allowedIds = allowedIds.map(x => String(x));
 
-        // Kung walang IDs — payagan lahat
         if (allowedIds.length === 0) {
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, String(userId), String(username).substring(0,100), true, false]);
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -356,8 +386,6 @@ app.get('/api/verify', async function(req, res) {
         }
 
         const isAllowed = allowedIds.includes(String(userId));
-
-        // I-log ang attempt
         await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, String(userId), String(username).substring(0,100), isAllowed, !isAllowed]);
 
         if (!isAllowed) {
@@ -365,23 +393,9 @@ app.get('/api/verify', async function(req, res) {
             return res.send("ACCESS_DENIED");
         }
 
-        // ✅ Whitelisted — ibigay ang totoong script
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         return res.send(s.real_content);
     } catch (e) { console.error(e); res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.send("ACCESS_DENIED"); }
-});
-
-// Legacy log endpoint (panatilihin para sa compatibility)
-app.post('/api/log-execution', async function(req, res) {
-    try {
-        const { token, userId, username, allowed } = req.body;
-        if (!token || !userId) return res.json({ ok: false });
-        const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [token]);
-        if (r.rows.length === 0) return res.json({ ok: false });
-        const s = r.rows[0];
-        await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, String(userId), username || '', !!allowed, !allowed]);
-        return res.json({ ok: true });
-    } catch (e) { console.error(e); res.json({ ok: false }); }
 });
 
 // ==================== LOGS ====================
@@ -543,5 +557,5 @@ app.post('/api/channels/:id/send', requireLogin, async function(req, res) {
 server.listen(PORT, function() {
     console.log('✅ ' + BRAND_NAME + ' — ShieldHub v3.0');
     console.log('🔒 Public = Lahat pwede | Whitelist = Auto-Kick kung wala');
-    console.log('🏠 Servers + Channels + Delete Channel');
+    console.log('🔗 Pretty URL: /:name/:version/id=:shortId');
 });
