@@ -15,11 +15,16 @@ if (!DATABASE_URL) { console.error('❌ DATABASE_URL not set!'); process.exit(1)
 
 const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
+// ==================== ICON / FAVICON (inline SVG base64) ====================
+const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff3b3b"/><stop offset="100%" stop-color="#cc0000"/></linearGradient></defs><rect width="100" height="100" rx="22" fill="url(#g)"/><path d="M30 30 L50 50 L30 70 M70 30 L50 50 L70 70" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
+const FAVICON_DATA = 'data:image/svg+xml;base64,' + Buffer.from(FAVICON_SVG).toString('base64');
+const DEFAULT_ICON = FAVICON_DATA;
+
 // ==================== DATABASE INIT ====================
 async function initDB() {
     try {
         await pool.query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, role VARCHAR(20) DEFAULT 'USER', created_at TIMESTAMP DEFAULT NOW());`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS scripts (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, version VARCHAR(50) DEFAULT 'V1', real_content TEXT NOT NULL, token VARCHAR(64) UNIQUE NOT NULL, owner VARCHAR(50) NOT NULL, access_type VARCHAR(20) DEFAULT 'public', allowed_ids TEXT DEFAULT '[]', short_id VARCHAR(32), created_at TIMESTAMP DEFAULT NOW());`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS scripts (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, version VARCHAR(50) DEFAULT 'V1', real_content TEXT NOT NULL, token VARCHAR(64) UNIQUE NOT NULL, owner VARCHAR(50) NOT NULL, access_type VARCHAR(20) DEFAULT 'public', allowed_ids TEXT DEFAULT '[]', short_id VARCHAR(32), icon TEXT DEFAULT '', created_at TIMESTAMP DEFAULT NOW());`);
         await pool.query(`CREATE TABLE IF NOT EXISTS "session" ("sid" VARCHAR NOT NULL COLLATE "default", "sess" JSON NOT NULL, "expire" TIMESTAMP(6) NOT NULL, CONSTRAINT "session_pkey" PRIMARY KEY ("sid"));`);
         await pool.query(`CREATE TABLE IF NOT EXISTS execution_logs (id SERIAL PRIMARY KEY, script_id INTEGER NOT NULL, user_id VARCHAR(30) NOT NULL, username VARCHAR(100) DEFAULT '', allowed BOOLEAN DEFAULT FALSE, kicked BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT NOW());`);
         await pool.query(`CREATE TABLE IF NOT EXISTS servers (id SERIAL PRIMARY KEY, name VARCHAR(100) NOT NULL, owner VARCHAR(50) NOT NULL, invite_code VARCHAR(16) UNIQUE NOT NULL, icon VARCHAR(10) DEFAULT '🎮', created_at TIMESTAMP DEFAULT NOW());`);
@@ -28,6 +33,7 @@ async function initDB() {
         await pool.query(`CREATE TABLE IF NOT EXISTS chat_messages (id SERIAL PRIMARY KEY, channel_id INTEGER NOT NULL, username VARCHAR(50) NOT NULL, role VARCHAR(20) DEFAULT 'USER', message TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
 
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS short_id VARCHAR(32);`);
+        await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '';`);
 
         const noShort = await pool.query(`SELECT id FROM scripts WHERE short_id IS NULL`);
         for (const row of noShort.rows) {
@@ -103,6 +109,16 @@ function buildWhitelistWrapper(shortId) {
 'if _sh_fn then pcall(_sh_fn) end\n';
 }
 
+// ==================== FAVICON ROUTE ====================
+app.get('/favicon.ico', function(req, res) {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.send(FAVICON_SVG);
+});
+app.get('/favicon.svg', function(req, res) {
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.send(FAVICON_SVG);
+});
+
 const LAYOUT_STYLES = `
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#080404;--bg1:#0e0707;--bg2:#160b0b;--bg3:#1f0f0f;--border:rgba(255,255,255,0.06);--border1:rgba(255,255,255,0.1);--text:#fff;--text1:#e0e0e0;--text2:#9a9a9a;--text3:#5a5a5a;--red:#ff3b3b;--red2:#cc0000;--red-dim:rgba(255,59,59,0.12);--purple:#b855ff;--green:#22c55e;--yellow:#ffbb44}
@@ -115,7 +131,8 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300p
 .layout{display:flex;min-height:100vh;position:relative;z-index:1}
 .sidebar{width:270px;background:rgba(15,8,8,0.95);backdrop-filter:blur(30px);border-right:1px solid var(--border);padding:22px 14px;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50}
 .brand{display:flex;align-items:center;gap:11px;padding:6px 10px 18px;border-bottom:1px solid var(--border);margin-bottom:16px}
-.brand-logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:#fff;box-shadow:0 8px 24px rgba(255,59,59,0.4);animation:logoGlow 3s infinite alternate}
+.brand-logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:#fff;box-shadow:0 8px 24px rgba(255,59,59,0.4);animation:logoGlow 3s infinite alternate;overflow:hidden}
+.brand-logo img{width:100%;height:100%;object-fit:cover}
 @keyframes logoGlow{0%{box-shadow:0 8px 24px rgba(255,59,59,0.4)}100%{box-shadow:0 8px 32px rgba(255,59,59,0.7)}}
 .brand-name{font-size:16px;font-weight:800}
 .brand-sub{font-size:10px;color:var(--text3);font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:3px}
@@ -158,9 +175,14 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300p
 .id-row{display:flex;gap:10px;margin-bottom:10px}
 .id-row input{flex:1;font-family:'JetBrains Mono',monospace}
 .id-row button{width:48px;height:48px;border-radius:11px;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.35);color:#ff5555;font-size:20px;flex-shrink:0}
+.script-icon{width:52px;height:52px;border-radius:13px;object-fit:cover;flex-shrink:0;border:1px solid var(--border1);background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:22px;overflow:hidden}
+.script-icon img{width:100%;height:100%;object-fit:cover;display:block}
+.icon-preview{width:80px;height:80px;border-radius:16px;object-fit:cover;border:1px solid var(--border1);background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:32px;margin-bottom:12px;overflow:hidden}
+.icon-preview img{width:100%;height:100%;object-fit:cover;display:block}
 .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
 .login-card{background:linear-gradient(180deg,rgba(22,11,11,0.85),rgba(10,5,5,0.95));border:1px solid var(--border1);border-radius:22px;padding:44px 40px;width:440px;max-width:100%}
-.login-logo{width:76px;height:76px;border-radius:20px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:28px;color:#fff;margin:0 auto 18px;box-shadow:0 12px 40px rgba(255,59,59,0.5)}
+.login-logo{width:76px;height:76px;border-radius:20px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:28px;color:#fff;margin:0 auto 18px;box-shadow:0 12px 40px rgba(255,59,59,0.5);overflow:hidden}
+.login-logo img{width:100%;height:100%;object-fit:cover}
 .login-title{font-size:26px;font-weight:800;text-align:center;margin-bottom:6px}
 .login-sub{font-size:13.5px;color:var(--text2);text-align:center;margin-bottom:30px}
 .login-card input{margin-bottom:12px}
@@ -216,18 +238,28 @@ function renderLayout(opts) {
     var title = opts.title, pageTitle = opts.pageTitle, pageSubtitle = opts.pageSubtitle, content = opts.content, user = opts.user, activeNav = opts.activeNav, actions = opts.actions;
     var isAdmin = user.role === 'ADMIN';
     var adminLink = isAdmin ? '<div class="nav-label">Admin</div><a href="/admin" class="nav-item ' + (activeNav === 'admin' ? 'active' : '') + '">♛ Admin Panel</a>' : '';
-    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + title + ' · ' + BRAND_SHORT + '</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="layout"><aside class="sidebar"><div class="brand"><div class="brand-logo">ZK</div><div><div class="brand-name">' + BRAND_SHORT + '</div><div class="brand-sub">By Zyrox-Kido</div></div></div><div class="nav-label">Workspace</div><a href="/" class="nav-item ' + (activeNav === 'dashboard' ? 'active' : '') + '">◈ Dashboard</a><a href="/create" class="nav-item ' + (activeNav === 'create' ? 'active' : '') + '">✦ Create Script</a><a href="/servers" class="nav-item ' + (activeNav === 'servers' ? 'active' : '') + '">🏠 Servers</a>' + adminLink + '<div class="sidebar-footer"><a href="/logout" class="user-card"><div class="user-avatar ' + (isAdmin ? 'user-avatar-admin' : '') + '">' + user.username[0].toUpperCase() + '</div><div><div class="user-name">' + user.username + '</div><div class="user-role">' + (isAdmin ? '♛ Admin' : 'Member') + '</div></div></a></div></aside><div class="main"><header class="topbar"><div class="topbar-title">' + pageTitle + '</div></header><div class="content"><div class="page-title">' + pageTitle + '</div>' + (pageSubtitle ? '<div class="page-sub">' + pageSubtitle + '</div>' : '') + (actions || '') + content + '</div></div></div><script>' + TOAST_SCRIPT + '</script></body></html>';
+    var faviconLink = '<link rel="icon" type="image/svg+xml" href="' + FAVICON_DATA + '">';
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + title + ' · ' + BRAND_SHORT + '</title>' + faviconLink + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="layout"><aside class="sidebar"><div class="brand"><div class="brand-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div><div class="brand-name">' + BRAND_SHORT + '</div><div class="brand-sub">By Zyrox-Kido</div></div></div><div class="nav-label">Workspace</div><a href="/" class="nav-item ' + (activeNav === 'dashboard' ? 'active' : '') + '">◈ Dashboard</a><a href="/create" class="nav-item ' + (activeNav === 'create' ? 'active' : '') + '">✦ Create Script</a><a href="/servers" class="nav-item ' + (activeNav === 'servers' ? 'active' : '') + '">🏠 Servers</a>' + adminLink + '<div class="sidebar-footer"><a href="/logout" class="user-card"><div class="user-avatar ' + (isAdmin ? 'user-avatar-admin' : '') + '">' + user.username[0].toUpperCase() + '</div><div><div class="user-name">' + user.username + '</div><div class="user-role">' + (isAdmin ? '♛ Admin' : 'Member') + '</div></div></a></div></aside><div class="main"><header class="topbar"><div class="topbar-title">' + pageTitle + '</div></header><div class="content"><div class="page-title">' + pageTitle + '</div>' + (pageSubtitle ? '<div class="page-sub">' + pageSubtitle + '</div>' : '') + (actions || '') + content + '</div></div></div><script>' + TOAST_SCRIPT + '</script></body></html>';
+}
+
+// ==================== ICON RENDER ====================
+function renderScriptIcon(icon, fallbackText) {
+    var src = (icon && icon.trim()) ? icon.trim() : FAVICON_DATA;
+    var fallback = (fallbackText || '◈').replace(/"/g, '');
+    return '<div class="script-icon"><img src="' + src.replace(/"/g, '&quot;') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'' + fallback + '\'" alt=""></div>';
 }
 
 // ==================== AUTH ====================
 app.get('/login', function(req, res) {
-    res.send('<!DOCTYPE html><html><head><title>Login · ' + BRAND_SHORT + '</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo">ZK</div><div class="login-title">Welcome back</div><div class="login-sub">Sign in to continue</div><form method="POST" action="/login"><input type="text" name="username" placeholder="Username" required autofocus><input type="password" name="password" placeholder="Password" required><button type="submit" class="btn btn-primary" style="width:100%">Sign In →</button></form><div class="login-err">' + (req.query.error ? 'Invalid credentials' : '') + '</div><a href="/register" class="login-link">Create account →</a></div></div></body></html>');
+    var faviconLink = '<link rel="icon" type="image/svg+xml" href="' + FAVICON_DATA + '">';
+    res.send('<!DOCTYPE html><html><head><title>Login · ' + BRAND_SHORT + '</title>' + faviconLink + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div class="login-title">Welcome back</div><div class="login-sub">Sign in to continue</div><form method="POST" action="/login"><input type="text" name="username" placeholder="Username" required autofocus><input type="password" name="password" placeholder="Password" required><button type="submit" class="btn btn-primary" style="width:100%">Sign In →</button></form><div class="login-err">' + (req.query.error ? 'Invalid credentials' : '') + '</div><a href="/register" class="login-link">Create account →</a></div></div></body></html>');
 });
 app.post('/login', async function(req, res) {
     try { const { username, password } = req.body; const r = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]); if (r.rows.length === 0) return res.redirect('/login?error=1'); const u = r.rows[0]; if (u.password !== password) return res.redirect('/login?error=1'); req.session.user = { username: u.username, role: u.role }; res.redirect('/'); } catch (e) { res.redirect('/login?error=1'); }
 });
 app.get('/register', function(req, res) {
-    res.send('<!DOCTYPE html><html><head><title>Register · ' + BRAND_SHORT + '</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo">ZK</div><div class="login-title">Create account</div><div class="login-sub">Join ' + BRAND_SHORT + '</div><form method="POST" action="/register"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><input type="password" name="confirmPassword" placeholder="Confirm password" required><button type="submit" class="btn btn-primary" style="width:100%">Create Account →</button></form><div class="login-err">' + (req.query.error || '') + '</div><a href="/login" class="login-link">← Back to sign in</a></div></div></body></html>');
+    var faviconLink = '<link rel="icon" type="image/svg+xml" href="' + FAVICON_DATA + '">';
+    res.send('<!DOCTYPE html><html><head><title>Register · ' + BRAND_SHORT + '</title>' + faviconLink + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div class="login-title">Create account</div><div class="login-sub">Join ' + BRAND_SHORT + '</div><form method="POST" action="/register"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><input type="password" name="confirmPassword" placeholder="Confirm password" required><button type="submit" class="btn btn-primary" style="width:100%">Create Account →</button></form><div class="login-err">' + (req.query.error || '') + '</div><a href="/login" class="login-link">← Back to sign in</a></div></div></body></html>');
 });
 app.post('/register', async function(req, res) {
     try { const { username, password, confirmPassword } = req.body; if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match'); if (username.length < 2 || password.length < 4) return res.redirect('/register?error=Min 2 chars, 4 chars pass'); const ex = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]); if (ex.rows.length > 0) return res.redirect('/register?error=Username taken'); const role = username === 'Z-K' ? 'ADMIN' : 'USER'; await pool.query('INSERT INTO users (username, password, role) VALUES ($1, $2, $3)', [username, password, role]); res.redirect('/login?registered=1'); } catch (e) { res.redirect('/register?error=Server error'); }
@@ -250,7 +282,7 @@ app.get('/', requireLogin, async function(req, res) {
                 let count = 0; try { count = JSON.parse(s.allowed_ids || '[]').length; } catch(e) {}
                 const ls = buildLoadstring(s.name, s.version, s.short_id);
                 const badge = s.access_type === 'whitelist' ? '<span class="badge badge-yellow">🔒 Whitelist (' + count + ')</span>' : '<span class="badge badge-green">🌐 Public</span>';
-                scriptsHtml += '<div class="card"><div style="display:flex;gap:12px;margin-bottom:14px;"><div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">◈</div><div><div style="font-size:16px;font-weight:800;margin-bottom:6px;">' + s.name + '</div><div style="display:flex;gap:6px;">' + badge + '<span class="badge badge-purple">' + s.version + '</span></div></div></div><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">🔗 ' + ls + ' 📋</div><div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">📋 Loadstring</button><a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">📊 Logs</a><a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">✎ Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name + '\')">🗑</button></div></div>';
+                scriptsHtml += '<div class="card"><div style="display:flex;gap:12px;margin-bottom:14px;">' + renderScriptIcon(s.icon, s.name[0]) + '<div><div style="font-size:16px;font-weight:800;margin-bottom:6px;">' + s.name + '</div><div style="display:flex;gap:6px;">' + badge + '<span class="badge badge-purple">' + s.version + '</span></div></div></div><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">🔗 ' + ls + ' 📋</div><div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">📋 Loadstring</button><a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">📊 Logs</a><a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">✎ Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name + '\')">🗑</button></div></div>';
             }
             scriptsHtml += '</div>';
         }
@@ -258,26 +290,28 @@ app.get('/', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).send('Error: ' + e.message); }
 });
 
-// ==================== CREATE / EDIT / DELETE ====================
+// ==================== CREATE ====================
 app.get('/create', requireLogin, function(req, res) {
-    var verOpts = ''; for (var i = 1; i <= 100; i++) verOpts += '<option value="V' + i + '">';
-    const content = '<div class="card" style="max-width:900px;"><form method="POST" action="/create" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">📝 Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div><div class="form-group"><label class="form-label">🏷 Version</label><input type="text" name="version" list="versionList" value="V1" placeholder="V1" required style="font-family:monospace"><datalist id="versionList">' + verOpts + '</datalist></div></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public">🌐 Public (Lahat pwede)</option><option value="whitelist">🔒 Whitelist (May ID check)</option></select></div><div class="form-group" id="idListWrap" style="display:none;"><label class="form-label">👤 Roblox User IDs</label><div id="idList"><div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div></div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button><div style="font-size:12px;color:var(--text3);margin-top:10px;">💡 Ang ID ay HINDI makikita ng player</div></div><input type="hidden" name="access_type" id="accessTypeHidden" value="public"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required placeholder="-- Isulat ang Lua script dito..."></textarea></div><div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">💾 Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div><script>function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}document.addEventListener("DOMContentLoaded",updateAccessUI);</script>';
+    var verOpts = ''; for (var i = 1; i <= 1000; i++) verOpts += '<option value="V' + i + '">V' + i + '</option>';
+    const content = '<div class="card" style="max-width:900px;"><form method="POST" action="/create" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">📝 Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div><div class="form-group"><label class="form-label">🏷 Version</label><select name="version" required>' + verOpts + '</select></div></div><div class="form-group"><label class="form-label">🖼️ Icon Image (URL o iwan blangko para sa default)</label><div class="icon-preview" id="iconPreview"><img src="' + FAVICON_DATA + '" alt=""></div><input type="text" id="iconInput" name="icon" placeholder="https://example.com/icon.png (opsyonal)" oninput="updateIconPreview(this.value)"><div style="font-size:12px;color:var(--text3);margin-top:8px;">💡 Mag-upload ng image sa imgur.com o Discord, tapos i-paste ang direct URL dito.</div></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public">🌐 Public (Lahat pwede)</option><option value="whitelist">🔒 Whitelist (May ID check)</option></select></div><div class="form-group" id="idListWrap" style="display:none;"><label class="form-label">👤 Roblox User IDs</label><div id="idList"><div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div></div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button><div style="font-size:12px;color:var(--text3);margin-top:10px;">💡 Ang ID ay HINDI makikita ng player</div></div><input type="hidden" name="access_type" id="accessTypeHidden" value="public"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required placeholder="-- Isulat ang Lua script dito..."></textarea></div><div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">💾 Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div><script>function updateIconPreview(u){var p=document.getElementById("iconPreview");if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'◈\'" alt="">\'}else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}}function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}document.addEventListener("DOMContentLoaded",updateAccessUI);</script>';
     res.send(renderLayout({ title: 'Create', pageTitle: 'Create Script', pageSubtitle: 'Add a new Lua script', content: content, user: req.session.user, activeNav: 'create' }));
 });
 app.post('/create', requireLogin, async function(req, res) {
     try {
         const name = req.body.name, version = req.body.version || 'V1', content = req.body.content;
+        const icon = (req.body.icon || '').trim().substring(0, 2000);
         const access_type = req.body.access_type || 'public';
         let allowed_ids = req.body.allowed_ids || '[]';
         try { JSON.parse(allowed_ids); } catch(e) { allowed_ids = '[]'; }
         const token = crypto.randomBytes(16).toString('hex');
         let shortId; let exists = true;
         while (exists) { shortId = makeShortId(); const c = await pool.query('SELECT id FROM scripts WHERE short_id = $1', [shortId]); exists = c.rows.length > 0; }
-        await pool.query('INSERT INTO scripts (name, version, real_content, token, owner, access_type, allowed_ids, short_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [name, version, content, token, req.session.user.username, access_type, allowed_ids, shortId]);
+        await pool.query('INSERT INTO scripts (name, version, real_content, token, owner, access_type, allowed_ids, short_id, icon) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [name, version, content, token, req.session.user.username, access_type, allowed_ids, shortId, icon]);
         res.redirect('/');
     } catch (e) { res.status(500).send('Error: ' + e.message); }
 });
 
+// ==================== EDIT ====================
 app.get('/edit/:token', requireLogin, async function(req, res) {
     try {
         const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
@@ -290,8 +324,9 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
         let idsHtml = ''; for (const i of ids) idsHtml += '<div class="id-row"><input type="text" class="id-input" value="' + i + '" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div>';
         if (!idsHtml) idsHtml = '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div>';
         const ls = buildLoadstring(s.name, s.version, s.short_id);
-        let verOpts = ''; for (let i = 1; i <= 100; i++) verOpts += '<option value="V' + i + '">';
-        const content = '<div class="card" style="max-width:900px;"><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" style="margin-bottom:18px;">🔗 ' + ls + ' 📋</div><form method="POST" action="/edit/' + s.token + '" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">📝 Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div><div class="form-group"><label class="form-label">🏷 Version</label><input type="text" name="version" list="versionList" value="' + s.version + '" placeholder="V1" required style="font-family:monospace"><datalist id="versionList">' + verOpts + '</datalist></div></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>🌐 Public</option><option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>🔒 Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:' + (s.access_type === 'whitelist' ? 'block' : 'none') + ';"><label class="form-label">👤 User IDs</label><div id="idList">' + idsHtml + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div><button type="submit" class="btn btn-primary">💾 Save</button></form></div><script>function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}</script>';
+        let verOpts = ''; for (let i = 1; i <= 1000; i++) verOpts += '<option value="V' + i + '"' + (s.version === 'V' + i ? ' selected' : '') + '>V' + i + '</option>';
+        const currentIcon = (s.icon && s.icon.trim()) ? s.icon : FAVICON_DATA;
+        const content = '<div class="card" style="max-width:900px;"><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" style="margin-bottom:18px;">🔗 ' + ls + ' 📋</div><form method="POST" action="/edit/' + s.token + '" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">📝 Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div><div class="form-group"><label class="form-label">🏷 Version</label><select name="version" required>' + verOpts + '</select></div></div><div class="form-group"><label class="form-label">🖼️ Icon Image (URL)</label><div class="icon-preview" id="iconPreview"><img src="' + currentIcon.replace(/"/g, '&quot;') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'◈\'" alt=""></div><input type="text" id="iconInput" name="icon" value="' + (s.icon || '').replace(/"/g, '&quot;') + '" placeholder="https://example.com/icon.png (opsyonal)" oninput="updateIconPreview(this.value)"></div><div class="form-group"><label class="form-label">🔒 Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>🌐 Public</option><option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>🔒 Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:' + (s.access_type === 'whitelist' ? 'block' : 'none') + ';"><label class="form-label">👤 User IDs</label><div id="idList">' + idsHtml + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">📜 Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div><button type="submit" class="btn btn-primary">💾 Save</button></form></div><script>function updateIconPreview(u){var p=document.getElementById("iconPreview");if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'◈\'" alt="">\'}else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}}function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}</script>';
         res.send(renderLayout({ title: 'Edit', pageTitle: 'Edit Script', pageSubtitle: s.name, content: content, user: req.session.user, activeNav: 'dashboard' }));
     } catch (e) { res.status(500).send('Error'); }
 });
@@ -304,7 +339,8 @@ app.post('/edit/:token', requireLogin, async function(req, res) {
         if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied");
         let allowed_ids = req.body.allowed_ids || '[]';
         try { JSON.parse(allowed_ids); } catch(e) { allowed_ids = '[]'; }
-        await pool.query('UPDATE scripts SET name=$1, version=$2, real_content=$3, access_type=$4, allowed_ids=$5 WHERE token=$6', [req.body.name, req.body.version || 'V1', req.body.content, req.body.access_type || 'public', allowed_ids, req.params.token]);
+        const icon = (req.body.icon || '').trim().substring(0, 2000);
+        await pool.query('UPDATE scripts SET name=$1, version=$2, real_content=$3, access_type=$4, allowed_ids=$5, icon=$6 WHERE token=$7', [req.body.name, req.body.version || 'V1', req.body.content, req.body.access_type || 'public', allowed_ids, icon, req.params.token]);
         res.redirect('/');
     } catch (e) { res.status(500).send('Error'); }
 });
@@ -314,9 +350,6 @@ app.get('/delete/:token', requireLogin, async function(req, res) {
 });
 
 // ==================== PRETTY URL LOADSTRING ====================
-// Format: /:scriptName/:version/id=:shortId
-// Halimbawa: /LEMON_HUB/V1/id=e15b147ab2
-// Ito ay DIRECT na nag-se-serve ng script (public) o wrapper (whitelist)
 app.get('/:scriptName/:version/id=:shortId', async function(req, res) {
     try {
         const shortId = req.params.shortId;
@@ -325,14 +358,12 @@ app.get('/:scriptName/:version/id=:shortId', async function(req, res) {
         const s = r.rows[0];
         const accessType = s.access_type || 'public';
 
-        // PUBLIC — ibigay agad ang totoong script
         if (accessType === 'public') {
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, 'public', '', true, false]);
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
             return res.send(s.real_content);
         }
 
-        // WHITELIST — ibalik ang wrapper (auto-detect UserId + verify sa /api/verify)
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         return res.send(buildWhitelistWrapper(s.short_id));
     } catch (e) { 
@@ -342,7 +373,7 @@ app.get('/:scriptName/:version/id=:shortId', async function(req, res) {
     }
 });
 
-// ==================== API/RAW (legacy — still works) ====================
+// ==================== API/RAW (legacy) ====================
 app.get('/api/raw', async function(req, res) {
     try {
         const shortId = req.query.id;
@@ -363,7 +394,7 @@ app.get('/api/raw', async function(req, res) {
     } catch (e) { console.error(e); res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.status(500).send("-- Error --"); }
 });
 
-// ==================== VERIFY ENDPOINT (tinatawag ng wrapper) ====================
+// ==================== VERIFY ENDPOINT ====================
 app.get('/api/verify', async function(req, res) {
     try {
         const shortId = req.query.id;
@@ -558,4 +589,5 @@ server.listen(PORT, function() {
     console.log('✅ ' + BRAND_NAME + ' — ShieldHub v3.0');
     console.log('🔒 Public = Lahat pwede | Whitelist = Auto-Kick kung wala');
     console.log('🔗 Pretty URL: /:name/:version/id=:shortId');
+    console.log('🖼️ Custom Icon support + Favicon SVG');
 });
