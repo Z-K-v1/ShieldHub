@@ -72,6 +72,19 @@ function getBaseUrl() { return process.env.RENDER_EXTERNAL_URL || ('http://local
 function makeShortId() { return crypto.randomBytes(5).toString('hex'); }
 function makeInvite() { return crypto.randomBytes(4).toString('hex'); }
 
+// 🔥 Check kung browser ba ang request (para hindi makita ang script)
+function isBrowserRequest(req) {
+    const ua = (req.headers['user-agent'] || '').toLowerCase();
+    const isRoblox = ua.includes('roblox') || ua.includes('wininet') || ua.includes('httpget');
+    // Kung may userId query param, it's from executor
+    if (req.query.userId) return false;
+    // Kung walang user-agent, treat as suspicious
+    if (!ua) return true;
+    // Kung browser (mozilla/chrome/safari/edge/firefox) at HINDI roblox → BLOCK
+    const isBrowserUA = (ua.includes('mozilla') || ua.includes('chrome') || ua.includes('safari') || ua.includes('firefox') || ua.includes('edg/')) && !isRoblox;
+    return isBrowserUA;
+}
+
 function buildLoadstring(name, version, shortId) {
     const cleanName = (name || 'SCRIPT').toUpperCase().replace(/[^A-Z0-9_-]/g, '_').substring(0, 30) || 'SCRIPT';
     const cleanVer = (version || 'V1').toUpperCase().replace(/[^A-Z0-9_]/g, '') || 'V1';
@@ -90,6 +103,18 @@ function buildWhitelistWrapper(shortId) {
 'if not _sh_res or not _sh_res.Body or _sh_res.Body == "" or string.find(_sh_res.Body, "ACCESS_DENIED") then pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] You are NOT whitelisted.") end) return end\n' +
 'local _sh_fn = loadstring(_sh_res.Body)\n' +
 'if _sh_fn then pcall(_sh_fn) end\n';
+}
+
+// 🔥 Fake script para sa browsers (walang tunay na laman)
+function buildFakeScript() {
+    return '-- [ShieldHub Protection]\n' +
+'-- This script is protected. Cannot be accessed via browser.\n' +
+'-- Please use it via Roblox executor.\n' +
+'\n' +
+'if game and game.Players and game.Players.LocalPlayer then\n' +
+'    pcall(function() game.Players.LocalPlayer:Kick("[ShieldHub] Cannot access script via browser. Use executor.") end)\n' +
+'end\n' +
+'return\n';
 }
 
 app.get('/favicon.ico', function(req, res) { res.setHeader('Content-Type', 'image/svg+xml'); res.setHeader('Cache-Control', 'public, max-age=86400'); res.send(FAVICON_SVG); });
@@ -338,63 +363,74 @@ app.get('/delete/:token', requireLogin, async function(req, res) {
     try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.redirect('/'); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]); await pool.query('DELETE FROM execution_logs WHERE script_id = $1', [s.id]); const back = req.query.back === 'admin' ? '/admin' : (req.query.back === 'adminuser' ? '/admin/user/' + encodeURIComponent(s.owner) : '/'); res.redirect(back); } catch (e) { res.status(500).send('Error'); }
 });
 
-// ==================== PRETTY URL LOADSTRING ====================
+// ==================== PRETTY URL LOADSTRING (with BROWSER BLOCK) ====================
 app.get('/:scriptName/:version/id=:shortId', async function(req, res) {
     try {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        
+        // 🔥 BLOCK BROWSER ACCESS — kick code lang ibibigay
+        if (isBrowserRequest(req)) {
+            return res.send(buildFakeScript());
+        }
+        
         const shortId = req.params.shortId;
         const r = await pool.query('SELECT * FROM scripts WHERE short_id = $1 LIMIT 1', [shortId]);
-        if (r.rows.length === 0) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(404).send("-- Not found --"); }
+        if (r.rows.length === 0) { return res.status(404).send("-- Not found --"); }
         const s = r.rows[0];
         const accessType = s.access_type || 'public';
+        
         if (accessType === 'public') {
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, 'public', '', true, false]);
-            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
             return res.send(s.real_content);
         }
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         return res.send(buildWhitelistWrapper(s.short_id));
     } catch (e) { console.error(e); res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(500).send("-- Error --"); }
 });
 
 app.get('/api/raw', async function(req, res) {
     try {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        
+        // 🔥 BLOCK BROWSER ACCESS
+        if (isBrowserRequest(req)) {
+            return res.send(buildFakeScript());
+        }
+        
         const shortId = req.query.id;
-        if (!shortId) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(400).send("-- Invalid --"); }
+        if (!shortId) { return res.status(400).send("-- Invalid --"); }
         const r = await pool.query('SELECT * FROM scripts WHERE short_id = $1 LIMIT 1', [shortId]);
-        if (r.rows.length === 0) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(404).send("-- Not found --"); }
+        if (r.rows.length === 0) { return res.status(404).send("-- Not found --"); }
         const s = r.rows[0];
         const accessType = s.access_type || 'public';
+        
         if (accessType === 'public') {
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, 'public', '', true, false]);
-            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
             return res.send(s.real_content);
         }
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         return res.send(buildWhitelistWrapper(s.short_id));
     } catch (e) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.status(500).send("-- Error --"); }
 });
 
 app.get('/api/verify', async function(req, res) {
     try {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         const shortId = req.query.id;
         const userId = req.query.userId;
         const username = req.query.username || '';
-        if (!shortId || !userId) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.send("ACCESS_DENIED"); }
+        if (!shortId || !userId) { return res.send("ACCESS_DENIED"); }
         const r = await pool.query('SELECT * FROM scripts WHERE short_id = $1 LIMIT 1', [shortId]);
-        if (r.rows.length === 0) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.send("ACCESS_DENIED"); }
+        if (r.rows.length === 0) { return res.send("ACCESS_DENIED"); }
         const s = r.rows[0];
         let allowedIds = [];
         try { allowedIds = JSON.parse(s.allowed_ids || '[]'); } catch(e) { allowedIds = []; }
         allowedIds = allowedIds.map(x => String(x));
         if (allowedIds.length === 0) {
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, String(userId), String(username).substring(0,100), true, false]);
-            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
             return res.send(s.real_content);
         }
         const isAllowed = allowedIds.includes(String(userId));
         await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, String(userId), String(username).substring(0,100), isAllowed, !isAllowed]);
-        if (!isAllowed) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.send("ACCESS_DENIED"); }
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        if (!isAllowed) { return res.send("ACCESS_DENIED"); }
         return res.send(s.real_content);
     } catch (e) { res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.send("ACCESS_DENIED"); }
 });
