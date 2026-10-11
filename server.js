@@ -347,7 +347,7 @@ app.post('/edit/:token', requireLogin, async function(req, res) {
 });
 
 app.get('/delete/:token', requireLogin, async function(req, res) {
-    try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.redirect('/'); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]); await pool.query('DELETE FROM execution_logs WHERE script_id = $1', [s.id]); const back = req.query.back === 'admin' ? '/admin' : '/'; res.redirect(back); } catch (e) { res.status(500).send('Error'); }
+    try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.redirect('/'); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]); await pool.query('DELETE FROM execution_logs WHERE script_id = $1', [s.id]); const back = req.query.back === 'admin' ? '/admin' : (req.query.back === 'adminuser' ? '/admin/user/' + encodeURIComponent(s.owner) : '/'); res.redirect(back); } catch (e) { res.status(500).send('Error'); }
 });
 
 // ==================== PRETTY URL LOADSTRING ====================
@@ -452,22 +452,66 @@ app.get('/logs/:token', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).send('Error'); }
 });
 
-// ==================== ADMIN ====================
+// ==================== ADMIN (Users List) ====================
 app.get('/admin', requireLogin, requireAdmin, async function(req, res) {
     try {
-        // === USERS LIST ===
+        // === USERS LIST (clickable) ===
         const u = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
         let userRows = '';
         for (const x of u.rows) { 
             const isA = x.role === 'ADMIN'; 
-            userRows += '<div class="card" style="display:flex;align-items:center;gap:14px;padding:16px 20px;margin-bottom:8px;"><div class="user-avatar ' + (isA ? 'user-avatar-admin' : '') + '">' + x.username[0].toUpperCase() + '</div><div style="flex:1;"><div style="font-weight:700;">' + x.username + ' <span class="badge ' + (isA ? 'badge-admin' : 'badge-purple') + '">' + x.role + '</span></div></div></div>'; 
+            // Get script count for this user
+            const scCount = await pool.query('SELECT COUNT(*) as c FROM scripts WHERE owner = $1', [x.username]);
+            const scriptCount = scCount.rows[0].c;
+            userRows += '<div class="card" style="display:flex;align-items:center;gap:14px;padding:16px 20px;margin-bottom:8px;cursor:pointer;transition:all 0.2s;" onclick="window.location.href=\'/admin/user/' + encodeURIComponent(x.username) + '\'" onmouseover="this.style.background=\'rgba(255,59,59,0.08)\'" onmouseout="this.style.background=\'\'">' +
+                '<div class="user-avatar ' + (isA ? 'user-avatar-admin' : '') + '">' + x.username[0].toUpperCase() + '</div>' +
+                '<div style="flex:1;">' +
+                    '<div style="font-weight:700;">' + x.username + ' <span class="badge ' + (isA ? 'badge-admin' : 'badge-purple') + '">' + x.role + '</span></div>' +
+                    '<div style="font-size:12px;color:var(--text3);margin-top:4px;">' + scriptCount + ' script' + (scriptCount !== 1 ? 's' : '') + '</div>' +
+                '</div>' +
+                '<span style="color:var(--text3);font-size:20px;">→</span>' +
+            '</div>'; 
         }
 
-        // === ALL SCRIPTS FROM ALL USERS ===
-        const sc = await pool.query('SELECT * FROM scripts ORDER BY created_at DESC');
+        const content = 
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">' +
+                '<div style="font-size:22px;font-weight:800;">Users (' + u.rows.length + ')</div>' +
+                '<div style="font-size:12px;color:var(--text3);">Click a user to view their scripts</div>' +
+            '</div>' +
+            userRows;
+
+        res.send(renderLayout({ 
+            title: 'Admin', 
+            pageTitle: 'Admin Panel', 
+            pageSubtitle: u.rows.length + ' users', 
+            content: content, 
+            user: req.session.user, 
+            activeNav: 'admin' 
+        }));
+    } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
+});
+
+// ==================== ADMIN - USER SCRIPTS VIEW ====================
+app.get('/admin/user/:username', requireLogin, requireAdmin, async function(req, res) {
+    try {
+        const targetUser = req.params.username;
+        
+        // Get user info
+        const uR = await pool.query('SELECT id, username, role, created_at FROM users WHERE username = $1', [targetUser]);
+        if (uR.rows.length === 0) return res.status(404).send('User not found');
+        const targetUserInfo = uR.rows[0];
+        const isTargetAdmin = targetUserInfo.role === 'ADMIN';
+
+        // Get ALL scripts of this user
+        const sc = await pool.query('SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC', [targetUser]);
+        
+        // Get log stats per user
+        const logStats = await pool.query('SELECT COUNT(*) as total, SUM(CASE WHEN allowed THEN 1 ELSE 0 END) as allowed, SUM(CASE WHEN kicked THEN 1 ELSE 0 END) as kicked FROM execution_logs WHERE script_id IN (SELECT id FROM scripts WHERE owner = $1)', [targetUser]);
+        const stats = logStats.rows[0] || { total: 0, allowed: 0, kicked: 0 };
+
         let scriptRows = '';
         if (sc.rows.length === 0) {
-            scriptRows = '<div class="empty"><div style="font-size:48px;margin-bottom:14px;">ZK</div><div style="font-size:18px;font-weight:700;margin-bottom:8px;">No scripts yet</div><a href="/create" class="btn btn-primary">Create Script</a></div>';
+            scriptRows = '<div class="empty"><div style="font-size:48px;margin-bottom:14px;">ZK</div><div style="font-size:18px;font-weight:700;margin-bottom:8px;">This user has no scripts yet</div><a href="/create" class="btn btn-primary">Create Script</a></div>';
         } else {
             scriptRows = '<div class="grid-scripts">';
             for (const s of sc.rows) {
@@ -483,7 +527,6 @@ app.get('/admin', requireLogin, requireAdmin, async function(req, res) {
                             '<div style="font-size:16px;font-weight:800;margin-bottom:6px;">' + s.name + '</div>' +
                             '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + badge + 
                                 '<span class="badge badge-purple">' + s.version + '</span>' +
-                                '<span class="badge badge-admin">By: ' + s.owner + '</span>' +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -499,21 +542,34 @@ app.get('/admin', requireLogin, requireAdmin, async function(req, res) {
             scriptRows += '</div>';
         }
 
-        const content = 
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">' +
-                '<div style="font-size:22px;font-weight:800;">Users (' + u.rows.length + ')</div>' +
-            '</div>' +
-            userRows +
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin:36px 0 20px;flex-wrap:wrap;gap:12px;">' +
-                '<div style="font-size:22px;font-weight:800;">All Scripts (' + sc.rows.length + ')</div>' +
-                '<a href="/create" class="btn btn-primary">+ New Script</a>' +
-            '</div>' +
-            scriptRows;
+        const header = 
+            '<div class="card" style="display:flex;align-items:center;gap:20px;margin-bottom:24px;flex-wrap:wrap;">' +
+                '<div class="user-avatar ' + (isTargetAdmin ? 'user-avatar-admin' : '') + '" style="width:64px;height:64px;font-size:24px;border-radius:16px;">' + targetUserInfo.username[0].toUpperCase() + '</div>' +
+                '<div style="flex:1;min-width:200px;">' +
+                    '<div style="font-size:24px;font-weight:800;margin-bottom:6px;">' + targetUserInfo.username + '</div>' +
+                    '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+                        '<span class="badge ' + (isTargetAdmin ? 'badge-admin' : 'badge-purple') + '">' + targetUserInfo.role + '</span>' +
+                        '<span class="badge badge-green">' + sc.rows.length + ' scripts</span>' +
+                        '<span class="badge badge-purple">' + (stats.total || 0) + ' executions</span>' +
+                    '</div>' +
+                '</div>' +
+                '<a href="/admin" class="btn btn-ghost btn-sm">← Back to Admin</a>' +
+            '</div>';
+
+        const statCards = 
+            '<div class="stat-grid">' +
+                '<div class="stat"><div class="stat-label">Total Scripts</div><div class="stat-value">' + sc.rows.length + '</div></div>' +
+                '<div class="stat"><div class="stat-label">Whitelist Scripts</div><div class="stat-value">' + sc.rows.filter(s => s.access_type === 'whitelist').length + '</div></div>' +
+                '<div class="stat"><div class="stat-label">Total Executions</div><div class="stat-value">' + (stats.total || 0) + '</div></div>' +
+                '<div class="stat"><div class="stat-label">Kicked</div><div class="stat-value" style="color:#ff5555">' + (stats.kicked || 0) + '</div></div>' +
+            '</div>';
+
+        const content = header + statCards + scriptRows;
 
         res.send(renderLayout({ 
-            title: 'Admin', 
-            pageTitle: 'Admin Panel', 
-            pageSubtitle: u.rows.length + ' users · ' + sc.rows.length + ' scripts total', 
+            title: targetUserInfo.username + ' - Scripts', 
+            pageTitle: targetUserInfo.username + "'s Scripts", 
+            pageSubtitle: 'All scripts owned by this user', 
             content: content, 
             user: req.session.user, 
             activeNav: 'admin' 
@@ -649,5 +705,5 @@ server.listen(PORT, function() {
     console.log('ShieldHub v3.0 - ' + BRAND_NAME);
     console.log('Public = Everyone can use | Whitelist = Auto-kick if not in list');
     console.log('Pretty URL: /:name/:version/id=:shortId');
-    console.log('Admin Panel: View/Edit/Delete/Create all scripts');
+    console.log('Admin: Click user to view their scripts');
 });
