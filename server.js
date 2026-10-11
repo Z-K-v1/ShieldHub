@@ -121,7 +121,7 @@ app.get('/js/voice.js', function(req, res) {
     res.sendFile(__dirname + '/js/voice.js');
 });
 
-// 🔥 RESPONSIVE CSS — auto adjust sa phone/tablet/desktop
+// 🔥 RESPONSIVE CSS
 const LAYOUT_STYLES = `
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#080404;--bg1:#0e0707;--bg2:#160b0b;--border:rgba(255,255,255,0.06);--border1:rgba(255,255,255,0.1);--text:#fff;--text1:#e0e0e0;--text2:#9a9a9a;--text3:#5a5a5a;--red:#ff3b3b;--red2:#cc0000;--red-dim:rgba(255,59,59,0.12);--purple:#b855ff;--green:#22c55e;--yellow:#ffbb44}
@@ -133,14 +133,14 @@ input,textarea,select{font-family:inherit;width:100%;padding:13px 15px;backgroun
 input:focus,textarea:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 4px var(--red-dim)}
 textarea{font-family:'JetBrains Mono',monospace;font-size:13px;min-height:300px;resize:vertical}
 .layout{display:flex;min-height:100vh;position:relative;z-index:1}
-.sidebar{width:270px;background:rgba(15,8,8,0.95);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-right:1px solid var(--border);padding:22px 14px;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50;transition:transform 0.3s ease}
+.sidebar{width:270px;background:rgba(15,8,8,0.98);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-right:1px solid var(--border);padding:22px 14px;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform 0.3s ease}
 .brand{display:flex;align-items:center;gap:11px;padding:6px 10px 18px;border-bottom:1px solid var(--border);margin-bottom:16px}
 .brand-logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:#fff;overflow:hidden;flex-shrink:0}
 .brand-logo img{width:100%;height:100%;object-fit:cover}
 .brand-name{font-size:16px;font-weight:800}
 .brand-sub{font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-top:3px}
 .nav-label{font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;padding:14px 12px 6px}
-.nav-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600;color:var(--text1);margin-bottom:3px;transition:all 0.2s;border:1px solid transparent}
+.nav-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600;color:var(--text1);margin-bottom:3px;transition:all 0.2s;border:1px solid transparent;cursor:pointer}
 .nav-item:hover{background:var(--bg2);color:var(--text)}
 .nav-item.active{background:var(--red-dim);color:var(--red);border-left:3px solid var(--red)}
 .sidebar-footer{margin-top:auto;padding-top:16px;border-top:1px solid var(--border)}
@@ -158,7 +158,6 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:13px;min-height:300px;
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 22px;border-radius:12px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid transparent;min-height:46px;transition:all 0.2s;text-decoration:none;white-space:nowrap}
 .btn-primary{background:linear-gradient(135deg,var(--red),var(--red2));color:#fff}
 .btn-primary:hover{transform:translateY(-2px)}
-.btn-primary:active{transform:translateY(0)}
 .btn-secondary{background:var(--bg2);color:var(--text);border-color:var(--border)}
 .btn-danger{background:rgba(255,59,59,0.1);color:#ff5555;border-color:rgba(255,59,59,0.25)}
 .btn-ghost{background:transparent;color:var(--text1);border-color:var(--border)}
@@ -243,9 +242,10 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:13px;min-height:300px;
 body.screenshare-lock{overflow:hidden!important}
 @keyframes copyToast{0%{opacity:0;transform:translate(-50%,20px)}15%{opacity:1;transform:translate(-50%,0)}85%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-20px)}}
 
-/* 🔥 MOBILE MENU BUTTON */
-.mobile-menu-btn{display:none;background:var(--bg2);border:1px solid var(--border);border-radius:10px;width:40px;height:40px;align-items:center;justify-content:center;font-size:20px;color:var(--text)}
-.mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:49}
+/* 🔥 MOBILE MENU BUTTON — nasa sidebar, hindi overlay */
+.mobile-menu-btn{display:none;position:fixed;top:14px;left:14px;z-index:90;width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--red),var(--red2));border:none;color:#fff;font-size:20px;font-weight:800;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(255,59,59,0.5);cursor:pointer;pointer-events:auto}
+.mobile-menu-btn.hidden{display:none!important}
+.mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:95}
 .mobile-overlay.active{display:block}
 
 /* 🔥 TABLET (max 1024px) */
@@ -263,7 +263,7 @@ body.screenshare-lock{overflow:hidden!important}
     .sidebar{transform:translateX(-100%);box-shadow:0 0 40px rgba(0,0,0,0.8)}
     .sidebar.open{transform:translateX(0)}
     .main{margin-left:0}
-    .topbar{padding:0 16px;height:60px}
+    .topbar{padding:0 16px 0 70px;height:60px}
     .topbar-title{font-size:14px;max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .content{padding:20px 16px}
     .page-title{font-size:26px;letter-spacing:-0.8px}
@@ -297,10 +297,6 @@ body.screenshare-lock{overflow:hidden!important}
     .log-icon{width:32px;height:32px;font-size:12px}
     .channel-item{padding:10px 14px}
     .id-row button{width:44px;height:44px;font-size:18px}
-    #screenShareOverlay > div:first-child{padding:10px 12px;height:auto}
-    #screenShareOverlay > div:first-child > div:first-child{font-size:12px}
-    #screenShareOverlay > div:first-child > div:last-child{flex-direction:column;gap:4px}
-    #screenShareOverlay > div:first-child button{padding:6px 10px;font-size:11px;min-height:auto}
 }
 
 /* 🔥 SMALL PHONE (max 480px) */
@@ -328,8 +324,6 @@ body.screenshare-lock{overflow:hidden!important}
     .chat-input-area .btn{padding:10px 14px;min-height:42px}
     .badge{font-size:9.5px;padding:3px 8px}
     .sidebar{width:85%}
-    #screenShareOverlay > div:first-child{padding:8px;flex-wrap:wrap}
-    #screenShareOverlay > div:first-child > div:first-child{font-size:11px;width:100%;margin-bottom:6px}
 }
 
 /* 🔥 LANDSCAPE PHONE */
@@ -338,7 +332,7 @@ body.screenshare-lock{overflow:hidden!important}
     .sidebar{padding:12px}
     .brand{padding:4px 8px 12px;margin-bottom:10px}
     .user-card{padding:8px}
-    .topbar{height:48px;padding:0 12px}
+    .topbar{height:48px;padding:0 12px 0 66px}
     .content{padding:12px}
     .page-title{font-size:22px;margin-bottom:4px}
     .page-sub{margin-bottom:12px;font-size:12px}
@@ -355,14 +349,16 @@ body.screenshare-lock{overflow:hidden!important}
 }
 `;
 
-const TOAST_SCRIPT = `function copyText(t){navigator.clipboard.writeText(t).then(function(){var _t=document.createElement('div');_t.textContent='✅ Copied!';_t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;z-index:999999;box-shadow:0 10px 30px rgba(0,0,0,0.5);animation:copyToast 2s ease-in-out forwards;max-width:90vw;text-align:center;';document.body.appendChild(_t);setTimeout(function(){if(_t.parentNode)_t.parentNode.removeChild(_t)},2000)})}function confirmDelete(i,n){if(confirm('Delete "'+n+'"?'))window.location.href='/delete/'+i}function toggleSidebar(){var s=document.querySelector('.sidebar');var o=document.querySelector('.mobile-overlay');s.classList.toggle('open');o.classList.toggle('active')}`;
+const TOAST_SCRIPT = `function copyText(t){navigator.clipboard.writeText(t).then(function(){var _t=document.createElement('div');_t.textContent='✅ Copied!';_t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;z-index:999999;box-shadow:0 10px 30px rgba(0,0,0,0.5);animation:copyToast 2s ease-in-out forwards;max-width:90vw;text-align:center;';document.body.appendChild(_t);setTimeout(function(){if(_t.parentNode)_t.parentNode.removeChild(_t)},2000)})}function confirmDelete(i,n){if(confirm('Delete "'+n+'"?'))window.location.href='/delete/'+i}function toggleSidebar(){var s=document.querySelector('.sidebar');var o=document.querySelector('.mobile-overlay');var b=document.getElementById('mobileMenuBtn');if(s.classList.contains('open')){s.classList.remove('open');o.classList.remove('active');if(b)b.classList.remove('hidden')}else{s.classList.add('open');o.classList.add('active');if(b)b.classList.add('hidden')}}`;
 
 function renderLayout(opts) {
     var title = opts.title, pageTitle = opts.pageTitle, pageSubtitle = opts.pageSubtitle, content = opts.content, user = opts.user, activeNav = opts.activeNav;
     var isAdmin = user.role === 'ADMIN';
     var adminLink = isAdmin ? '<div class="nav-label">Admin</div><a href="/admin" class="nav-item ' + (activeNav === 'admin' ? 'active' : '') + '">Admin Panel</a>' : '';
     var faviconLink = '<link rel="icon" type="image/svg+xml" href="' + FAVICON_DATA + '">';
-    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes"><meta name="theme-color" content="#080404"><title>' + title + ' · ' + BRAND_SHORT + '</title>' + faviconLink + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><button class="mobile-menu-btn" onclick="toggleSidebar()" style="position:fixed;top:12px;left:12px;z-index:100;display:none;" id="mobileMenuBtn">☰</button><div class="mobile-overlay" onclick="toggleSidebar()"></div><div class="layout"><aside class="sidebar"><div class="brand"><div class="brand-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div><div class="brand-name">' + BRAND_SHORT + '</div><div class="brand-sub">By Zyrox-Kido</div></div></div><div class="nav-label">Workspace</div><a href="/" class="nav-item ' + (activeNav === 'dashboard' ? 'active' : '') + '">Dashboard</a><a href="/create" class="nav-item ' + (activeNav === 'create' ? 'active' : '') + '">Create Script</a><a href="/servers" class="nav-item ' + (activeNav === 'servers' ? 'active' : '') + '">Servers</a>' + adminLink + '<div class="sidebar-footer"><a href="/logout" class="user-card"><div class="user-avatar ' + (isAdmin ? 'user-avatar-admin' : '') + '">' + user.username[0].toUpperCase() + '</div><div><div class="user-name">' + user.username + '</div><div class="user-role">' + (isAdmin ? 'Admin' : 'Member') + '</div></div></a></div></aside><div class="main"><header class="topbar"><div class="topbar-title">' + pageTitle + '</div></header><div class="content"><div class="page-title">' + pageTitle + '</div>' + (pageSubtitle ? '<div class="page-sub">' + pageSubtitle + '</div>' : '') + content + '</div></div></div><script>document.addEventListener("DOMContentLoaded",function(){function checkMobile(){var b=document.getElementById("mobileMenuBtn");if(window.innerWidth<=900){b.style.display="flex"}else{b.style.display="none";var s=document.querySelector(".sidebar");var o=document.querySelector(".mobile-overlay");if(s)s.classList.remove("open");if(o)o.classList.remove("active")}}checkMobile();window.addEventListener("resize",checkMobile);document.querySelectorAll(".nav-item").forEach(function(el){el.addEventListener("click",function(){if(window.innerWidth<=900){var s=document.querySelector(".sidebar");var o=document.querySelector(".mobile-overlay");if(s)s.classList.remove("open");if(o)o.classList.remove("active")}})});});</script><script>' + TOAST_SCRIPT + '</script></body></html>';
+    var mobileBtn = '<button class="mobile-menu-btn" onclick="toggleSidebar()" id="mobileMenuBtn">☰</button>';
+    var mobileOverlay = '<div class="mobile-overlay" onclick="toggleSidebar()" id="mobileOverlay"></div>';
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes"><meta name="theme-color" content="#080404"><title>' + title + ' · ' + BRAND_SHORT + '</title>' + faviconLink + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body>' + mobileBtn + mobileOverlay + '<div class="layout"><aside class="sidebar"><div class="brand"><div class="brand-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div><div class="brand-name">' + BRAND_SHORT + '</div><div class="brand-sub">By Zyrox-Kido</div></div></div><div class="nav-label">Workspace</div><a href="/" class="nav-item ' + (activeNav === 'dashboard' ? 'active' : '') + '">Dashboard</a><a href="/create" class="nav-item ' + (activeNav === 'create' ? 'active' : '') + '">Create Script</a><a href="/servers" class="nav-item ' + (activeNav === 'servers' ? 'active' : '') + '">Servers</a>' + adminLink + '<div class="sidebar-footer"><a href="/logout" class="user-card"><div class="user-avatar ' + (isAdmin ? 'user-avatar-admin' : '') + '">' + user.username[0].toUpperCase() + '</div><div><div class="user-name">' + user.username + '</div><div class="user-role">' + (isAdmin ? 'Admin' : 'Member') + '</div></div></a></div></aside><div class="main"><header class="topbar"><div class="topbar-title">' + pageTitle + '</div></header><div class="content"><div class="page-title">' + pageTitle + '</div>' + (pageSubtitle ? '<div class="page-sub">' + pageSubtitle + '</div>' : '') + content + '</div></div></div><script>document.addEventListener("DOMContentLoaded",function(){function checkMobile(){var b=document.getElementById("mobileMenuBtn");var s=document.querySelector(".sidebar");var o=document.querySelector(".mobile-overlay");if(window.innerWidth<=900){if(b)b.style.display="flex";if(s)s.classList.remove("open");if(o)o.classList.remove("active");if(b)b.classList.remove("hidden")}else{if(b)b.style.display="none";if(s)s.classList.remove("open");if(o)o.classList.remove("active")}}checkMobile();window.addEventListener("resize",checkMobile);document.querySelectorAll(".nav-item").forEach(function(el){el.addEventListener("click",function(){if(window.innerWidth<=900){var s=document.querySelector(".sidebar");var o=document.querySelector(".mobile-overlay");var b=document.getElementById("mobileMenuBtn");if(s)s.classList.remove("open");if(o)o.classList.remove("active");if(b)b.classList.remove("hidden")}})});var overlay=document.querySelector(".mobile-overlay");if(overlay){overlay.addEventListener("click",function(){var s=document.querySelector(".sidebar");var b=document.getElementById("mobileMenuBtn");if(s)s.classList.remove("open");this.classList.remove("active");if(b)b.classList.remove("hidden")})}});</script><script>' + TOAST_SCRIPT + '</script></body></html>';
 }
 
 function renderScriptIcon(icon, fallbackText) {
@@ -471,7 +467,7 @@ app.get('/delete/:token', requireLogin, async function(req, res) {
     try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.redirect('/'); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]); await pool.query('DELETE FROM execution_logs WHERE script_id = $1', [s.id]); const back = req.query.back === 'admin' ? '/admin' : (req.query.back === 'adminuser' ? '/admin/user/' + encodeURIComponent(s.owner) : '/'); res.redirect(back); } catch (e) { res.status(500).send('Error'); }
 });
 
-// ==================== PRETTY URL LOADSTRING (with BROWSER BLOCK) ====================
+// ==================== PRETTY URL LOADSTRING ====================
 app.get('/:scriptName/:version/id=:shortId', async function(req, res) {
     try {
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
