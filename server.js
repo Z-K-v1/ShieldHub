@@ -621,9 +621,10 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         '<script src="/socket.io/socket.io.js"></script>' +
         '<script src="/js/voice.js"></script>' +
         '<script>' +
-        'window.SERVER_ID=' + serverId + ';' +
-        'window.ME="' + me.replace(/"/g, '\\"') + '";' +
+        'window.SERVER_ID=' + JSON.stringify(serverId) + ';' +
+        'window.ME=' + JSON.stringify(me) + ';' +
         'window.IS_MANAGER=' + (canManage ? 'true' : 'false') + ';' +
+        'console.log("Window vars set:", window.SERVER_ID, window.ME);' +
         '</script>';
         res.send(renderLayout({ title: srv.name, pageTitle: srv.name, pageSubtitle: membersR.rows.length + ' members', content: content, user: req.session.user, activeNav: 'servers' }));
     } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
