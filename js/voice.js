@@ -1,7 +1,3 @@
-// ==================================================
-// ShieldHub Voice + Screen Share (WebRTC) - CLIENT SIDE
-// ==================================================
-
 (function() {
     'use strict';
 
@@ -43,7 +39,7 @@
             if (el.requestFullscreen) el.requestFullscreen().catch(e => console.warn('FS blocked:', e));
             else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
             else if (el.msRequestFullscreen) el.msRequestFullscreen();
-        } catch(e) { console.warn('Fullscreen failed:', e); }
+        } catch(e) {}
     }
     function exitFullscreen() {
         try {
@@ -55,6 +51,9 @@
         } catch(e) {}
     }
 
+    // ==================================================
+    // SWITCH CHANNEL
+    // ==================================================
     window.switchChannel = async function(id, name, type, readOnly, canChat) {
         currentChannelId = id;
         currentChannelType = type;
@@ -110,7 +109,6 @@
             document.getElementById('chatInput').disabled = !currentCanChat;
             document.getElementById('sendBtn').disabled = !currentCanChat;
             document.getElementById('chatInput').placeholder = currentCanChat ? 'Message...' : 'Read-only (only creator/owner/admin can chat)';
-            document.getElementById('chatMessages').innerHTML = '<div style="text-align:center;color:var(--text3);padding:20px;">Loading...</div>';
             try {
                 const r = await fetch('/api/channels/' + id + '/messages');
                 const msgs = await r.json();
@@ -120,8 +118,16 @@
         }
     };
 
+    // ==================================================
+    // 🔥 TEXT CHAT — with AUTO-SCROLL
+    // ==================================================
     function renderMessages(msgs) {
         const box = document.getElementById('chatMessages');
+        if (!box) return;
+
+        // Check kung nasa baba ang user (para hindi mag-scroll kung nagbabasa sa taas)
+        const wasAtBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 100;
+
         if (msgs.length === 0) {
             box.innerHTML = '<div style="text-align:center;color:var(--text3);padding:40px;">No messages yet</div>';
             return;
@@ -139,9 +145,16 @@
                 '<div class="msg-content">' + escapeHtml(m.message) + '</div></div>';
             box.appendChild(div);
         });
-        box.scrollTop = box.scrollHeight;
+
+        // 🔥 Auto-scroll sa baba
+        setTimeout(function() {
+            box.scrollTop = box.scrollHeight;
+        }, 50);
     }
 
+    // ==================================================
+    // 🔥 VOICE CHAT — with AUTO-SCROLL
+    // ==================================================
     function renderVoiceMessages(msgs) {
         const box = document.getElementById('voiceChatMessages');
         if (!box) return;
@@ -156,7 +169,10 @@
             div.innerHTML = '<strong style="color:#ff5555;">' + m.username + ':</strong> <span style="color:var(--text1);">' + escapeHtml(m.message) + '</span>';
             box.appendChild(div);
         });
-        box.scrollTop = box.scrollHeight;
+        // 🔥 Auto-scroll sa baba
+        setTimeout(function() {
+            box.scrollTop = box.scrollHeight;
+        }, 50);
     }
 
     function escapeHtml(s) {
@@ -180,6 +196,9 @@
             const r2 = await fetch('/api/channels/' + currentChannelId + '/messages');
             const msgs = await r2.json();
             renderMessages(msgs);
+            // 🔥 Force scroll sa baba pag nag-send
+            const box = document.getElementById('chatMessages');
+            if (box) setTimeout(function() { box.scrollTop = box.scrollHeight; }, 100);
         } catch(e) { console.error(e); }
     };
 
@@ -204,6 +223,9 @@
         } catch(e) { console.error(e); }
     };
 
+    // ==================================================
+    // CREATE / DELETE CHANNEL
+    // ==================================================
     window.openCreateChannel = function(isVoice) {
         document.getElementById('createChannelModal').style.display = 'flex';
         if (isVoice) document.getElementById('newChannelType').value = 'voice';
@@ -237,6 +259,9 @@
         } catch(e) { alert('Error: ' + e.message); }
     };
 
+    // ==================================================
+    // KICK USER
+    // ==================================================
     window.kickUser = async function(username) {
         if (!confirm('Kick ' + username + ' from this server?')) return;
         try {
@@ -251,6 +276,9 @@
         } catch(e) { alert('Error: ' + e.message); }
     };
 
+    // ==================================================
+    // VOICE: JOIN / LEAVE
+    // ==================================================
     window.joinVoice = async function() {
         if (localStream) return;
         try {
@@ -287,6 +315,9 @@
         isSharing = false;
     };
 
+    // ==================================================
+    // VOICE: MUTE
+    // ==================================================
     window.toggleMute = function() {
         if (!localStream) return;
         const track = localStream.getAudioTracks()[0];
@@ -294,6 +325,9 @@
         document.getElementById('muteBtn').textContent = track.enabled ? 'Mute' : 'Unmute';
     };
 
+    // ==================================================
+    // VOICE: PEER CONNECTION
+    // ==================================================
     function createPeerConnection(username) {
         if (peerConnections[username]) {
             try { peerConnections[username].close(); } catch(e){}
@@ -320,6 +354,9 @@
         return pc;
     }
 
+    // ==================================================
+    // VOICE: SOCKET EVENTS
+    // ==================================================
     socket.on('voice-user-list', async function(users) {
         for (const username of users) {
             if (username === myUsername) continue;
@@ -389,6 +426,9 @@
         });
     }
 
+    // ==================================================
+    // SCREEN SHARE
+    // ==================================================
     window.toggleScreenShare = async function() {
         if (isSharing) { stopScreenShare(); return; }
         try {
@@ -538,6 +578,9 @@
         }
     };
 
+    // ==================================================
+    // SPEAKING DETECTION
+    // ==================================================
     function setupSpeakingDetection() {
         if (!localStream) return;
         try {
@@ -558,9 +601,12 @@
                 requestAnimationFrame(checkVolume);
             }
             checkVolume();
-        } catch(e) { console.warn('Speaking detection error:', e); }
+        } catch(e) {}
     }
 
+    // ==================================================
+    // KICK NOTIFICATION
+    // ==================================================
     socket.on('user-kicked', function(data) {
         if (data.username === myUsername) {
             alert('You have been kicked from this server.');
@@ -568,19 +614,42 @@
         }
     });
 
+    // ==================================================
+    // 🔥 CHAT MESSAGE AUTO-REFRESH + AUTO-SCROLL
+    // ==================================================
     socket.on('chat-message', function(data) {
         if (currentChannelId && data.channelId === currentChannelId) {
             if (currentChannelType === 'voice') {
                 fetch('/api/channels/' + currentChannelId + '/messages')
                     .then(r => r.json())
-                    .then(msgs => renderVoiceMessages(msgs));
+                    .then(msgs => {
+                        renderVoiceMessages(msgs);
+                        const box = document.getElementById('voiceChatMessages');
+                        if (box) setTimeout(function() { box.scrollTop = box.scrollHeight; }, 50);
+                    });
             } else {
                 fetch('/api/channels/' + currentChannelId + '/messages')
                     .then(r => r.json())
-                    .then(msgs => renderMessages(msgs));
+                    .then(msgs => {
+                        renderMessages(msgs);
+                        const box = document.getElementById('chatMessages');
+                        if (box) setTimeout(function() { box.scrollTop = box.scrollHeight; }, 50);
+                    });
             }
         }
     });
+
+    // 🔥 AUTO-REFRESH CHAT EVERY 3 SECONDS (with auto-scroll)
+    setInterval(function() {
+        if (currentChannelId && currentChannelType !== 'voice') {
+            fetch('/api/channels/' + currentChannelId + '/messages')
+                .then(r => r.json())
+                .then(msgs => {
+                    renderMessages(msgs);
+                })
+                .catch(e => {});
+        }
+    }, 3000);
 
     console.log('✅ ShieldHub Voice loaded for', myUsername);
 })();
