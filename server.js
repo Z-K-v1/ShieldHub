@@ -29,6 +29,11 @@ async function initDB() {
         await pool.query(`CREATE TABLE IF NOT EXISTS channels (id SERIAL PRIMARY KEY, server_id INTEGER NOT NULL, name VARCHAR(50) NOT NULL, type VARCHAR(10) DEFAULT 'text', read_only BOOLEAN DEFAULT FALSE, created_by VARCHAR(50) NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
         await pool.query(`CREATE TABLE IF NOT EXISTS chat_messages (id SERIAL PRIMARY KEY, channel_id INTEGER NOT NULL, username VARCHAR(50) NOT NULL, role VARCHAR(20) DEFAULT 'USER', message TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
 
+        // Media support
+        await pool.query(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(20) DEFAULT 'text';`);
+        await pool.query(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS file_data TEXT;`);
+        await pool.query(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS file_name VARCHAR(255);`);
+
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS short_id VARCHAR(32);`);
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '';`);
         await pool.query(`ALTER TABLE channels ADD COLUMN IF NOT EXISTS read_only BOOLEAN DEFAULT FALSE;`);
@@ -200,8 +205,8 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:13px;min-height:300px;
 .stat{background:linear-gradient(180deg,rgba(22,11,11,0.7),rgba(10,5,5,0.9));border:1px solid var(--border);border-radius:14px;padding:22px}
 .stat-label{font-size:11px;color:var(--text3);font-weight:800;text-transform:uppercase;margin-bottom:6px}
 .stat-value{font-size:28px;font-weight:800}
-.chat-layout{display:grid;grid-template-columns:240px 1fr 220px;background:var(--bg1);border:1px solid var(--border);border-radius:16px;overflow:hidden;height:calc(100vh - 260px);min-height:500px}
-.chat-sidebar{background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.chat-layout{display:grid;grid-template-columns:240px 1fr 220px;background:var(--bg1);border:1px solid var(--border);border-radius:16px;overflow:hidden;height:calc(100vh - 260px);min-height:500px;max-height:calc(100vh - 260px)}
+.chat-sidebar{background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;min-height:0}
 .chat-sidebar-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .channel-group-label{font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:1px;padding:12px 14px 6px;display:flex;justify-content:space-between;align-items:center}
 .channel-item{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;cursor:pointer;color:var(--text2);font-size:13px;font-weight:600;margin:2px 6px;justify-content:space-between}
@@ -212,9 +217,13 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:13px;min-height:300px;
 .channel-delete{width:22px;height:22px;border-radius:5px;color:var(--text3);font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0;flex-shrink:0}
 .channel-item:hover .channel-delete{opacity:1}
 .channel-delete:hover{background:rgba(220,38,38,0.3);color:#ff5555}
-.chat-main{display:flex;flex-direction:column;min-width:0}
+.chat-main{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
 .chat-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg)}
-.chat-messages{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.chat-messages{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 20px;display:flex;flex-direction:column;gap:12px;min-height:0;max-height:100%;scrollbar-width:thin;scrollbar-color:rgba(255,59,59,0.5) transparent}
+.chat-messages::-webkit-scrollbar{width:8px}
+.chat-messages::-webkit-scrollbar-track{background:transparent}
+.chat-messages::-webkit-scrollbar-thumb{background:rgba(255,59,59,0.4);border-radius:4px}
+.chat-messages::-webkit-scrollbar-thumb:hover{background:rgba(255,59,59,0.7)}
 .chat-message{display:flex;gap:10px;align-items:flex-start}
 .msg-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff;flex-shrink:0}
 .msg-body{flex:1;min-width:0}
@@ -222,11 +231,15 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:13px;min-height:300px;
 .msg-username{font-weight:700;font-size:13px}
 .msg-time{font-size:10.5px;color:var(--text3);font-weight:600}
 .msg-content{font-size:13.5px;line-height:1.5;word-wrap:break-word}
-.chat-input-area{padding:14px 18px;border-top:1px solid var(--border);background:var(--bg)}
-.chat-input-area form{display:flex;gap:10px}
+.chat-input-area{padding:14px 18px;border-top:1px solid var(--border);background:var(--bg);flex-shrink:0}
+.chat-input-area form{display:flex;gap:8px;align-items:center}
 .chat-input-area input{flex:1;margin:0;background:var(--bg2);border-color:transparent;min-width:0}
 .chat-input-area input:disabled{opacity:0.5;cursor:not-allowed}
-.members-list{padding:12px;overflow-y:auto;border-left:1px solid var(--border);background:var(--bg)}
+.chat-input-area button[disabled]{opacity:0.4;cursor:not-allowed}
+.chat-input-area #imageBtn,.chat-input-area #voiceRecordBtn{font-size:18px;line-height:1;padding:0 14px;min-width:46px}
+.chat-input-area #voiceRecordBtn.recording{background:linear-gradient(135deg,#ff3b3b,#cc0000);color:#fff;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+.members-list{padding:12px;overflow-y:auto;border-left:1px solid var(--border);background:var(--bg);min-height:0}
 .member-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--text1);margin-bottom:2px}
 .member-avatar{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex-shrink:0}
 .member-actions{margin-left:auto;display:flex;gap:4px;opacity:0;transition:opacity 0.2s}
@@ -240,7 +253,7 @@ body.screenshare-lock{overflow:hidden!important}
 .mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:98}
 .mobile-overlay.active{display:block}
 @media(max-width:1024px){.chat-layout{grid-template-columns:220px 1fr 180px}.content{padding:24px}.grid-scripts{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}.grid-servers{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}}
-@media(max-width:900px){html{font-size:15px}.mobile-menu-btn{display:flex}.sidebar{transform:translateX(-100%);box-shadow:0 0 40px rgba(0,0,0,0.8)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.topbar{padding:0 16px 0 66px;height:60px}.topbar-title{font-size:14px;max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.content{padding:20px 16px}.page-title{font-size:26px;letter-spacing:-0.8px}.page-sub{font-size:13px;margin-bottom:20px}.btn{padding:11px 18px;font-size:12.5px;min-height:44px}.btn-sm{padding:8px 12px;font-size:11.5px;min-height:36px}.card{padding:20px;border-radius:14px}.grid-2{grid-template-columns:1fr;gap:12px}.grid-scripts{grid-template-columns:1fr}.grid-servers{grid-template-columns:1fr}.stat-grid{grid-template-columns:1fr 1fr;gap:10px}.stat{padding:16px;border-radius:12px}.stat-value{font-size:22px}.stat-label{font-size:10px}.login-card{padding:32px 24px;border-radius:18px}.login-logo{width:64px;height:64px;font-size:24px}.login-title{font-size:22px}.chat-layout{grid-template-columns:1fr;height:auto;min-height:calc(100vh - 200px)}.members-list{display:none}.chat-sidebar{max-height:220px;border-right:none;border-bottom:1px solid var(--border)}.chat-main{min-height:400px}.msg-avatar{width:32px;height:32px;font-size:12px}.msg-content{font-size:13px}.script-icon{width:46px;height:46px;font-size:18px}.icon-preview{width:64px;height:64px;font-size:24px}input,textarea,select{font-size:16px;padding:12px 14px;min-height:46px}textarea{min-height:200px;font-size:13px}.form-group{margin-bottom:16px}.form-label{font-size:11px}.log-item{padding:12px;gap:10px}.log-icon{width:32px;height:32px;font-size:12px}.channel-item{padding:10px 14px}.id-row button{width:44px;height:44px;font-size:18px}}
+@media(max-width:900px){html{font-size:15px}.mobile-menu-btn{display:flex}.sidebar{transform:translateX(-100%);box-shadow:0 0 40px rgba(0,0,0,0.8)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.topbar{padding:0 16px 0 66px;height:60px}.topbar-title{font-size:14px;max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.content{padding:20px 16px}.page-title{font-size:26px;letter-spacing:-0.8px}.page-sub{font-size:13px;margin-bottom:20px}.btn{padding:11px 18px;font-size:12.5px;min-height:44px}.btn-sm{padding:8px 12px;font-size:11.5px;min-height:36px}.card{padding:20px;border-radius:14px}.grid-2{grid-template-columns:1fr;gap:12px}.grid-scripts{grid-template-columns:1fr}.grid-servers{grid-template-columns:1fr}.stat-grid{grid-template-columns:1fr 1fr;gap:10px}.stat{padding:16px;border-radius:12px}.stat-value{font-size:22px}.stat-label{font-size:10px}.login-card{padding:32px 24px;border-radius:18px}.login-logo{width:64px;height:64px;font-size:24px}.login-title{font-size:22px}.chat-layout{grid-template-columns:1fr;height:auto;min-height:calc(100vh - 200px);max-height:none}.members-list{display:none}.chat-sidebar{max-height:220px;border-right:none;border-bottom:1px solid var(--border)}.chat-main{min-height:400px;height:calc(100vh - 200px)}.chat-messages{min-height:200px;max-height:calc(100vh - 320px)}.msg-avatar{width:32px;height:32px;font-size:12px}.msg-content{font-size:13px}.script-icon{width:46px;height:46px;font-size:18px}.icon-preview{width:64px;height:64px;font-size:24px}input,textarea,select{font-size:16px;padding:12px 14px;min-height:46px}textarea{min-height:200px;font-size:13px}.form-group{margin-bottom:16px}.form-label{font-size:11px}.log-item{padding:12px;gap:10px}.log-icon{width:32px;height:32px;font-size:12px}.channel-item{padding:10px 14px}.id-row button{width:44px;height:44px;font-size:18px}}
 @media(max-width:480px){html{font-size:14px}.page-title{font-size:22px}.content{padding:16px 12px}.btn{padding:10px 14px;font-size:12px;gap:5px}.btn-sm{padding:7px 10px;font-size:11px}.card{padding:16px;border-radius:12px}.stat-grid{grid-template-columns:1fr;gap:8px}.stat{padding:14px}.stat-value{font-size:20px}.login-card{padding:24px 20px}.script-icon{width:40px;height:40px;font-size:16px;border-radius:10px}.icon-preview{width:56px;height:56px;font-size:20px}.chat-sidebar{max-height:180px}.msg-avatar{width:28px;height:28px;font-size:11px;border-radius:8px}.badge{font-size:9.5px;padding:3px 8px}.sidebar{width:85%}}
 @media(hover:none){.channel-item{padding:11px 14px}.nav-item{padding:13px 14px}.member-item{padding:8px 10px}.member-actions{opacity:1}.channel-delete{opacity:1;width:24px;height:24px}.btn-primary:hover{transform:none}}
 `;
@@ -664,7 +677,7 @@ app.get('/server/:id', requireLogin, async function(req, res) {
                 '</div>' +
                 '<div id="textView" style="display:flex;flex-direction:column;flex:1;min-height:0;">' +
                     '<div class="chat-messages" id="chatMessages"><div style="text-align:center;color:var(--text3);padding:40px;">Select a channel</div></div>' +
-                    '<div class="chat-input-area"><form onsubmit="event.preventDefault();sendMessage();"><input type="text" id="chatInput" placeholder="Message..." maxlength="500" disabled><button type="submit" class="btn btn-primary" id="sendBtn" disabled>Send</button></form></div>' +
+                    '<div class="chat-input-area"><form onsubmit="event.preventDefault();sendMessage();"><button type="button" class="btn btn-secondary" id="imageBtn" onclick="sendImage()" title="Send Image" disabled>📷</button><button type="button" class="btn btn-secondary" id="voiceRecordBtn" onclick="toggleVoiceRecord()" title="Record Voice" disabled>🎤</button><input type="text" id="chatInput" placeholder="Message..." maxlength="500" disabled><button type="submit" class="btn btn-primary" id="sendBtn" disabled>Send</button></form></div>' +
                 '</div>' +
             '</div>' +
             '<div class="members-list"><div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;padding:8px;">Members (' + membersR.rows.length + ')</div>' + mbHtml + '</div>' +
@@ -758,21 +771,42 @@ app.post('/api/channels/:id/delete', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 🔥 MESSAGES — updated with media support
 app.get('/api/channels/:id/messages', requireLogin, async function(req, res) {
     try {
         const cid = parseInt(req.params.id);
         if (!cid || isNaN(cid)) return res.status(400).json({ error: 'Invalid channel ID' });
         const msgs = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 100', [cid]);
-        res.json(msgs.rows.reverse().map(m => ({ username: m.username, role: m.role, message: m.message, created_at: new Date(m.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })));
+        res.json(msgs.rows.reverse().map(m => ({
+            id: m.id,
+            username: m.username,
+            role: m.role,
+            message: m.message,
+            message_type: m.message_type || 'text',
+            file_data: m.file_data || null,
+            file_name: m.file_name || null,
+            created_at: new Date(m.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        })));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 🔥 SEND — updated with media support
 app.post('/api/channels/:id/send', requireLogin, async function(req, res) {
     try {
         const cid = parseInt(req.params.id);
         if (!cid || isNaN(cid)) return res.status(400).json({ error: 'Invalid channel ID' });
+        
         const msg = (req.body.message || '').trim().substring(0, 500);
-        if (!msg) return res.status(400).json({ error: 'Empty' });
+        const message_type = req.body.message_type || 'text';
+        const file_data = req.body.file_data || null;
+        const file_name = req.body.file_name || null;
+        
+        if (!msg && !file_data) return res.status(400).json({ error: 'Empty' });
+        
+        if (file_data && file_data.length > 5 * 1024 * 1024) {
+            return res.status(413).json({ error: 'File too large (max 5MB)' });
+        }
+        
         const chk = await pool.query('SELECT c.read_only, c.created_by, c.type, s.owner as server_owner FROM channels c JOIN servers s ON c.server_id = s.id WHERE c.id = $1', [cid]);
         if (chk.rows.length === 0) return res.status(404).json({ error: 'Not found' });
         const ch = chk.rows[0];
@@ -781,9 +815,14 @@ app.post('/api/channels/:id/send', requireLogin, async function(req, res) {
         const isServerOwner = ch.server_owner === me;
         const isChannelCreator = ch.created_by === me;
         const canChat = isAdmin || isServerOwner || isChannelCreator;
+        
         if (ch.read_only && !canChat) return res.status(403).json({ error: 'Only admin, server owner, or channel creator can chat here' });
         if (ch.type === 'voice' && !canChat) return res.status(403).json({ error: 'Only admin, server owner, or channel creator can chat here' });
-        await pool.query('INSERT INTO chat_messages (channel_id, username, role, message) VALUES ($1,$2,$3,$4)', [cid, me, req.session.user.role, msg]);
+        
+        await pool.query(
+            'INSERT INTO chat_messages (channel_id, username, role, message, message_type, file_data, file_name) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+            [cid, me, req.session.user.role, msg || '', message_type, file_data, file_name]
+        );
         io.to('channel-' + cid).emit('chat-message', { channelId: cid });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -843,6 +882,6 @@ io.on('connection', function(socket) {
 
 server.listen(PORT, function() {
     console.log('ShieldHub v3.0 - ' + BRAND_NAME);
-    console.log('Public | Whitelist | Voice | Screen Share | Kick | Private Chat');
+    console.log('Public | Whitelist | Voice | Screen Share | Kick | Private Chat | Media');
     console.log('Server running on port ' + PORT);
 });
