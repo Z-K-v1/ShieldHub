@@ -314,10 +314,10 @@ app.get('/create', requireLogin, function(req, res) {
                 '<div class="form-group"><label class="form-label">Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div>' +
                 '<div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div>' +
             '</div>' +
-            '<div class="form-group"><label class="form-label">Icon Image (URL - optional)</label><div class="icon-preview" id="iconPreview"><img src="' + FAVICON_DATA + '" alt=""></div><input type="text" id="iconInput" name="icon" placeholder="https://example.com/icon.png" oninput="var p=document.getElementById(\'iconPreview\');if(this.value.trim()){p.innerHTML=\'<img src=\\\'\'+this.value+\'\\\' onerror=\\\'this.style.display=&quot;none&quot;\\\'>\'}"></div>' +
+            '<div class="form-group"><label class="form-label">Icon Image (URL - optional)</label><div class="icon-preview" id="iconPreview"><img src="' + FAVICON_DATA + '" alt=""></div><input type="text" id="iconInput" name="icon" placeholder="https://example.com/icon.png"></div>' +
             '<div class="form-group">' +
                 '<label class="form-label">Access Type</label>' +
-                '<select id="accessType" name="access_type" onchange="var w=document.getElementById(\'idListWrap\');if(this.value===\'whitelist\'){w.style.display=\'block\'}else{w.style.display=\'none\'}">' +
+                '<select id="accessType" name="access_type" onchange="document.getElementById(\'idListWrap\').style.display=this.value===\'whitelist\'?\'block\':\'none\'">' +
                     '<option value="public">Public (Everyone can use)</option>' +
                     '<option value="whitelist">Whitelist (Specific User IDs only)</option>' +
                 '</select>' +
@@ -327,7 +327,7 @@ app.get('/create', requireLogin, function(req, res) {
                 '<div id="idList">' +
                     '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="this.parentNode.remove()">×</button></div>' +
                 '</div>' +
-                '<button type="button" class="btn btn-success btn-sm" onclick="var l=document.getElementById(\'idList\');var d=document.createElement(\'div\');d.className=\'id-row\';d.innerHTML=\'<input type=text class=id-input placeholder=&quot;Roblox User ID&quot; inputmode=numeric><button type=button onclick=this.parentNode.remove()>×</button>\';l.appendChild(d)">+ Add User</button>' +
+                '<button type="button" class="btn btn-success btn-sm" onclick="var l=document.getElementById(\'idList\');var d=document.createElement(\'div\');d.className=\'id-row\';d.innerHTML=\'<input type=text class=id-input placeholder=Roblox-User-ID inputmode=numeric><button type=button onclick=this.parentNode.remove()>×</button>\';l.appendChild(d)">+ Add User</button>' +
                 '<div style="font-size:12px;color:var(--text3);margin-top:10px;">Only users in this list can execute the script.</div>' +
             '</div>' +
             '<input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]">' +
@@ -379,10 +379,10 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
                     '<div class="form-group"><label class="form-label">Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div>' +
                     '<div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div>' +
                 '</div>' +
-                '<div class="form-group"><label class="form-label">Icon Image (URL)</label><div class="icon-preview" id="iconPreview"><img src="' + ci.replace(/"/g, '&quot;') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt=""></div><input type="text" id="iconInput" name="icon" value="' + (s.icon || '').replace(/"/g, '&quot;') + '" placeholder="https://example.com/icon.png" oninput="var p=document.getElementById(\'iconPreview\');if(this.value.trim()){p.innerHTML=\'<img src=\\\'\'+this.value+\'\\\' onerror=\\\'this.style.display=&quot;none&quot;\\\'>\'}"></div>' +
+                '<div class="form-group"><label class="form-label">Icon Image (URL)</label><div class="icon-preview" id="iconPreview"><img src="' + ci.replace(/"/g, '&quot;') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt=""></div><input type="text" id="iconInput" name="icon" value="' + (s.icon || '').replace(/"/g, '&quot;') + '" placeholder="https://example.com/icon.png"></div>' +
                 '<div class="form-group">' +
                     '<label class="form-label">Access Type</label>' +
-                    '<select id="accessType" name="access_type" onchange="var w=document.getElementById(\'idListWrap\');if(this.value===\'whitelist\'){w.style.display=\'block\'}else{w.style.display=\'none\'}">' +
+                    '<select id="accessType" name="access_type" onchange="document.getElementById(\'idListWrap\').style.display=this.value===\'whitelist\'?\'block\':\'none\'">' +
                         '<option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>Public (Everyone can use)</option>' +
                         '<option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>Whitelist (Specific User IDs only)</option>' +
                     '</select>' +
@@ -390,7 +390,7 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
                 '<div class="form-group" id="idListWrap" style="' + (isWhitelist ? '' : 'display:none;') + '">' +
                     '<label class="form-label">Roblox User IDs</label>' +
                     '<div id="idList">' + idsHtml + '</div>' +
-                    '<button type="button" class="btn btn-success btn-sm" onclick="var l=document.getElementById(\'idList\');var d=document.createElement(\'div\');d.className=\'id-row\';d.innerHTML=\'<input type=text class=id-input placeholder=&quot;Roblox User ID&quot; inputmode=numeric><button type=button onclick=this.parentNode.remove()>×</button>\';l.appendChild(d)">+ Add User</button>' +
+                    '<button type="button" class="btn btn-success btn-sm" onclick="var l=document.getElementById(\'idList\');var d=document.createElement(\'div\');d.className=\'id-row\';d.innerHTML=\'<input type=text class=id-input placeholder=Roblox-User-ID inputmode=numeric><button type=button onclick=this.parentNode.remove()>×</button>\';l.appendChild(d)">+ Add User</button>' +
                     '<div style="font-size:12px;color:var(--text3);margin-top:10px;">Only users in this list can execute the script. Users not on the list will see "Script in protection".</div>' +
                 '</div>' +
                 '<input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]">' +
@@ -398,6 +398,7 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
                 '<button type="submit" class="btn btn-primary" onclick="var ids=[];document.querySelectorAll(\'.id-input\').forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById(\'allowedIdsHidden\').value=JSON.stringify(ids);return true">Save</button>' +
             '</form>' +
         '</div>';
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         res.send(renderLayout({ title: 'Edit', pageTitle: 'Edit Script', pageSubtitle: s.name, content: content, user: req.session.user, activeNav: 'dashboard' }));
     } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
 });
@@ -592,6 +593,7 @@ app.post('/api/servers/join', requireLogin, async function(req, res) {
 app.get('/server/:id', requireLogin, async function(req, res) {
     try {
         const serverId = parseInt(req.params.id);
+        if (!serverId || isNaN(serverId)) return res.status(400).send('Invalid server ID');
         const me = req.session.user.username;
         const srvR = await pool.query('SELECT * FROM servers WHERE id = $1', [serverId]);
         if (srvR.rows.length === 0) return res.status(404).send('Not found');
@@ -702,6 +704,7 @@ app.get('/server/:id', requireLogin, async function(req, res) {
 app.post('/api/servers/:id/kick', requireLogin, async function(req, res) {
     try {
         const serverId = parseInt(req.params.id);
+        if (!serverId || isNaN(serverId)) return res.status(400).json({ error: 'Invalid server ID' });
         const { username } = req.body;
         const me = req.session.user.username;
         const isAdmin = req.session.user.role === 'ADMIN';
@@ -719,6 +722,7 @@ app.post('/api/servers/:id/kick', requireLogin, async function(req, res) {
 app.post('/api/servers/:id/channels', requireLogin, async function(req, res) {
     try {
         const serverId = parseInt(req.params.id);
+        if (!serverId || isNaN(serverId)) return res.status(400).json({ error: 'Invalid server ID' });
         const me = req.session.user.username;
         const isAdmin = req.session.user.role === 'ADMIN';
         const srvR = await pool.query('SELECT * FROM servers WHERE id = $1', [serverId]);
@@ -741,6 +745,7 @@ app.post('/api/servers/:id/channels', requireLogin, async function(req, res) {
 app.post('/api/channels/:id/delete', requireLogin, async function(req, res) {
     try {
         const cid = parseInt(req.params.id);
+        if (!cid || isNaN(cid)) return res.status(400).json({ error: 'Invalid channel ID' });
         const me = req.session.user.username;
         const isAdmin = req.session.user.role === 'ADMIN';
         const cR = await pool.query('SELECT c.*, s.owner FROM channels c JOIN servers s ON c.server_id = s.id WHERE c.id = $1', [cid]);
@@ -756,6 +761,7 @@ app.post('/api/channels/:id/delete', requireLogin, async function(req, res) {
 app.get('/api/channels/:id/messages', requireLogin, async function(req, res) {
     try {
         const cid = parseInt(req.params.id);
+        if (!cid || isNaN(cid)) return res.status(400).json({ error: 'Invalid channel ID' });
         const msgs = await pool.query('SELECT * FROM chat_messages WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 100', [cid]);
         res.json(msgs.rows.reverse().map(m => ({ username: m.username, role: m.role, message: m.message, created_at: new Date(m.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) })));
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -764,6 +770,7 @@ app.get('/api/channels/:id/messages', requireLogin, async function(req, res) {
 app.post('/api/channels/:id/send', requireLogin, async function(req, res) {
     try {
         const cid = parseInt(req.params.id);
+        if (!cid || isNaN(cid)) return res.status(400).json({ error: 'Invalid channel ID' });
         const msg = (req.body.message || '').trim().substring(0, 500);
         if (!msg) return res.status(400).json({ error: 'Empty' });
         const chk = await pool.query('SELECT c.read_only, c.created_by, c.type, s.owner as server_owner FROM channels c JOIN servers s ON c.server_id = s.id WHERE c.id = $1', [cid]);
