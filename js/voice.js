@@ -1,6 +1,6 @@
 // ==================================================
 // ShieldHub Voice + Screen Share (WebRTC) - CLIENT SIDE
-// 🔥 Fixed: Auto-scroll chat (force to bottom on new messages)
+// 🔥 Fixed: Smart auto-scroll (hindi mawawala typing)
 // ==================================================
 
 (function() {
@@ -58,17 +58,27 @@
     }
 
     // ==================================================
-    // FORCE SCROLL TO BOTTOM — Helper function
+    // 🔥 SMART SCROLL — hindi pilit kung nagbabasa sa taas
     // ==================================================
-    function forceScrollToBottom() {
+    function smartScrollToBottom(force) {
         const box = document.getElementById('chatMessages');
         if (!box) return;
-        // Multiple tries para siguradong nasa baba
-        box.scrollTop = box.scrollHeight;
-        setTimeout(function() { box.scrollTop = box.scrollHeight; }, 10);
-        setTimeout(function() { box.scrollTop = box.scrollHeight; }, 50);
-        setTimeout(function() { box.scrollTop = box.scrollHeight; }, 150);
-        setTimeout(function() { box.scrollTop = box.scrollHeight; }, 300);
+        
+        // 🔥 Wag mag-scroll kung naka-focus sa chat input
+        const inputActive = document.activeElement && document.activeElement.id === 'chatInput';
+        if (inputActive && !force) return;
+        
+        // Check kung nasa baba na ang user
+        const isAtBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 150;
+        
+        // 🔥 Mag-scroll lang kung:
+        // - Nasa baba na ang user, O
+        // - Nag-force tayo (e.g., nag-send o nag-load)
+        if (isAtBottom || force) {
+            box.scrollTop = box.scrollHeight;
+            setTimeout(function() { box.scrollTop = box.scrollHeight; }, 50);
+            setTimeout(function() { box.scrollTop = box.scrollHeight; }, 150);
+        }
     }
 
     // ==================================================
@@ -134,13 +144,15 @@
                 const r = await fetch('/api/channels/' + id + '/messages');
                 const msgs = await r.json();
                 renderMessages(msgs);
+                // 🔥 Force scroll pag switch ng channel
+                setTimeout(function() { smartScrollToBottom(true); }, 100);
             } catch(e) { console.error(e); }
             socket.emit('join-channel', id);
         }
     };
 
     // ==================================================
-    // 🔥 TEXT CHAT RENDER — with FORCE SCROLL
+    // 🔥 TEXT CHAT RENDER
     // ==================================================
     function renderMessages(msgs) {
         const box = document.getElementById('chatMessages');
@@ -170,13 +182,12 @@
             box.appendChild(div);
         });
 
-        // 🔥 FORCE SCROLL sa baba pagkatapos mag-render
-        forceScrollToBottom();
+        // 🔥 Smart scroll: mag-scroll kung may bagong message at nasa baba
+        if (hasNewMessages) {
+            smartScrollToBottom(false);
+        }
     }
 
-    // ==================================================
-    // 🔥 VOICE CHAT RENDER — with FORCE SCROLL
-    // ==================================================
     function renderVoiceMessages(msgs) {
         const box = document.getElementById('voiceChatMessages');
         if (!box) return;
@@ -191,9 +202,7 @@
             div.innerHTML = '<strong style="color:#ff5555;">' + m.username + ':</strong> <span style="color:var(--text1);">' + escapeHtml(m.message) + '</span>';
             box.appendChild(div);
         });
-        // 🔥 Force scroll
         box.scrollTop = box.scrollHeight;
-        setTimeout(function() { box.scrollTop = box.scrollHeight; }, 50);
     }
 
     function escapeHtml(s) {
@@ -201,7 +210,7 @@
     }
 
     // ==================================================
-    // SEND MESSAGE — with FORCE SCROLL
+    // SEND MESSAGE
     // ==================================================
     window.sendMessage = async function() {
         if (!currentChannelId || currentChannelType === 'voice' || !currentCanChat) return;
@@ -220,8 +229,8 @@
             const r2 = await fetch('/api/channels/' + currentChannelId + '/messages');
             const msgs = await r2.json();
             renderMessages(msgs);
-            // 🔥 Force scroll agad pagkatapos mag-send
-            forceScrollToBottom();
+            // 🔥 Force scroll agad pag nag-send
+            setTimeout(function() { smartScrollToBottom(true); }, 100);
         } catch(e) { console.error(e); }
     };
 
@@ -620,7 +629,7 @@
     });
 
     // ==================================================
-    // 🔥 CHAT MESSAGE AUTO-REFRESH + FORCE SCROLL
+    // 🔥 CHAT MESSAGE AUTO-REFRESH
     // ==================================================
     socket.on('chat-message', function(data) {
         if (currentChannelId && data.channelId === currentChannelId) {
@@ -637,33 +646,37 @@
                     .then(r => r.json())
                     .then(msgs => {
                         renderMessages(msgs);
-                        forceScrollToBottom();
+                        setTimeout(function() { smartScrollToBottom(false); }, 50);
                     });
             }
         }
     });
 
     // ==================================================
-    // 🔥 AUTO-REFRESH CHAT EVERY 2 SECONDS — with FORCE SCROLL
+    // 🔥 AUTO-REFRESH CHAT — hindi pilit kung may naka-focus
     // ==================================================
     setInterval(function() {
         if (currentChannelId && currentChannelType !== 'voice') {
+            // 🔥 Wag mag-refresh kung may naka-focus sa chat input (para hindi mawala typing)
+            const inputActive = document.activeElement && document.activeElement.id === 'chatInput';
+            if (inputActive) return;
+            
             fetch('/api/channels/' + currentChannelId + '/messages')
                 .then(r => r.json())
                 .then(msgs => {
                     renderMessages(msgs);
-                    forceScrollToBottom();
+                    setTimeout(function() { smartScrollToBottom(false); }, 50);
                 })
                 .catch(e => {});
         }
     }, 2000);
 
     // ==================================================
-    // 🔥 SCROLL SA BABA PAG LOAD ANG PAGE
+    // 🔥 SCROLL SA BABA PAG LOAD
     // ==================================================
     window.addEventListener('load', function() {
-        setTimeout(function() { forceScrollToBottom(); }, 500);
-        setTimeout(function() { forceScrollToBottom(); }, 1000);
+        setTimeout(function() { smartScrollToBottom(true); }, 500);
+        setTimeout(function() { smartScrollToBottom(true); }, 1000);
     });
 
     console.log('✅ ShieldHub Voice loaded for', myUsername);
