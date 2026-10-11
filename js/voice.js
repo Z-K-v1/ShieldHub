@@ -1,6 +1,5 @@
 // ==================================================
 // ShieldHub Voice + Screen Share (WebRTC) - CLIENT SIDE
-// Click user → view their screen | Click "me" → view own screen
 // ==================================================
 
 (function() {
@@ -26,6 +25,16 @@
     let isSharing = false;
     let myUsername = window.ME;
     let myServerId = window.SERVER_ID;
+
+    // 🔥 FALLBACK: If window.ME is undefined, get username from sidebar
+    if (!myUsername || myUsername === 'undefined' || myUsername === undefined) {
+        const nameEl = document.querySelector('.user-name');
+        if (nameEl) myUsername = nameEl.textContent.trim();
+        else myUsername = 'User-' + Math.floor(Math.random() * 1000);
+        console.log('⚠️ window.ME was undefined, using fallback:', myUsername);
+    }
+    console.log('🎤 Voice setup: user =', myUsername, '| serverId =', myServerId);
+
     let audioContext = null;
     let analyser = null;
     let voiceParticipants = [];
@@ -390,7 +399,6 @@
 
     // ==================================================
     // VOICE PARTICIPANTS RENDER
-    // 🔥 ALL participants (including yourself) get "View Screen" button
     // ==================================================
     function renderVoiceParticipants() {
         const box = document.getElementById('voiceUsers');
@@ -429,7 +437,6 @@
             document.getElementById('shareBtn').className = 'btn btn-danger btn-xs';
             socket.emit('screen-share-start', { serverId: myServerId, channelId: currentChannelId, username: myUsername });
             screenStream.getVideoTracks()[0].onended = function() { stopScreenShare(); };
-            // Show own screen share in the overlay (you can click "me" in participant list to view again)
             document.getElementById('screenVideo').srcObject = screenStream;
             document.getElementById('sharingUser').textContent = 'You (your screen)';
             const overlay = document.getElementById('screenShareOverlay');
@@ -536,11 +543,9 @@
     });
 
     // ==================================================
-    // 🔥 VIEW USER SCREEN
-    // Click user → view their screen | Click "me" → view own screen
+    // VIEW SCREEN
     // ==================================================
     window.viewUserScreen = function(username) {
-        // 🔥 Clicking your own "View Screen" button → view your own screen
         if (username === myUsername) {
             if (screenStream) {
                 document.getElementById('screenVideo').srcObject = screenStream;
@@ -554,7 +559,6 @@
             }
             return;
         }
-        // 🔥 Clicking another user's "View Screen" button → view their screen
         if (screenConnections[username]) {
             document.getElementById('sharingUser').textContent = username;
             const overlay = document.getElementById('screenShareOverlay');
