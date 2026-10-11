@@ -310,7 +310,75 @@ app.get('/', requireLogin, async function(req, res) {
 // ==================== CREATE ====================
 app.get('/create', requireLogin, function(req, res) {
     var verOpts = ''; for (var i = 1; i <= 1000; i++) verOpts += '<option value="V' + i + '">V' + i + '</option>';
-    const content = '<div class="card" style="max-width:900px;"><form method="POST" action="/create"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div></div><div class="form-group"><label class="form-label">Icon Image (URL - optional)</label><div class="icon-preview" id="iconPreview"><img src="' + FAVICON_DATA + '" alt=""></div><input type="text" id="iconInput" name="icon" placeholder="https://example.com/icon.png" oninput="updateIconPreview(this.value)"></div><div class="form-group"><label class="form-label">Access Type</label><select id="accessType" onchange="toggleIdSection()"><option value="public">Public</option><option value="whitelist">Whitelist</option></select><input type="hidden" name="access_type" id="accessTypeHidden" value="public"></div><div class="form-group" id="idListWrap" style="display:none;"><label class="form-label">Roblox User IDs</label><div id="idList"><div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div></div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required placeholder="-- Write your Lua script here..."></textarea></div><div style="display:flex;gap:12px;flex-wrap:wrap;"><button type="submit" class="btn btn-primary" onclick="return prepareSubmit()">Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div><script>function toggleIdSection(){var s=document.getElementById("accessType");var w=document.getElementById("idListWrap");var h=document.getElementById("accessTypeHidden");if(s&&w){if(s.value==="whitelist"){w.style.display="block"}else{w.style.display="none"}if(h){h.value=s.value}}}function updateIconPreview(u){var p=document.getElementById("iconPreview");if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");var h=document.getElementById("accessTypeHidden");if(h){h.value=s.value}var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids);return true}</script>';
+    const content = 
+    '<div class="card" style="max-width:900px;">' +
+        '<form method="POST" action="/create">' +
+            '<div class="grid-2" style="margin-bottom:18px;">' +
+                '<div class="form-group"><label class="form-label">Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div>' +
+                '<div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div>' +
+            '</div>' +
+            '<div class="form-group"><label class="form-label">Icon Image (URL - optional)</label><div class="icon-preview" id="iconPreview"><img src="' + FAVICON_DATA + '" alt=""></div><input type="text" id="iconInput" name="icon" placeholder="https://example.com/icon.png" oninput="updateIconPreview(this.value)"></div>' +
+            '<div class="form-group">' +
+                '<label class="form-label">Access Type</label>' +
+                '<select id="accessType" onchange="toggleIdSection()">' +
+                    '<option value="public">Public (Everyone can use)</option>' +
+                    '<option value="whitelist">Whitelist (Specific User IDs only)</option>' +
+                '</select>' +
+                '<input type="hidden" name="access_type" id="accessTypeHidden" value="public">' +
+            '</div>' +
+            '<div class="form-group" id="idListWrap" style="display:none;">' +
+                '<label class="form-label">Roblox User IDs</label>' +
+                '<div id="idList">' +
+                    '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div>' +
+                '</div>' +
+                '<button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button>' +
+                '<div style="font-size:12px;color:var(--text3);margin-top:10px;">Only users in this list can execute the script.</div>' +
+            '</div>' +
+            '<input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]">' +
+            '<div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required placeholder="-- Write your Lua script here..."></textarea></div>' +
+            '<div style="display:flex;gap:12px;flex-wrap:wrap;"><button type="submit" class="btn btn-primary" onclick="return prepareSubmit()">Save</button><a href="/" class="btn btn-ghost">Cancel</a></div>' +
+        '</form>' +
+    '</div>' +
+    '<script>' +
+        'function toggleIdSection(){' +
+            'var s=document.getElementById("accessType");' +
+            'var w=document.getElementById("idListWrap");' +
+            'var h=document.getElementById("accessTypeHidden");' +
+            'if(s&&w){' +
+                'if(s.value==="whitelist"){w.style.display="block"}else{w.style.display="none"}' +
+                'if(h){h.value=s.value}' +
+            '}' +
+        '}' +
+        'function updateIconPreview(u){' +
+            'var p=document.getElementById("iconPreview");' +
+            'if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}' +
+            'else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}' +
+        '}' +
+        'function addIdRow(){' +
+            'var l=document.getElementById("idList");' +
+            'var d=document.createElement("div");' +
+            'd.className="id-row";' +
+            'd.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';' +
+            'l.appendChild(d)' +
+        '}' +
+        'function removeIdRow(b){b.parentNode.remove()}' +
+        'function prepareSubmit(){' +
+            'var s=document.getElementById("accessType");' +
+            'var h=document.getElementById("accessTypeHidden");' +
+            'if(h){h.value=s.value}' +
+            'var ids=[];' +
+            'document.querySelectorAll(".id-input").forEach(function(el){' +
+                'var v=el.value.trim();' +
+                'if(v&&/^[0-9]+$/.test(v))ids.push(v)' +
+            '});' +
+            'document.getElementById("allowedIdsHidden").value=JSON.stringify(ids);' +
+            'return true' +
+        '}' +
+        'window.addEventListener("load",function(){' +
+            'var s=document.getElementById("accessType");' +
+            'if(s){toggleIdSection()}' +
+        '});' +
+    '</script>';
     res.send(renderLayout({ title: 'Create', pageTitle: 'Create Script', pageSubtitle: 'Add a new Lua script', content: content, user: req.session.user, activeNav: 'create' }));
 });
 app.post('/create', requireLogin, async function(req, res) {
@@ -339,7 +407,7 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
         const escaped = s.real_content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         let ids = []; try { ids = JSON.parse(s.allowed_ids || '[]'); } catch(e) {}
         let idsHtml = ''; 
-        for (const i of ids) idsHtml += '<div class="id-row"><input type="text" class="id-input" value="' + i + '" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div>';
+        for (const i of ids) idsHtml += '<div class="id-row"><input type="text" class="id-input" value="' + i + '" inputmode="numeric" placeholder="Roblox User ID"><button type="button" onclick="removeIdRow(this)">×</button></div>';
         if (!idsHtml) idsHtml = '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div>';
         const ls = buildLoadstring(s.name, s.version, s.short_id);
         let verOpts = ''; 
@@ -359,8 +427,8 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
                 '<div class="form-group">' +
                     '<label class="form-label">Access Type</label>' +
                     '<select id="accessType" onchange="toggleIdSection()">' +
-                        '<option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>Public</option>' +
-                        '<option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>Whitelist</option>' +
+                        '<option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>Public (Everyone can use)</option>' +
+                        '<option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>Whitelist (Specific User IDs only)</option>' +
                     '</select>' +
                     '<input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '">' +
                 '</div>' +
@@ -368,6 +436,7 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
                     '<label class="form-label">Roblox User IDs</label>' +
                     '<div id="idList">' + idsHtml + '</div>' +
                     '<button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button>' +
+                    '<div style="font-size:12px;color:var(--text3);margin-top:10px;">Only users in this list can execute the script. Users not on the list will see "Script in protection".</div>' +
                 '</div>' +
                 '<input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]">' +
                 '<div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div>' +
@@ -375,11 +444,44 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
             '</form>' +
         '</div>' +
         '<script>' +
-            'function toggleIdSection(){var s=document.getElementById("accessType");var w=document.getElementById("idListWrap");var h=document.getElementById("accessTypeHidden");if(s&&w){if(s.value==="whitelist"){w.style.display="block"}else{w.style.display="none"}if(h){h.value=s.value}}}' +
-            'function updateIconPreview(u){var p=document.getElementById("iconPreview");if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}}' +
-            'function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}' +
+            'function toggleIdSection(){' +
+                'var s=document.getElementById("accessType");' +
+                'var w=document.getElementById("idListWrap");' +
+                'var h=document.getElementById("accessTypeHidden");' +
+                'if(s&&w){' +
+                    'if(s.value==="whitelist"){w.style.display="block"}else{w.style.display="none"}' +
+                    'if(h){h.value=s.value}' +
+                '}' +
+            '}' +
+            'function updateIconPreview(u){' +
+                'var p=document.getElementById("iconPreview");' +
+                'if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}' +
+                'else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}' +
+            '}' +
+            'function addIdRow(){' +
+                'var l=document.getElementById("idList");' +
+                'var d=document.createElement("div");' +
+                'd.className="id-row";' +
+                'd.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';' +
+                'l.appendChild(d)' +
+            '}' +
             'function removeIdRow(b){b.parentNode.remove()}' +
-            'function prepareSubmit(){var s=document.getElementById("accessType");var h=document.getElementById("accessTypeHidden");if(h){h.value=s.value}var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids);return true}' +
+            'function prepareSubmit(){' +
+                'var s=document.getElementById("accessType");' +
+                'var h=document.getElementById("accessTypeHidden");' +
+                'if(h){h.value=s.value}' +
+                'var ids=[];' +
+                'document.querySelectorAll(".id-input").forEach(function(el){' +
+                    'var v=el.value.trim();' +
+                    'if(v&&/^[0-9]+$/.test(v))ids.push(v)' +
+                '});' +
+                'document.getElementById("allowedIdsHidden").value=JSON.stringify(ids);' +
+                'return true' +
+            '}' +
+            'window.addEventListener("load",function(){' +
+                'var s=document.getElementById("accessType");' +
+                'if(s){toggleIdSection()}' +
+            '});' +
         '</script>';
         
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
