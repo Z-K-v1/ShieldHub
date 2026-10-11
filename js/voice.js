@@ -1,6 +1,6 @@
 // ==================================================
 // ShieldHub Voice + Screen Share (WebRTC) - CLIENT SIDE
-// 🔥 Fixed: Smart auto-scroll (hindi mawawala typing at scroll)
+// 🔥 Fixed: Smart auto-scroll + Image + Voice Message
 // ==================================================
 
 (function() {
@@ -38,7 +38,7 @@
     let analyser = null;
     let voiceParticipants = [];
     let lastMessageCount = 0;
-    let isUserScrolling = false; // 🔥 Flag para hindi pilit mag-scroll
+    let isUserScrolling = false;
 
     function enterFullscreen(el) {
         if (!el) return;
@@ -59,7 +59,7 @@
     }
 
     // ==================================================
-    // 🔥 SMART SCROLL — hindi pilit kung nagbabasa sa taas
+    // 🔥 SMART SCROLL
     // ==================================================
     function isScrolledToBottom(box) {
         if (!box) return true;
@@ -69,30 +69,18 @@
     function smartScrollToBottom(force) {
         const box = document.getElementById('chatMessages');
         if (!box) return;
-        
-        // 🔥 Wag mag-scroll kung naka-focus sa chat input
         const inputActive = document.activeElement && document.activeElement.id === 'chatInput';
         if (inputActive && !force) return;
-        
-        // 🔥 Wag mag-scroll kung user ay nag-scroll pataas
         if (isUserScrolling && !force) return;
-        
-        // Mag-scroll lang kung:
-        // - Nasa baba na ang user, O
-        // - Nag-force tayo (e.g., nag-send o nag-load)
         if (isScrolledToBottom(box) || force) {
             box.scrollTop = box.scrollHeight;
         }
     }
 
-    // ==================================================
-    // 🔥 TRACK USER SCROLL
-    // ==================================================
     function attachScrollTracker() {
         const box = document.getElementById('chatMessages');
         if (!box || box._scrollTracked) return;
         box._scrollTracked = true;
-        
         box.addEventListener('scroll', function() {
             isUserScrolling = !isScrolledToBottom(box);
         }, { passive: true });
@@ -158,21 +146,23 @@
             document.getElementById('chatInput').disabled = !currentCanChat;
             document.getElementById('sendBtn').disabled = !currentCanChat;
             document.getElementById('chatInput').placeholder = currentCanChat ? 'Message...' : 'Read-only (only creator/owner/admin can chat)';
+            const imgBtn = document.getElementById('imageBtn');
+            const voiceBtn = document.getElementById('voiceRecordBtn');
+            if (imgBtn) imgBtn.disabled = !currentCanChat;
+            if (voiceBtn) voiceBtn.disabled = !currentCanChat;
             try {
                 const r = await fetch('/api/channels/' + id + '/messages');
                 const msgs = await r.json();
                 renderMessages(msgs);
-                // 🔥 Force scroll pag switch ng channel
                 setTimeout(function() { smartScrollToBottom(true); }, 100);
             } catch(e) { console.error(e); }
             socket.emit('join-channel', id);
-            // 🔥 I-attach ang scroll tracker
             setTimeout(attachScrollTracker, 200);
         }
     };
 
     // ==================================================
-    // 🔥 TEXT CHAT RENDER
+    // 🔥 RENDER TEXT MESSAGES (with media support)
     // ==================================================
     function renderMessages(msgs) {
         const box = document.getElementById('chatMessages');
@@ -184,11 +174,9 @@
             return;
         }
 
-        // Check kung may bagong message
         const hasNewMessages = msgs.length > lastMessageCount;
         lastMessageCount = msgs.length;
 
-        // 🔥 I-save ang scroll position bago i-render
         const wasAtBottom = isScrolledToBottom(box);
         const oldScrollTop = box.scrollTop;
 
@@ -198,20 +186,31 @@
             const av = isA ? 'linear-gradient(135deg,#ffaa00,#ff6600)' : 'linear-gradient(135deg,var(--red),var(--red2))';
             const div = document.createElement('div');
             div.className = 'chat-message';
+
+            let contentHtml = '';
+            const type = m.message_type || 'text';
+
+            if (type === 'image' && m.file_data) {
+                contentHtml = '<div class="msg-content"><img src="' + m.file_data + '" style="max-width:280px;max-height:280px;border-radius:10px;cursor:pointer;display:block;margin-top:4px;" onclick="window.open(this.src,\'_blank\')" alt="image"></div>';
+                if (m.message) contentHtml += '<div class="msg-content" style="margin-top:6px;">' + escapeHtml(m.message) + '</div>';
+            } else if (type === 'voice' && m.file_data) {
+                contentHtml = '<div class="msg-content"><audio controls src="' + m.file_data + '" style="max-width:260px;height:36px;margin-top:4px;"></audio></div>';
+                if (m.message) contentHtml += '<div class="msg-content" style="margin-top:6px;">' + escapeHtml(m.message) + '</div>';
+            } else {
+                contentHtml = '<div class="msg-content">' + escapeHtml(m.message) + '</div>';
+            }
+
             div.innerHTML = '<div class="msg-avatar" style="background:' + av + '">' + m.username[0].toUpperCase() + '</div>' +
                 '<div class="msg-body"><div class="msg-meta"><span class="msg-username">' + m.username + '</span>' +
                 (isA ? '<span class="badge badge-admin">Admin</span>' : '') +
                 '<span class="msg-time">' + m.created_at + '</span></div>' +
-                '<div class="msg-content">' + escapeHtml(m.message) + '</div></div>';
+                contentHtml + '</div>';
             box.appendChild(div);
         });
 
-        // 🔥 Ibalik ang scroll position kung hindi naman nag-send
         if (!isUserScrolling && wasAtBottom) {
-            // Nasa baba dati — manatili sa baba
             box.scrollTop = box.scrollHeight;
         } else {
-            // Nagbabasa sa taas — ibalik ang dating position
             box.scrollTop = oldScrollTop;
         }
     }
@@ -225,9 +224,18 @@
         }
         box.innerHTML = '';
         msgs.forEach(function(m) {
+            const type = m.message_type || 'text';
+            let body = '';
+            if (type === 'image' && m.file_data) {
+                body = '<img src="' + m.file_data + '" style="max-width:200px;border-radius:8px;display:block;margin-top:4px;cursor:pointer;" onclick="window.open(this.src,\'_blank\')">';
+            } else if (type === 'voice' && m.file_data) {
+                body = '<audio controls src="' + m.file_data + '" style="max-width:220px;height:32px;margin-top:4px;"></audio>';
+            } else {
+                body = '<span style="color:var(--text1);">' + escapeHtml(m.message) + '</span>';
+            }
             const div = document.createElement('div');
-            div.style.cssText = 'display:flex;gap:8px;padding:8px 12px;background:rgba(22,11,11,0.5);border-radius:10px;font-size:13px;margin-bottom:6px;';
-            div.innerHTML = '<strong style="color:#ff5555;">' + m.username + ':</strong> <span style="color:var(--text1);">' + escapeHtml(m.message) + '</span>';
+            div.style.cssText = 'display:flex;gap:8px;padding:8px 12px;background:rgba(22,11,11,0.5);border-radius:10px;font-size:13px;margin-bottom:6px;flex-direction:column;';
+            div.innerHTML = '<div><strong style="color:#ff5555;">' + m.username + ':</strong></div>' + body;
             box.appendChild(div);
         });
         box.scrollTop = box.scrollHeight;
@@ -250,17 +258,122 @@
             const r = await fetch('/api/channels/' + currentChannelId + '/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: msg })
+                body: JSON.stringify({ message: msg, message_type: 'text' })
             });
             const d = await r.json();
             if (d.error) { alert(d.error); return; }
             const r2 = await fetch('/api/channels/' + currentChannelId + '/messages');
             const msgs = await r2.json();
-            isUserScrolling = false; // 🔥 Reset scroll flag pag nag-send
+            isUserScrolling = false;
             renderMessages(msgs);
-            // 🔥 Force scroll agad pag nag-send
             setTimeout(function() { smartScrollToBottom(true); }, 50);
         } catch(e) { console.error(e); }
+    };
+
+    // 🔥 SEND IMAGE
+    window.sendImage = function() {
+        if (!currentChannelId || currentChannelType === 'voice' || !currentCanChat) return;
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.onchange = async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) { alert('Image too large (max 5MB)'); return; }
+            const reader = new FileReader();
+            reader.onload = async function(ev) {
+                const base64 = ev.target.result;
+                const caption = prompt('Add a caption (optional):') || '';
+                try {
+                    const r = await fetch('/api/channels/' + currentChannelId + '/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: caption,
+                            message_type: 'image',
+                            file_data: base64,
+                            file_name: file.name
+                        })
+                    });
+                    const d = await r.json();
+                    if (d.error) { alert(d.error); return; }
+                    const r2 = await fetch('/api/channels/' + currentChannelId + '/messages');
+                    const msgs = await r2.json();
+                    isUserScrolling = false;
+                    renderMessages(msgs);
+                    setTimeout(function() { smartScrollToBottom(true); }, 50);
+                } catch(err) { alert('Error: ' + err.message); }
+            };
+            reader.readAsDataURL(file);
+        };
+        fileInput.click();
+    };
+
+    // 🔥 VOICE RECORDING
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
+
+    window.toggleVoiceRecord = async function() {
+        if (!currentChannelId || currentChannelType === 'voice' || !currentCanChat) return;
+
+        if (isRecording) {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            isRecording = false;
+            const btn = document.getElementById('voiceRecordBtn');
+            if (btn) { btn.classList.remove('recording'); btn.textContent = '🎤'; btn.title = 'Record Voice'; }
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = function(e) {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = async function() {
+                stream.getTracks().forEach(t => t.stop());
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                if (audioBlob.size > 5 * 1024 * 1024) { alert('Voice too large (max 5MB)'); return; }
+
+                const reader = new FileReader();
+                reader.onload = async function(ev) {
+                    const base64 = ev.target.result;
+                    try {
+                        const r = await fetch('/api/channels/' + currentChannelId + '/send', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                message: '',
+                                message_type: 'voice',
+                                file_data: base64,
+                                file_name: 'voice.webm'
+                            })
+                        });
+                        const d = await r.json();
+                        if (d.error) { alert(d.error); return; }
+                        const r2 = await fetch('/api/channels/' + currentChannelId + '/messages');
+                        const msgs = await r2.json();
+                        isUserScrolling = false;
+                        renderMessages(msgs);
+                        setTimeout(function() { smartScrollToBottom(true); }, 50);
+                    } catch(err) { alert('Error: ' + err.message); }
+                };
+                reader.readAsDataURL(audioBlob);
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            const btn = document.getElementById('voiceRecordBtn');
+            if (btn) { btn.classList.add('recording'); btn.textContent = '⏹'; btn.title = 'Stop recording'; }
+        } catch(e) {
+            alert('Microphone access denied: ' + e.message);
+        }
     };
 
     window.sendVoiceMessage = async function() {
@@ -274,7 +387,7 @@
             const r = await fetch('/api/channels/' + currentChannelId + '/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: msg })
+                body: JSON.stringify({ message: msg, message_type: 'text' })
             });
             const d = await r.json();
             if (d.error) { alert(d.error); return; }
@@ -465,7 +578,7 @@
             const isMe = username === myUsername;
             const div = document.createElement('div');
             div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(22,11,11,0.6);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;';
-            div.innerHTML = 
+            div.innerHTML =
                 '<div id="ring-' + username + '" style="position:relative;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:20px;flex-shrink:0;">' +
                     username[0].toUpperCase() +
                 '</div>' +
@@ -671,37 +784,27 @@
                         if (box) setTimeout(function() { box.scrollTop = box.scrollHeight; }, 50);
                     });
             } else {
-                // 🔥 Check kung nagbabasa sa taas bago mag-render
                 const box = document.getElementById('chatMessages');
                 if (box && isUserScrolling) return;
-                
                 fetch('/api/channels/' + currentChannelId + '/messages')
                     .then(r => r.json())
-                    .then(msgs => {
-                        renderMessages(msgs);
-                    });
+                    .then(msgs => { renderMessages(msgs); });
             }
         }
     });
 
     // ==================================================
-    // 🔥 AUTO-REFRESH CHAT — hindi pilit kung nagbabasa o nagta-type
+    // 🔥 AUTO-REFRESH CHAT
     // ==================================================
     setInterval(function() {
         if (currentChannelId && currentChannelType !== 'voice') {
-            // 🔥 Wag mag-refresh kung may naka-focus sa chat input (para hindi mawala typing)
             const inputActive = document.activeElement && document.activeElement.id === 'chatInput';
             if (inputActive) return;
-            
-            // 🔥 Wag mag-refresh kung nag-scroll pataas ang user (nagbabasa)
             const box = document.getElementById('chatMessages');
             if (box && isUserScrolling) return;
-            
             fetch('/api/channels/' + currentChannelId + '/messages')
                 .then(r => r.json())
-                .then(msgs => {
-                    renderMessages(msgs);
-                })
+                .then(msgs => { renderMessages(msgs); })
                 .catch(e => {});
         }
     }, 2000);
