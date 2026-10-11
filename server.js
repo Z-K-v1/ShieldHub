@@ -15,7 +15,7 @@ if (!DATABASE_URL) { console.error('ERROR: DATABASE_URL not set!'); process.exit
 
 const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
-// ==================== FAVICON (ZK logo) ====================
+// ==================== FAVICON ====================
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff3b3b"/><stop offset="100%" stop-color="#cc0000"/></linearGradient></defs><rect width="100" height="100" rx="22" fill="url(#g)"/><text x="50" y="54" font-family="Inter,Arial,sans-serif" font-size="44" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" letter-spacing="-2">ZK</text></svg>`;
 const FAVICON_DATA = 'data:image/svg+xml;base64,' + Buffer.from(FAVICON_SVG).toString('base64');
 
@@ -28,11 +28,12 @@ async function initDB() {
         await pool.query(`CREATE TABLE IF NOT EXISTS execution_logs (id SERIAL PRIMARY KEY, script_id INTEGER NOT NULL, user_id VARCHAR(30) NOT NULL, username VARCHAR(100) DEFAULT '', allowed BOOLEAN DEFAULT FALSE, kicked BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT NOW());`);
         await pool.query(`CREATE TABLE IF NOT EXISTS servers (id SERIAL PRIMARY KEY, name VARCHAR(100) NOT NULL, owner VARCHAR(50) NOT NULL, invite_code VARCHAR(16) UNIQUE NOT NULL, icon VARCHAR(10) DEFAULT '🎮', created_at TIMESTAMP DEFAULT NOW());`);
         await pool.query(`CREATE TABLE IF NOT EXISTS server_members (id SERIAL PRIMARY KEY, server_id INTEGER NOT NULL, username VARCHAR(50) NOT NULL, role VARCHAR(20) DEFAULT 'MEMBER', joined_at TIMESTAMP DEFAULT NOW());`);
-        await pool.query(`CREATE TABLE IF NOT EXISTS channels (id SERIAL PRIMARY KEY, server_id INTEGER NOT NULL, name VARCHAR(50) NOT NULL, type VARCHAR(10) DEFAULT 'text', created_by VARCHAR(50) NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS channels (id SERIAL PRIMARY KEY, server_id INTEGER NOT NULL, name VARCHAR(50) NOT NULL, type VARCHAR(10) DEFAULT 'text', read_only BOOLEAN DEFAULT FALSE, created_by VARCHAR(50) NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
         await pool.query(`CREATE TABLE IF NOT EXISTS chat_messages (id SERIAL PRIMARY KEY, channel_id INTEGER NOT NULL, username VARCHAR(50) NOT NULL, role VARCHAR(20) DEFAULT 'USER', message TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
 
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS short_id VARCHAR(32);`);
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '';`);
+        await pool.query(`ALTER TABLE channels ADD COLUMN IF NOT EXISTS read_only BOOLEAN DEFAULT FALSE;`);
 
         const noShort = await pool.query(`SELECT id FROM scripts WHERE short_id IS NULL`);
         for (const row of noShort.rows) {
@@ -109,16 +110,8 @@ function buildWhitelistWrapper(shortId) {
 }
 
 // ==================== FAVICON ROUTES ====================
-app.get('/favicon.ico', function(req, res) {
-    res.setHeader('Content-Type', 'image/svg+xml');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.send(FAVICON_SVG);
-});
-app.get('/favicon.svg', function(req, res) {
-    res.setHeader('Content-Type', 'image/svg+xml');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.send(FAVICON_SVG);
-});
+app.get('/favicon.ico', function(req, res) { res.setHeader('Content-Type', 'image/svg+xml'); res.setHeader('Cache-Control', 'public, max-age=86400'); res.send(FAVICON_SVG); });
+app.get('/favicon.svg', function(req, res) { res.setHeader('Content-Type', 'image/svg+xml'); res.setHeader('Cache-Control', 'public, max-age=86400'); res.send(FAVICON_SVG); });
 
 const LAYOUT_STYLES = `
 *{box-sizing:border-box;margin:0;padding:0}
@@ -160,6 +153,7 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300p
 .btn-danger{background:rgba(255,59,59,0.1);color:#ff5555;border-color:rgba(255,59,59,0.25)}
 .btn-ghost{background:transparent;color:var(--text1);border-color:var(--border)}
 .btn-sm{padding:9px 14px;font-size:12px;min-height:38px}
+.btn-xs{padding:4px 8px;font-size:11px;min-height:auto}
 .btn-success{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
 .card{background:linear-gradient(180deg,rgba(22,11,11,0.7),rgba(10,5,5,0.9));border:1px solid var(--border);border-radius:18px;padding:28px;margin-bottom:16px}
 .badge{display:inline-flex;align-items:center;padding:4px 11px;border-radius:8px;font-size:10.5px;font-weight:800;border:1px solid transparent}
@@ -202,8 +196,8 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300p
 .stat{background:linear-gradient(180deg,rgba(22,11,11,0.7),rgba(10,5,5,0.9));border:1px solid var(--border);border-radius:14px;padding:22px}
 .stat-label{font-size:11px;color:var(--text3);font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
 .stat-value{font-size:28px;font-weight:800}
-.chat-layout{display:grid;grid-template-columns:240px 1fr 200px;background:var(--bg1);border:1px solid var(--border);border-radius:16px;overflow:hidden;height:calc(100vh - 260px);min-height:500px}
-.chat-sidebar{background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.chat-layout{display:grid;grid-template-columns:240px 1fr 220px;background:var(--bg1);border:1px solid var(--border);border-radius:16px;overflow:hidden;height:calc(100vh - 260px);min-height:500px}
+.chat-sidebar{background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
 .chat-sidebar-header{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .channel-group-label{font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:1px;padding:12px 14px 6px;display:flex;justify-content:space-between}
 .channel-item{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;cursor:pointer;color:var(--text2);font-size:13px;font-weight:600;margin:2px 6px;justify-content:space-between}
@@ -227,10 +221,23 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300p
 .chat-input-area{padding:14px 18px;border-top:1px solid var(--border);background:var(--bg)}
 .chat-input-area form{display:flex;gap:10px}
 .chat-input-area input{flex:1;margin:0;background:var(--bg2);border-color:transparent}
+.chat-input-area input:disabled{opacity:0.5;cursor:not-allowed}
 .members-list{padding:12px;overflow-y:auto;border-left:1px solid var(--border);background:var(--bg)}
 .member-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--text1);margin-bottom:2px}
 .member-avatar{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;flex-shrink:0}
-@media(max-width:900px){.sidebar{transform:translateX(-100%)}.main{margin-left:0}.content{padding:20px}.page-title{font-size:26px}.grid-2{grid-template-columns:1fr}.grid-scripts{grid-template-columns:1fr}.chat-layout{grid-template-columns:1fr}.members-list{display:none}}
+.member-actions{margin-left:auto;display:flex;gap:4px;opacity:0;transition:opacity 0.2s}
+.member-item:hover .member-actions{opacity:1}
+.member-kick{background:rgba(220,38,38,0.15);color:#ff5555;border-radius:5px;font-size:10px;padding:2px 6px;font-weight:700}
+.member-kick:hover{background:rgba(220,38,38,0.4)}
+.voice-status{padding:12px;border-top:1px solid var(--border);background:var(--bg2)}
+.voice-status-title{font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;margin-bottom:6px}
+.voice-participant{display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0;color:var(--text1)}
+.voice-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+#screenShareVideo{position:fixed;top:20px;right:20px;width:480px;max-width:45vw;background:#000;border-radius:12px;border:2px solid var(--red);z-index:9999;display:none;box-shadow:0 20px 60px rgba(0,0,0,0.8)}
+#screenShareVideo video{width:100%;display:block;border-radius:10px}
+#screenShareVideo .close-btn{position:absolute;top:8px;right:8px;background:var(--red);color:#fff;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer}
+@media(max-width:900px){.sidebar{transform:translateX(-100%)}.main{margin-left:0}.content{padding:20px}.page-title{font-size:26px}.grid-2{grid-template-columns:1fr}.grid-scripts{grid-template-columns:1fr}.chat-layout{grid-template-columns:1fr}.members-list{display:none}#screenShareVideo{width:90vw;right:5vw}}
 `;
 
 const TOAST_SCRIPT = `function copyText(t){navigator.clipboard.writeText(t).then(function(){alert('Copied!')})}function confirmDelete(i,n){if(confirm('Delete "'+n+'"?'))window.location.href='/delete/'+i}`;
@@ -243,7 +250,6 @@ function renderLayout(opts) {
     return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + title + ' · ' + BRAND_SHORT + '</title>' + faviconLink + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="layout"><aside class="sidebar"><div class="brand"><div class="brand-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div><div class="brand-name">' + BRAND_SHORT + '</div><div class="brand-sub">By Zyrox-Kido</div></div></div><div class="nav-label">Workspace</div><a href="/" class="nav-item ' + (activeNav === 'dashboard' ? 'active' : '') + '">Dashboard</a><a href="/create" class="nav-item ' + (activeNav === 'create' ? 'active' : '') + '">Create Script</a><a href="/servers" class="nav-item ' + (activeNav === 'servers' ? 'active' : '') + '">Servers</a>' + adminLink + '<div class="sidebar-footer"><a href="/logout" class="user-card"><div class="user-avatar ' + (isAdmin ? 'user-avatar-admin' : '') + '">' + user.username[0].toUpperCase() + '</div><div><div class="user-name">' + user.username + '</div><div class="user-role">' + (isAdmin ? 'Admin' : 'Member') + '</div></div></a></div></aside><div class="main"><header class="topbar"><div class="topbar-title">' + pageTitle + '</div></header><div class="content"><div class="page-title">' + pageTitle + '</div>' + (pageSubtitle ? '<div class="page-sub">' + pageSubtitle + '</div>' : '') + (actions || '') + content + '</div></div></div><script>' + TOAST_SCRIPT + '</script></body></html>';
 }
 
-// ==================== ICON RENDER ====================
 function renderScriptIcon(icon, fallbackText) {
     var src = (icon && icon.trim()) ? icon.trim() : FAVICON_DATA;
     var fallback = (fallbackText || 'ZK').replace(/"/g, '').replace(/'/g, '');
@@ -367,14 +373,10 @@ app.get('/:scriptName/:version/id=:shortId', async function(req, res) {
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         return res.send(buildWhitelistWrapper(s.short_id));
-    } catch (e) { 
-        console.error(e); 
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8'); 
-        return res.status(500).send("-- Error --"); 
-    }
+    } catch (e) { console.error(e); res.setHeader('Content-Type', 'text/plain; charset=utf-8'); return res.status(500).send("-- Error --"); }
 });
 
-// ==================== API/RAW (legacy) ====================
+// ==================== API/RAW ====================
 app.get('/api/raw', async function(req, res) {
     try {
         const shortId = req.query.id;
@@ -452,42 +454,19 @@ app.get('/logs/:token', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).send('Error'); }
 });
 
-// ==================== ADMIN (Users List) ====================
+// ==================== ADMIN ====================
 app.get('/admin', requireLogin, requireAdmin, async function(req, res) {
     try {
-        // === USERS LIST (clickable) ===
         const u = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
         let userRows = '';
         for (const x of u.rows) { 
             const isA = x.role === 'ADMIN'; 
-            // Get script count for this user
             const scCount = await pool.query('SELECT COUNT(*) as c FROM scripts WHERE owner = $1', [x.username]);
             const scriptCount = scCount.rows[0].c;
-            userRows += '<div class="card" style="display:flex;align-items:center;gap:14px;padding:16px 20px;margin-bottom:8px;cursor:pointer;transition:all 0.2s;" onclick="window.location.href=\'/admin/user/' + encodeURIComponent(x.username) + '\'" onmouseover="this.style.background=\'rgba(255,59,59,0.08)\'" onmouseout="this.style.background=\'\'">' +
-                '<div class="user-avatar ' + (isA ? 'user-avatar-admin' : '') + '">' + x.username[0].toUpperCase() + '</div>' +
-                '<div style="flex:1;">' +
-                    '<div style="font-weight:700;">' + x.username + ' <span class="badge ' + (isA ? 'badge-admin' : 'badge-purple') + '">' + x.role + '</span></div>' +
-                    '<div style="font-size:12px;color:var(--text3);margin-top:4px;">' + scriptCount + ' script' + (scriptCount !== 1 ? 's' : '') + '</div>' +
-                '</div>' +
-                '<span style="color:var(--text3);font-size:20px;">→</span>' +
-            '</div>'; 
+            userRows += '<div class="card" style="display:flex;align-items:center;gap:14px;padding:16px 20px;margin-bottom:8px;cursor:pointer;transition:all 0.2s;" onclick="window.location.href=\'/admin/user/' + encodeURIComponent(x.username) + '\'" onmouseover="this.style.background=\'rgba(255,59,59,0.08)\'" onmouseout="this.style.background=\'\'">' + '<div class="user-avatar ' + (isA ? 'user-avatar-admin' : '') + '">' + x.username[0].toUpperCase() + '</div>' + '<div style="flex:1;">' + '<div style="font-weight:700;">' + x.username + ' <span class="badge ' + (isA ? 'badge-admin' : 'badge-purple') + '">' + x.role + '</span></div>' + '<div style="font-size:12px;color:var(--text3);margin-top:4px;">' + scriptCount + ' script' + (scriptCount !== 1 ? 's' : '') + '</div>' + '</div>' + '<span style="color:var(--text3);font-size:20px;">→</span>' + '</div>'; 
         }
-
-        const content = 
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">' +
-                '<div style="font-size:22px;font-weight:800;">Users (' + u.rows.length + ')</div>' +
-                '<div style="font-size:12px;color:var(--text3);">Click a user to view their scripts</div>' +
-            '</div>' +
-            userRows;
-
-        res.send(renderLayout({ 
-            title: 'Admin', 
-            pageTitle: 'Admin Panel', 
-            pageSubtitle: u.rows.length + ' users', 
-            content: content, 
-            user: req.session.user, 
-            activeNav: 'admin' 
-        }));
+        const content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">' + '<div style="font-size:22px;font-weight:800;">Users (' + u.rows.length + ')</div>' + '<div style="font-size:12px;color:var(--text3);">Click a user to view their scripts</div>' + '</div>' + userRows;
+        res.send(renderLayout({ title: 'Admin', pageTitle: 'Admin Panel', pageSubtitle: u.rows.length + ' users', content: content, user: req.session.user, activeNav: 'admin' }));
     } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
 });
 
@@ -495,17 +474,11 @@ app.get('/admin', requireLogin, requireAdmin, async function(req, res) {
 app.get('/admin/user/:username', requireLogin, requireAdmin, async function(req, res) {
     try {
         const targetUser = req.params.username;
-        
-        // Get user info
         const uR = await pool.query('SELECT id, username, role, created_at FROM users WHERE username = $1', [targetUser]);
         if (uR.rows.length === 0) return res.status(404).send('User not found');
         const targetUserInfo = uR.rows[0];
         const isTargetAdmin = targetUserInfo.role === 'ADMIN';
-
-        // Get ALL scripts of this user
         const sc = await pool.query('SELECT * FROM scripts WHERE owner = $1 ORDER BY created_at DESC', [targetUser]);
-        
-        // Get log stats per user
         const logStats = await pool.query('SELECT COUNT(*) as total, SUM(CASE WHEN allowed THEN 1 ELSE 0 END) as allowed, SUM(CASE WHEN kicked THEN 1 ELSE 0 END) as kicked FROM execution_logs WHERE script_id IN (SELECT id FROM scripts WHERE owner = $1)', [targetUser]);
         const stats = logStats.rows[0] || { total: 0, allowed: 0, kicked: 0 };
 
@@ -517,63 +490,16 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async function(req,
             for (const s of sc.rows) {
                 let count = 0; try { count = JSON.parse(s.allowed_ids || '[]').length; } catch(e) {}
                 const ls = buildLoadstring(s.name, s.version, s.short_id);
-                const badge = s.access_type === 'whitelist' 
-                    ? '<span class="badge badge-yellow">Whitelist (' + count + ')</span>' 
-                    : '<span class="badge badge-green">Public</span>';
-                scriptRows += '<div class="card">' +
-                    '<div style="display:flex;gap:12px;margin-bottom:14px;">' + 
-                        renderScriptIcon(s.icon, s.name[0]) + 
-                        '<div style="flex:1;min-width:0;">' +
-                            '<div style="font-size:16px;font-weight:800;margin-bottom:6px;">' + s.name + '</div>' +
-                            '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + badge + 
-                                '<span class="badge badge-purple">' + s.version + '</span>' +
-                            '</div>' +
-                        '</div>' +
-                    '</div>' +
-                    '<div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" title="Click to copy">' + ls + '</div>' +
-                    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">' +
-                        '<button class="btn btn-primary btn-sm" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">Copy Loadstring</button>' +
-                        '<a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">Logs</a>' +
-                        '<a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">Edit</a>' +
-                        '<button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name.replace(/'/g, "\\'") + '\')">Delete</button>' +
-                    '</div>' +
-                '</div>';
+                const badge = s.access_type === 'whitelist' ? '<span class="badge badge-yellow">Whitelist (' + count + ')</span>' : '<span class="badge badge-green">Public</span>';
+                scriptRows += '<div class="card">' + '<div style="display:flex;gap:12px;margin-bottom:14px;">' + renderScriptIcon(s.icon, s.name[0]) + '<div style="flex:1;min-width:0;">' + '<div style="font-size:16px;font-weight:800;margin-bottom:6px;">' + s.name + '</div>' + '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + badge + '<span class="badge badge-purple">' + s.version + '</span>' + '</div>' + '</div>' + '</div>' + '<div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" title="Click to copy">' + ls + '</div>' + '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">' + '<button class="btn btn-primary btn-sm" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">Copy Loadstring</button>' + '<a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">Logs</a>' + '<a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">Edit</a>' + '<button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name.replace(/'/g, "\\'") + '\')">Delete</button>' + '</div>' + '</div>';
             }
             scriptRows += '</div>';
         }
 
-        const header = 
-            '<div class="card" style="display:flex;align-items:center;gap:20px;margin-bottom:24px;flex-wrap:wrap;">' +
-                '<div class="user-avatar ' + (isTargetAdmin ? 'user-avatar-admin' : '') + '" style="width:64px;height:64px;font-size:24px;border-radius:16px;">' + targetUserInfo.username[0].toUpperCase() + '</div>' +
-                '<div style="flex:1;min-width:200px;">' +
-                    '<div style="font-size:24px;font-weight:800;margin-bottom:6px;">' + targetUserInfo.username + '</div>' +
-                    '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
-                        '<span class="badge ' + (isTargetAdmin ? 'badge-admin' : 'badge-purple') + '">' + targetUserInfo.role + '</span>' +
-                        '<span class="badge badge-green">' + sc.rows.length + ' scripts</span>' +
-                        '<span class="badge badge-purple">' + (stats.total || 0) + ' executions</span>' +
-                    '</div>' +
-                '</div>' +
-                '<a href="/admin" class="btn btn-ghost btn-sm">← Back to Admin</a>' +
-            '</div>';
-
-        const statCards = 
-            '<div class="stat-grid">' +
-                '<div class="stat"><div class="stat-label">Total Scripts</div><div class="stat-value">' + sc.rows.length + '</div></div>' +
-                '<div class="stat"><div class="stat-label">Whitelist Scripts</div><div class="stat-value">' + sc.rows.filter(s => s.access_type === 'whitelist').length + '</div></div>' +
-                '<div class="stat"><div class="stat-label">Total Executions</div><div class="stat-value">' + (stats.total || 0) + '</div></div>' +
-                '<div class="stat"><div class="stat-label">Kicked</div><div class="stat-value" style="color:#ff5555">' + (stats.kicked || 0) + '</div></div>' +
-            '</div>';
-
+        const header = '<div class="card" style="display:flex;align-items:center;gap:20px;margin-bottom:24px;flex-wrap:wrap;">' + '<div class="user-avatar ' + (isTargetAdmin ? 'user-avatar-admin' : '') + '" style="width:64px;height:64px;font-size:24px;border-radius:16px;">' + targetUserInfo.username[0].toUpperCase() + '</div>' + '<div style="flex:1;min-width:200px;">' + '<div style="font-size:24px;font-weight:800;margin-bottom:6px;">' + targetUserInfo.username + '</div>' + '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + '<span class="badge ' + (isTargetAdmin ? 'badge-admin' : 'badge-purple') + '">' + targetUserInfo.role + '</span>' + '<span class="badge badge-green">' + sc.rows.length + ' scripts</span>' + '<span class="badge badge-purple">' + (stats.total || 0) + ' executions</span>' + '</div>' + '</div>' + '<a href="/admin" class="btn btn-ghost btn-sm">← Back to Admin</a>' + '</div>';
+        const statCards = '<div class="stat-grid">' + '<div class="stat"><div class="stat-label">Total Scripts</div><div class="stat-value">' + sc.rows.length + '</div></div>' + '<div class="stat"><div class="stat-label">Whitelist Scripts</div><div class="stat-value">' + sc.rows.filter(s => s.access_type === 'whitelist').length + '</div></div>' + '<div class="stat"><div class="stat-label">Total Executions</div><div class="stat-value">' + (stats.total || 0) + '</div></div>' + '<div class="stat"><div class="stat-label">Kicked</div><div class="stat-value" style="color:#ff5555">' + (stats.kicked || 0) + '</div></div>' + '</div>';
         const content = header + statCards + scriptRows;
-
-        res.send(renderLayout({ 
-            title: targetUserInfo.username + ' - Scripts', 
-            pageTitle: targetUserInfo.username + "'s Scripts", 
-            pageSubtitle: 'All scripts owned by this user', 
-            content: content, 
-            user: req.session.user, 
-            activeNav: 'admin' 
-        }));
+        res.send(renderLayout({ title: targetUserInfo.username + ' - Scripts', pageTitle: targetUserInfo.username + "'s Scripts", pageSubtitle: 'All scripts owned by this user', content: content, user: req.session.user, activeNav: 'admin' }));
     } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
 });
 
@@ -615,7 +541,7 @@ app.post('/api/servers/join', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ==================== SERVER VIEW ====================
+// ==================== SERVER VIEW (with Voice + Kick + Private Chat) ====================
 app.get('/server/:id', requireLogin, async function(req, res) {
     try {
         const serverId = parseInt(req.params.id);
@@ -634,20 +560,171 @@ app.get('/server/:id', requireLogin, async function(req, res) {
 
         let chHtml = '';
         for (const c of channels) {
-            const icon = c.type === 'text' ? '#' : '🔊';
+            const icon = c.type === 'text' ? '#' : (c.type === 'voice' ? '🔊' : '🔒');
             const del = canManage ? '<button class="channel-delete" onclick="event.stopPropagation();deleteChannel(' + c.id + ')">🗑</button>' : '';
-            chHtml += '<div class="channel-item" data-channel-id="' + c.id + '" data-channel-name="' + c.name + '" data-channel-type="' + c.type + '" onclick="switchChannel(' + c.id + ', \'' + c.name.replace(/'/g, "\\'") + '\', \'' + c.type + '\')"><div class="channel-item-left"><span style="color:var(--text3);">' + icon + '</span><span class="channel-name">' + c.name + '</span></div>' + del + '</div>';
+            chHtml += '<div class="channel-item" data-channel-id="' + c.id + '" data-channel-name="' + c.name + '" data-channel-type="' + c.type + '" data-readonly="' + (c.read_only ? '1' : '0') + '" onclick="switchChannel(' + c.id + ', \'' + c.name.replace(/'/g, "\\'") + '\', \'' + c.type + '\', ' + (c.read_only ? 'true' : 'false') + ')"><div class="channel-item-left"><span style="color:var(--text3);">' + icon + '</span><span class="channel-name">' + c.name + '</span>' + (c.read_only ? '<span style="font-size:9px;color:var(--text3);">READ-ONLY</span>' : '') + '</div>' + del + '</div>';
         }
         let mbHtml = '';
         for (const m of membersR.rows) {
             const bdg = m.role === 'OWNER' ? '👑' : '';
-            mbHtml += '<div class="member-item"><div class="member-avatar">' + m.username[0].toUpperCase() + '</div><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + m.username + '</span><span style="font-size:11px;">' + bdg + '</span></div>';
+            const kickBtn = (canManage && m.username !== srv.owner) ? '<button class="member-kick" onclick="event.stopPropagation();kickUser(\'' + m.username.replace(/'/g, "\\'") + '\')">Kick</button>' : '';
+            mbHtml += '<div class="member-item"><div class="member-avatar">' + m.username[0].toUpperCase() + '</div><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + m.username + '</span><span style="font-size:11px;">' + bdg + '</span><div class="member-actions">' + kickBtn + '</div></div>';
         }
-        const content = '<div class="chat-layout"><div class="chat-sidebar"><div class="chat-sidebar-header"><div style="display:flex;align-items:center;gap:10px;"><span style="font-size:22px;">' + (srv.icon || '🎮') + '</span><span style="font-weight:800;font-size:14px;">' + srv.name + '</span></div></div><div class="channel-group-label"><span>CHANNELS</span>' + (canManage ? '<button onclick="document.getElementById(\'createChannelModal\').style.display=\'flex\'" style="color:var(--text3);font-size:16px;">+</button>' : '') + '</div><div id="channelsList">' + chHtml + '</div><div style="margin-top:auto;padding:12px;border-top:1px solid var(--border);"><div class="copy-box" onclick="copyText(\'' + srv.invite_code + '\')">Invite: ' + srv.invite_code + '</div><a href="/servers" style="display:block;text-align:center;color:var(--text2);font-size:12px;padding:8px;">All Servers</a></div></div><div class="chat-main"><div class="chat-header"><div style="display:flex;align-items:center;gap:8px;"><span id="currentChannelIcon" style="color:var(--text3);">#</span><span id="currentChannelName" style="font-weight:700;">Select channel</span></div></div><div class="chat-messages" id="chatMessages"><div style="text-align:center;color:var(--text3);padding:40px;">Select a channel</div></div><div class="chat-input-area"><form onsubmit="event.preventDefault();sendMessage();"><input type="text" id="chatInput" placeholder="Message..." maxlength="500"><button type="submit" class="btn btn-primary">Send</button></form></div></div><div class="members-list"><div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;padding:8px;">Members (' + membersR.rows.length + ')</div>' + mbHtml + '</div></div><div id="createChannelModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;"><div class="card" style="width:400px;"><div style="font-size:18px;font-weight:800;margin-bottom:16px;">Create Channel</div><div class="form-group"><label class="form-label">Name</label><input type="text" id="newChannelName"></div><div class="form-group"><label class="form-label">Type</label><select id="newChannelType"><option value="text">Text</option><option value="voice">Voice</option></select></div><div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn btn-ghost" onclick="document.getElementById(\'createChannelModal\').style.display=\'none\'">Cancel</button><button class="btn btn-primary" onclick="createChannel()">Create</button></div></div></div><script>const SERVER_ID=' + serverId + ';let currentChannelId=null,currentChannelType="text";async function createChannel(){const n=document.getElementById("newChannelName").value.trim();const t=document.getElementById("newChannelType").value;if(!n)return alert("Name required");const r=await fetch("/api/servers/' + serverId + '/channels",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:n,type:t})});const d=await r.json();if(d.id){location.reload()}else alert(d.error||"Error")}async function deleteChannel(id){if(!confirm("Delete this channel?"))return;const r=await fetch("/api/channels/"+id+"/delete",{method:"POST"});const d=await r.json();if(d.success){const el=document.querySelector(\'.channel-item[data-channel-id="\'+id+\'"]\');if(el)el.remove();if(currentChannelId===id){currentChannelId=null;document.getElementById("chatMessages").innerHTML=\'<div style="text-align:center;color:var(--text3);padding:40px;">Select a channel</div>\';document.getElementById("currentChannelName").textContent="Select channel"}}else alert(d.error||"Error")}async function switchChannel(id,name,type){currentChannelId=id;currentChannelType=type;document.querySelectorAll(".channel-item").forEach(function(el){el.classList.remove("active")});const el=document.querySelector(\'.channel-item[data-channel-id="\'+id+\'"]\');if(el)el.classList.add("active");document.getElementById("currentChannelName").textContent=name;document.getElementById("currentChannelIcon").textContent=type==="voice"?"🔊":"#";document.getElementById("chatMessages").innerHTML=\'<div style="text-align:center;color:var(--text3);padding:20px;">Loading...</div>\';const r=await fetch("/api/channels/"+id+"/messages");const msgs=await r.json();renderMessages(msgs)}function renderMessages(msgs){const box=document.getElementById("chatMessages");if(msgs.length===0){box.innerHTML=\'<div style="text-align:center;color:var(--text3);padding:40px;">No messages yet</div>\';return}box.innerHTML="";msgs.forEach(function(m){const isA=m.role==="ADMIN";const av=isA?"linear-gradient(135deg,#ffaa00,#ff6600)":"linear-gradient(135deg,var(--red),var(--red2))";const div=document.createElement("div");div.className="chat-message";div.innerHTML=\'<div class="msg-avatar" style="background:\'+av+\'">\'+m.username[0].toUpperCase()+\'</div><div class="msg-body"><div class="msg-meta"><span class="msg-username">\'+m.username+\'</span>\'+(isA?\'<span class="badge badge-admin">Admin</span>\':"")+\'<span class="msg-time">\'+m.created_at+\'</span></div><div class="msg-content">\'+m.message+\'</div></div>\';box.appendChild(div)});box.scrollTop=box.scrollHeight}async function sendMessage(){if(!currentChannelId||currentChannelType==="voice")return;const input=document.getElementById("chatInput");const msg=input.value.trim();if(!msg)return;await fetch("/api/channels/"+currentChannelId+"/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg})});input.value="";switchChannel(currentChannelId,document.getElementById("currentChannelName").textContent,currentChannelType)}setInterval(function(){if(currentChannelId&&currentChannelType==="text")switchChannel(currentChannelId,document.getElementById("currentChannelName").textContent,currentChannelType)},5000);</script>';
+
+        const content = '<div class="chat-layout">' +
+            '<div class="chat-sidebar">' +
+                '<div class="chat-sidebar-header"><div style="display:flex;align-items:center;gap:10px;"><span style="font-size:22px;">' + (srv.icon || '🎮') + '</span><span style="font-weight:800;font-size:14px;">' + srv.name + '</span></div></div>' +
+                '<div class="channel-group-label"><span>CHANNELS</span>' + (canManage ? '<button onclick="document.getElementById(\'createChannelModal\').style.display=\'flex\'" style="color:var(--text3);font-size:16px;">+</button>' : '') + '</div>' +
+                '<div id="channelsList">' + chHtml + '</div>' +
+                '<div class="voice-status" id="voiceStatus" style="display:none;">' +
+                    '<div class="voice-status-title">🔊 Voice Connected</div>' +
+                    '<div id="voiceParticipants"></div>' +
+                    '<div style="display:flex;gap:6px;margin-top:8px;">' +
+                        '<button class="btn btn-danger btn-xs" onclick="leaveVoice()" style="flex:1;">Disconnect</button>' +
+                        '<button class="btn btn-secondary btn-xs" onclick="toggleMute()" id="muteBtn" style="flex:1;">Mute</button>' +
+                    '</div>' +
+                    '<button class="btn btn-secondary btn-xs" onclick="shareScreen()" id="shareBtn" style="width:100%;margin-top:6px;">Share Screen</button>' +
+                '</div>' +
+                '<div style="margin-top:auto;padding:12px;border-top:1px solid var(--border);">' +
+                    '<div class="copy-box" onclick="copyText(\'' + srv.invite_code + '\')">Invite: ' + srv.invite_code + '</div>' +
+                    '<a href="/servers" style="display:block;text-align:center;color:var(--text2);font-size:12px;padding:8px;">All Servers</a>' +
+                '</div>' +
+            '</div>' +
+            '<div class="chat-main">' +
+                '<div class="chat-header"><div style="display:flex;align-items:center;gap:8px;"><span id="currentChannelIcon" style="color:var(--text3);">#</span><span id="currentChannelName" style="font-weight:700;">Select channel</span><span id="channelTypeBadge"></span></div></div>' +
+                '<div class="chat-messages" id="chatMessages"><div style="text-align:center;color:var(--text3);padding:40px;">Select a channel</div></div>' +
+                '<div class="chat-input-area"><form onsubmit="event.preventDefault();sendMessage();"><input type="text" id="chatInput" placeholder="Message..." maxlength="500" disabled><button type="submit" class="btn btn-primary" id="sendBtn" disabled>Send</button></form></div>' +
+            '</div>' +
+            '<div class="members-list"><div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;padding:8px;">Members (' + membersR.rows.length + ')</div>' + mbHtml + '</div>' +
+        '</div>' +
+        '<div id="screenShareVideo"><button class="close-btn" onclick="stopScreenShare()">Stop</button><video id="screenVideo" autoplay playsinline></video></div>' +
+        '<audio id="remoteAudio" autoplay></audio>' +
+        '<div id="createChannelModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;"><div class="card" style="width:440px;">' +
+            '<div style="font-size:18px;font-weight:800;margin-bottom:16px;">Create Channel</div>' +
+            '<div class="form-group"><label class="form-label">Name</label><input type="text" id="newChannelName"></div>' +
+            '<div class="form-group"><label class="form-label">Type</label><select id="newChannelType"><option value="text">💬 Text</option><option value="voice">🔊 Voice</option><option value="private">🔒 Private (Read-Only)</option></select></div>' +
+            '<div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn btn-ghost" onclick="document.getElementById(\'createChannelModal\').style.display=\'none\'">Cancel</button><button class="btn btn-primary" onclick="createChannel()">Create</button></div>' +
+        '</div></div>' +
+        '<script src="/socket.io/socket.io.js"></script>' +
+        '<script>' +
+        'const SERVER_ID=' + serverId + ';' +
+        'const ME="' + me.replace(/"/g, '\\"') + '";' +
+        'const IS_ADMIN=' + (canManage ? 'true' : 'false') + ';' +
+        'let currentChannelId=null,currentChannelType="text",currentReadOnly=false;' +
+        'const socket=io();' +
+        'let localStream=null,peerConnections={},screenStream=null;' +
+        // ==== CHANNEL SWITCH ====
+        'async function switchChannel(id,name,type,readOnly){' +
+            'currentChannelId=id;currentChannelType=type;currentReadOnly=!!readOnly;' +
+            'document.querySelectorAll(".channel-item").forEach(function(el){el.classList.remove("active")});' +
+            'const el=document.querySelector(\'.channel-item[data-channel-id="\'+id+\'"]\');if(el)el.classList.add("active");' +
+            'document.getElementById("currentChannelName").textContent=name;' +
+            'document.getElementById("currentChannelIcon").textContent=type==="voice"?"🔊":(type==="private"?"🔒":"#");' +
+            'document.getElementById("channelTypeBadge").innerHTML=readOnly?\' <span class="badge badge-red">Read-Only</span>\':"";' +
+            'if(type==="voice"){' +
+                'document.getElementById("chatMessages").innerHTML=\'<div style="text-align:center;color:var(--text3);padding:40px;">Voice Channel — Click Join to connect</div>\';' +
+                'document.getElementById("chatInput").disabled=true;document.getElementById("sendBtn").disabled=true;' +
+                'showJoinVoice();' +
+            '}else{' +
+                'document.getElementById("chatInput").disabled=readOnly;' +
+                'document.getElementById("sendBtn").disabled=readOnly;' +
+                'document.getElementById("chatInput").placeholder=readOnly?"Read-only channel":"Message...";' +
+                'document.getElementById("chatMessages").innerHTML=\'<div style="text-align:center;color:var(--text3);padding:20px;">Loading...</div>\';' +
+                'const r=await fetch("/api/channels/"+id+"/messages");const msgs=await r.json();renderMessages(msgs);' +
+                'socket.emit("join-channel",id);' +
+            '}' +
+        '}' +
+        'function showJoinVoice(){' +
+            'const box=document.getElementById("chatMessages");' +
+            'box.innerHTML=\'<div style="text-align:center;padding:40px;"><div style="font-size:60px;margin-bottom:16px;">🔊</div><div style="font-size:18px;font-weight:700;margin-bottom:16px;">Voice Channel</div><button class="btn btn-primary" onclick="joinVoice()">Join Voice</button></div>\';' +
+        '}' +
+        'function renderMessages(msgs){' +
+            'const box=document.getElementById("chatMessages");' +
+            'if(msgs.length===0){box.innerHTML=\'<div style="text-align:center;color:var(--text3);padding:40px;">No messages yet</div>\';return}' +
+            'box.innerHTML="";' +
+            'msgs.forEach(function(m){const isA=m.role==="ADMIN";const av=isA?"linear-gradient(135deg,#ffaa00,#ff6600)":"linear-gradient(135deg,var(--red),var(--red2))";const div=document.createElement("div");div.className="chat-message";div.innerHTML=\'<div class="msg-avatar" style="background:\'+av+\'">\'+m.username[0].toUpperCase()+\'</div><div class="msg-body"><div class="msg-meta"><span class="msg-username">\'+m.username+\'</span>\'+(isA?\'<span class="badge badge-admin">Admin</span>\':"")+\'<span class="msg-time">\'+m.created_at+\'</span></div><div class="msg-content">\'+m.message+\'</div></div>\';box.appendChild(div)});' +
+            'box.scrollTop=box.scrollHeight;' +
+        '}' +
+        'async function sendMessage(){' +
+            'if(!currentChannelId||currentChannelType==="voice"||currentReadOnly)return;' +
+            'const input=document.getElementById("chatInput");const msg=input.value.trim();if(!msg)return;' +
+            'await fetch("/api/channels/"+currentChannelId+"/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:msg})});' +
+            'input.value="";switchChannel(currentChannelId,document.getElementById("currentChannelName").textContent,currentChannelType,currentReadOnly);' +
+        '}' +
+        'async function createChannel(){' +
+            'const n=document.getElementById("newChannelName").value.trim();const t=document.getElementById("newChannelType").value;' +
+            'if(!n)return alert("Name required");' +
+            'const r=await fetch("/api/servers/' + serverId + '/channels",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:n,type:t})});' +
+            'const d=await r.json();if(d.id){location.reload()}else alert(d.error||"Error");' +
+        '}' +
+        'async function deleteChannel(id){if(!confirm("Delete this channel?"))return;const r=await fetch("/api/channels/"+id+"/delete",{method:"POST"});const d=await r.json();if(d.success){const el=document.querySelector(\'.channel-item[data-channel-id="\'+id+\'"]\');if(el)el.remove();if(currentChannelId===id){currentChannelId=null;document.getElementById("chatMessages").innerHTML=\'<div style="text-align:center;color:var(--text3);padding:40px;">Select a channel</div>\';document.getElementById("currentChannelName").textContent="Select channel"}}else alert(d.error||"Error")}' +
+        'async function kickUser(username){if(!confirm("Kick "+username+" from this server?"))return;const r=await fetch("/api/servers/' + serverId + '/kick",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:username})});const d=await r.json();if(d.success){location.reload()}else alert(d.error||"Error")}' +
+        // ==== VOICE (WebRTC) ====
+        'async function joinVoice(){' +
+            'try{' +
+                'localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});' +
+                'socket.emit("voice-join",{serverId:SERVER_ID,channelId:currentChannelId,username:ME});' +
+                'document.getElementById("voiceStatus").style.display="block";' +
+                'document.getElementById("voiceParticipants").innerHTML=\'<div class="voice-participant"><span class="voice-dot"></span>\'+ME+\' (you)</div>\';' +
+            '}catch(e){alert("Microphone access denied: "+e.message)}' +
+        '}' +
+        'function leaveVoice(){' +
+            'if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}' +
+            'if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}' +
+            'Object.values(peerConnections).forEach(pc=>pc.close());peerConnections={};' +
+            'socket.emit("voice-leave",{serverId:SERVER_ID,channelId:currentChannelId,username:ME});' +
+            'document.getElementById("voiceStatus").style.display="none";' +
+            'stopScreenShare();' +
+        '}' +
+        'function toggleMute(){if(localStream){const a=localStream.getAudioTracks()[0];a.enabled=!a.enabled;document.getElementById("muteBtn").textContent=a.enabled?"Mute":"Unmute"}}' +
+        'async function shareScreen(){' +
+            'try{' +
+                'screenStream=await navigator.mediaDevices.getDisplayMedia({video:true});' +
+                'document.getElementById("screenVideo").srcObject=screenStream;' +
+                'document.getElementById("screenShareVideo").style.display="block";' +
+                'socket.emit("screen-share-start",{serverId:SERVER_ID,channelId:currentChannelId,username:ME});' +
+                'screenStream.getVideoTracks()[0].onended=function(){stopScreenShare()};' +
+            '}catch(e){alert("Screen share cancelled")}' +
+        '}' +
+        'function stopScreenShare(){if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null}document.getElementById("screenShareVideo").style.display="none";socket.emit("screen-share-stop",{serverId:SERVER_ID,channelId:currentChannelId})}' +
+        // ==== SOCKET EVENTS ====
+        'socket.on("chat-message",function(data){if(currentChannelId&&data.channelId===currentChannelId&&currentChannelType!=="voice"){switchChannel(currentChannelId,document.getElementById("currentChannelName").textContent,currentChannelType,currentReadOnly)}});' +
+        'socket.on("voice-participants",function(list){' +
+            'if(list.length===0){document.getElementById("voiceParticipants").innerHTML="";return}' +
+            'document.getElementById("voiceParticipants").innerHTML=list.map(u=>\'<div class="voice-participant"><span class="voice-dot"></span>\'+u+\'</div>\').join("");' +
+        '});' +
+        'socket.on("screen-share-active",function(data){' +
+            'const v=document.getElementById("screenShareVideo");const vid=document.getElementById("screenVideo");' +
+            'if(data.username!==ME){v.style.display="block";vid.srcObject=data.stream||null}' +
+        '});' +
+        'socket.on("user-kicked",function(data){if(data.username===ME){alert("You have been kicked from this server.");window.location.href="/servers"}});' +
+        'setInterval(function(){if(currentChannelId&&currentChannelType!=="voice")switchChannel(currentChannelId,document.getElementById("currentChannelName").textContent,currentChannelType,currentReadOnly)},5000);' +
+        '</script>';
+
         res.send(renderLayout({ title: srv.name, pageTitle: srv.name, pageSubtitle: membersR.rows.length + ' members', content: content, user: req.session.user, activeNav: 'servers' }));
     } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
 });
 
+// ==================== KICK USER API ====================
+app.post('/api/servers/:id/kick', requireLogin, async function(req, res) {
+    try {
+        const serverId = parseInt(req.params.id);
+        const { username } = req.body;
+        const me = req.session.user.username;
+        const isAdmin = req.session.user.role === 'ADMIN';
+        const srvR = await pool.query('SELECT * FROM servers WHERE id = $1', [serverId]);
+        if (srvR.rows.length === 0) return res.status(404).json({ error: 'Not found' });
+        const srv = srvR.rows[0];
+        if (srv.owner !== me && !isAdmin) return res.status(403).json({ error: 'Only owner' });
+        if (username === srv.owner) return res.status(400).json({ error: 'Cannot kick owner' });
+        await pool.query('DELETE FROM server_members WHERE server_id = $1 AND username = $2', [serverId, username]);
+        // Notify kicked user via socket
+        io.to('user-' + username).emit('user-kicked', { username: username, serverId: serverId });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ==================== CHANNEL APIs ====================
 app.post('/api/servers/:id/channels', requireLogin, async function(req, res) {
     try {
         const serverId = parseInt(req.params.id);
@@ -662,7 +739,11 @@ app.post('/api/servers/:id/channels', requireLogin, async function(req, res) {
         const cleanName = name.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-').substring(0, 30);
         const chk = await pool.query('SELECT * FROM channels WHERE server_id = $1 AND name = $2', [serverId, cleanName]);
         if (chk.rows.length > 0) return res.status(400).json({ error: 'Exists' });
-        const r = await pool.query('INSERT INTO channels (server_id, name, type, created_by) VALUES ($1,$2,$3,$4) RETURNING *', [serverId, cleanName, type === 'voice' ? 'voice' : 'text', me]);
+        let ctype = 'text';
+        let readOnly = false;
+        if (type === 'voice') ctype = 'voice';
+        else if (type === 'private') { ctype = 'text'; readOnly = true; }
+        const r = await pool.query('INSERT INTO channels (server_id, name, type, read_only, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING *', [serverId, cleanName, ctype, readOnly, me]);
         res.json(r.rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -695,15 +776,43 @@ app.post('/api/channels/:id/send', requireLogin, async function(req, res) {
         const cid = parseInt(req.params.id);
         const msg = (req.body.message || '').trim().substring(0, 500);
         if (!msg) return res.status(400).json({ error: 'Empty' });
+        // Check if read-only
+        const chk = await pool.query('SELECT read_only FROM channels WHERE id = $1', [cid]);
+        if (chk.rows.length === 0) return res.status(404).json({ error: 'Channel not found' });
+        const isAdmin = req.session.user.role === 'ADMIN';
+        if (chk.rows[0].read_only && !isAdmin) return res.status(403).json({ error: 'Read-only channel' });
         await pool.query('INSERT INTO chat_messages (channel_id, username, role, message) VALUES ($1,$2,$3,$4)', [cid, req.session.user.username, req.session.user.role, msg]);
+        io.to('channel-' + cid).emit('chat-message', { channelId: cid, username: req.session.user.username, message: msg });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ==================== SOCKET.IO SIGNALING ====================
+io.on('connection', function(socket) {
+    socket.on('join-channel', function(channelId) {
+        socket.join('channel-' + channelId);
+    });
+    socket.on('voice-join', function(data) {
+        socket.join('voice-' + data.serverId + '-' + data.channelId);
+        socket.username = data.username;
+        socket.join('user-' + data.username);
+        io.to('voice-' + data.serverId + '-' + data.channelId).emit('voice-participants', [data.username]);
+    });
+    socket.on('voice-leave', function(data) {
+        socket.leave('voice-' + data.serverId + '-' + data.channelId);
+        socket.to('voice-' + data.serverId + '-' + data.channelId).emit('voice-participants', []);
+    });
+    socket.on('screen-share-start', function(data) {
+        socket.to('voice-' + data.serverId + '-' + data.channelId).emit('screen-share-active', { username: data.username });
+    });
+    socket.on('screen-share-stop', function(data) {
+        socket.to('voice-' + data.serverId + '-' + data.channelId).emit('screen-share-active', { username: null });
+    });
+    socket.on('disconnect', function() {});
 });
 
 // ==================== START ====================
 server.listen(PORT, function() {
     console.log('ShieldHub v3.0 - ' + BRAND_NAME);
-    console.log('Public = Everyone can use | Whitelist = Auto-kick if not in list');
-    console.log('Pretty URL: /:name/:version/id=:shortId');
-    console.log('Admin: Click user to view their scripts');
+    console.log('Public | Whitelist | Voice | Screen Share | Kick | Private Chat');
 });
