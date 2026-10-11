@@ -72,15 +72,11 @@ function getBaseUrl() { return process.env.RENDER_EXTERNAL_URL || ('http://local
 function makeShortId() { return crypto.randomBytes(5).toString('hex'); }
 function makeInvite() { return crypto.randomBytes(4).toString('hex'); }
 
-// 🔥 Check kung browser ba ang request (para hindi makita ang script)
 function isBrowserRequest(req) {
     const ua = (req.headers['user-agent'] || '').toLowerCase();
     const isRoblox = ua.includes('roblox') || ua.includes('wininet') || ua.includes('httpget');
-    // Kung may userId query param, it's from executor
     if (req.query.userId) return false;
-    // Kung walang user-agent, treat as suspicious
     if (!ua) return true;
-    // Kung browser (mozilla/chrome/safari/edge/firefox) at HINDI roblox → BLOCK
     const isBrowserUA = (ua.includes('mozilla') || ua.includes('chrome') || ua.includes('safari') || ua.includes('firefox') || ua.includes('edg/')) && !isRoblox;
     return isBrowserUA;
 }
@@ -105,7 +101,6 @@ function buildWhitelistWrapper(shortId) {
 'if _sh_fn then pcall(_sh_fn) end\n';
 }
 
-// 🔥 Fake script para sa browsers (walang tunay na laman)
 function buildFakeScript() {
     return '-- [ShieldHub Protection]\n' +
 '-- This script is protected. Cannot be accessed via browser.\n' +
@@ -126,41 +121,44 @@ app.get('/js/voice.js', function(req, res) {
     res.sendFile(__dirname + '/js/voice.js');
 });
 
+// 🔥 RESPONSIVE CSS — auto adjust sa phone/tablet/desktop
 const LAYOUT_STYLES = `
-*{box-sizing:border-box;margin:0;padding:0}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#080404;--bg1:#0e0707;--bg2:#160b0b;--border:rgba(255,255,255,0.06);--border1:rgba(255,255,255,0.1);--text:#fff;--text1:#e0e0e0;--text2:#9a9a9a;--text3:#5a5a5a;--red:#ff3b3b;--red2:#cc0000;--red-dim:rgba(255,59,59,0.12);--purple:#b855ff;--green:#22c55e;--yellow:#ffbb44}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;min-height:100vh}
+html{font-size:16px;scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;min-height:100vh;overflow-x:hidden}
 body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 1000px 800px at 10% -10%,rgba(255,59,59,0.18),transparent 55%),radial-gradient(ellipse 1000px 800px at 90% 110%,rgba(184,85,255,0.12),transparent 55%);pointer-events:none;z-index:0}
-a{color:inherit;text-decoration:none}button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
-input,textarea,select{font-family:inherit;width:100%;padding:13px 15px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:11px;color:var(--text);font-size:15px;outline:none;min-height:48px}
+a{color:inherit;text-decoration:none}button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;touch-action:manipulation}
+input,textarea,select{font-family:inherit;width:100%;padding:13px 15px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:11px;color:var(--text);font-size:16px;outline:none;min-height:48px;-webkit-appearance:none;appearance:none}
 input:focus,textarea:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 4px var(--red-dim)}
-textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300px;resize:vertical}
+textarea{font-family:'JetBrains Mono',monospace;font-size:13px;min-height:300px;resize:vertical}
 .layout{display:flex;min-height:100vh;position:relative;z-index:1}
-.sidebar{width:270px;background:rgba(15,8,8,0.95);backdrop-filter:blur(30px);border-right:1px solid var(--border);padding:22px 14px;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50}
+.sidebar{width:270px;background:rgba(15,8,8,0.95);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-right:1px solid var(--border);padding:22px 14px;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50;transition:transform 0.3s ease}
 .brand{display:flex;align-items:center;gap:11px;padding:6px 10px 18px;border-bottom:1px solid var(--border);margin-bottom:16px}
-.brand-logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:#fff;overflow:hidden}
+.brand-logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:#fff;overflow:hidden;flex-shrink:0}
 .brand-logo img{width:100%;height:100%;object-fit:cover}
 .brand-name{font-size:16px;font-weight:800}
 .brand-sub{font-size:10px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-top:3px}
 .nav-label{font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;padding:14px 12px 6px}
 .nav-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600;color:var(--text1);margin-bottom:3px;transition:all 0.2s;border:1px solid transparent}
-.nav-item:hover{background:var(--bg2);color:var(--text);transform:translateX(3px)}
+.nav-item:hover{background:var(--bg2);color:var(--text)}
 .nav-item.active{background:var(--red-dim);color:var(--red);border-left:3px solid var(--red)}
 .sidebar-footer{margin-top:auto;padding-top:16px;border-top:1px solid var(--border)}
 .user-card{display:flex;align-items:center;gap:11px;padding:12px;border-radius:12px;background:var(--bg2)}
-.user-avatar{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:15px}
+.user-avatar{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:15px;flex-shrink:0}
 .user-avatar-admin{background:linear-gradient(135deg,#ffaa00,#ff6600)}
-.user-name{font-size:14px;font-weight:700}
+.user-name{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .user-role{font-size:10px;color:var(--text3);font-weight:800;text-transform:uppercase}
-.main{flex:1;margin-left:270px;display:flex;flex-direction:column}
-.topbar{height:66px;background:rgba(10,5,5,0.85);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;position:sticky;top:0;z-index:40}
-.topbar-title{font-size:15px;font-weight:700}
-.content{padding:36px;flex:1;max-width:1400px;width:100%;margin:0 auto}
-.page-title{font-size:36px;font-weight:800;letter-spacing:-1.2px;background:linear-gradient(135deg,#fff 0%,#ff5555 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
+.main{flex:1;margin-left:270px;display:flex;flex-direction:column;min-width:0}
+.topbar{height:66px;background:rgba(10,5,5,0.85);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40}
+.topbar-title{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.content{padding:36px;flex:1;max-width:1400px;width:100%;margin:0 auto;min-width:0}
+.page-title{font-size:36px;font-weight:800;letter-spacing:-1.2px;background:linear-gradient(135deg,#fff 0%,#ff5555 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
 .page-sub{font-size:13.5px;color:var(--text2);margin-bottom:28px}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 22px;border-radius:12px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid transparent;min-height:46px;transition:all 0.2s;text-decoration:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 22px;border-radius:12px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid transparent;min-height:46px;transition:all 0.2s;text-decoration:none;white-space:nowrap}
 .btn-primary{background:linear-gradient(135deg,var(--red),var(--red2));color:#fff}
 .btn-primary:hover{transform:translateY(-2px)}
+.btn-primary:active{transform:translateY(0)}
 .btn-secondary{background:var(--bg2);color:var(--text);border-color:var(--border)}
 .btn-danger{background:rgba(255,59,59,0.1);color:#ff5555;border-color:rgba(255,59,59,0.25)}
 .btn-ghost{background:transparent;color:var(--text1);border-color:var(--border)}
@@ -168,20 +166,20 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300p
 .btn-xs{padding:4px 10px;font-size:11px;min-height:auto}
 .btn-success{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
 .card{background:linear-gradient(180deg,rgba(22,11,11,0.7),rgba(10,5,5,0.9));border:1px solid var(--border);border-radius:18px;padding:28px;margin-bottom:16px}
-.badge{display:inline-flex;align-items:center;padding:4px 11px;border-radius:8px;font-size:10.5px;font-weight:800}
+.badge{display:inline-flex;align-items:center;padding:4px 11px;border-radius:8px;font-size:10.5px;font-weight:800;white-space:nowrap}
 .badge-purple{background:rgba(184,85,255,0.15);color:#d4a3ff}
 .badge-green{background:rgba(34,197,94,0.15);color:#4ade80}
 .badge-yellow{background:rgba(255,170,0,0.15);color:#ffcc66}
 .badge-red{background:rgba(255,59,59,0.15);color:#ff6666}
 .badge-admin{background:rgba(255,170,0,0.15);color:#ffcc66}
 .form-group{margin-bottom:20px}
-.form-label{display:block;font-size:12px;font-weight:700;color:var(--text1);margin-bottom:9px;text-transform:uppercase}
+.form-label{display:block;font-size:12px;font-weight:700;color:var(--text1);margin-bottom:9px;text-transform:uppercase;letter-spacing:0.5px}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.grid-scripts{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
-.grid-servers{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
-.id-row{display:flex;gap:10px;margin-bottom:10px}
-.id-row input{flex:1;font-family:'JetBrains Mono',monospace}
-.id-row button{width:48px;height:48px;border-radius:11px;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.35);color:#ff5555;font-size:20px}
+.grid-scripts{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.grid-servers{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.id-row{display:flex;gap:10px;margin-bottom:10px;align-items:flex-start}
+.id-row input{flex:1;font-family:'JetBrains Mono',monospace;min-width:0}
+.id-row button{width:48px;height:48px;border-radius:11px;background:rgba(220,38,38,0.15);border:1px solid rgba(220,38,38,0.35);color:#ff5555;font-size:20px;flex-shrink:0}
 .script-icon{width:52px;height:52px;border-radius:13px;flex-shrink:0;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:22px;overflow:hidden}
 .script-icon img{width:100%;height:100%;object-fit:cover}
 .icon-preview{width:80px;height:80px;border-radius:16px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:32px;margin-bottom:12px;overflow:hidden}
@@ -201,10 +199,10 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300p
 .log-item{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:12px;margin-bottom:8px;border:1px solid}
 .log-allowed{border-color:rgba(34,197,94,0.3);background:rgba(34,197,94,0.05)}
 .log-kicked{border-color:rgba(220,38,38,0.4);background:rgba(220,38,38,0.08)}
-.log-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff}
+.log-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;flex-shrink:0}
 .log-icon.allowed{background:linear-gradient(135deg,#22c55e,#16a34a)}
 .log-icon.kicked{background:linear-gradient(135deg,#dc2626,#991b1b)}
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:28px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:28px}
 .stat{background:linear-gradient(180deg,rgba(22,11,11,0.7),rgba(10,5,5,0.9));border:1px solid var(--border);border-radius:14px;padding:22px}
 .stat-label{font-size:11px;color:var(--text3);font-weight:800;text-transform:uppercase;margin-bottom:6px}
 .stat-value{font-size:28px;font-weight:800}
@@ -217,7 +215,7 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300p
 .channel-item.active{background:var(--red-dim);color:var(--red)}
 .channel-item-left{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 .channel-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.channel-delete{width:22px;height:22px;border-radius:5px;color:var(--text3);font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0}
+.channel-delete{width:22px;height:22px;border-radius:5px;color:var(--text3);font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0;flex-shrink:0}
 .channel-item:hover .channel-delete{opacity:1}
 .channel-delete:hover{background:rgba(220,38,38,0.3);color:#ff5555}
 .chat-main{display:flex;flex-direction:column;min-width:0}
@@ -232,7 +230,7 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300p
 .msg-content{font-size:13.5px;line-height:1.5;word-wrap:break-word}
 .chat-input-area{padding:14px 18px;border-top:1px solid var(--border);background:var(--bg)}
 .chat-input-area form{display:flex;gap:10px}
-.chat-input-area input{flex:1;margin:0;background:var(--bg2);border-color:transparent}
+.chat-input-area input{flex:1;margin:0;background:var(--bg2);border-color:transparent;min-width:0}
 .chat-input-area input:disabled{opacity:0.5;cursor:not-allowed}
 .members-list{padding:12px;overflow-y:auto;border-left:1px solid var(--border);background:var(--bg)}
 .member-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--text1);margin-bottom:2px}
@@ -244,17 +242,127 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300p
 #screenShareOverlay{display:none}
 body.screenshare-lock{overflow:hidden!important}
 @keyframes copyToast{0%{opacity:0;transform:translate(-50%,20px)}15%{opacity:1;transform:translate(-50%,0)}85%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-20px)}}
-@media(max-width:900px){.sidebar{transform:translateX(-100%)}.main{margin-left:0}.content{padding:20px}.chat-layout{grid-template-columns:1fr}.members-list{display:none}}
+
+/* 🔥 MOBILE MENU BUTTON */
+.mobile-menu-btn{display:none;background:var(--bg2);border:1px solid var(--border);border-radius:10px;width:40px;height:40px;align-items:center;justify-content:center;font-size:20px;color:var(--text)}
+.mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:49}
+.mobile-overlay.active{display:block}
+
+/* 🔥 TABLET (max 1024px) */
+@media(max-width:1024px){
+    .chat-layout{grid-template-columns:220px 1fr 180px}
+    .content{padding:24px}
+    .grid-scripts{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+    .grid-servers{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+}
+
+/* 🔥 MOBILE (max 900px) */
+@media(max-width:900px){
+    html{font-size:15px}
+    .mobile-menu-btn{display:flex}
+    .sidebar{transform:translateX(-100%);box-shadow:0 0 40px rgba(0,0,0,0.8)}
+    .sidebar.open{transform:translateX(0)}
+    .main{margin-left:0}
+    .topbar{padding:0 16px;height:60px}
+    .topbar-title{font-size:14px;max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .content{padding:20px 16px}
+    .page-title{font-size:26px;letter-spacing:-0.8px}
+    .page-sub{font-size:13px;margin-bottom:20px}
+    .btn{padding:11px 18px;font-size:12.5px;min-height:44px}
+    .btn-sm{padding:8px 12px;font-size:11.5px;min-height:36px}
+    .card{padding:20px;border-radius:14px}
+    .grid-2{grid-template-columns:1fr;gap:12px}
+    .grid-scripts{grid-template-columns:1fr}
+    .grid-servers{grid-template-columns:1fr}
+    .stat-grid{grid-template-columns:1fr 1fr;gap:10px}
+    .stat{padding:16px;border-radius:12px}
+    .stat-value{font-size:22px}
+    .stat-label{font-size:10px}
+    .login-card{padding:32px 24px;border-radius:18px}
+    .login-logo{width:64px;height:64px;font-size:24px}
+    .login-title{font-size:22px}
+    .chat-layout{grid-template-columns:1fr;height:auto;min-height:calc(100vh - 200px)}
+    .members-list{display:none}
+    .chat-sidebar{max-height:220px;border-right:none;border-bottom:1px solid var(--border)}
+    .chat-main{min-height:400px}
+    .msg-avatar{width:32px;height:32px;font-size:12px}
+    .msg-content{font-size:13px}
+    .script-icon{width:46px;height:46px;font-size:18px}
+    .icon-preview{width:64px;height:64px;font-size:24px}
+    input,textarea,select{font-size:16px;padding:12px 14px;min-height:46px}
+    textarea{min-height:200px;font-size:13px}
+    .form-group{margin-bottom:16px}
+    .form-label{font-size:11px}
+    .log-item{padding:12px;gap:10px}
+    .log-icon{width:32px;height:32px;font-size:12px}
+    .channel-item{padding:10px 14px}
+    .id-row button{width:44px;height:44px;font-size:18px}
+    #screenShareOverlay > div:first-child{padding:10px 12px;height:auto}
+    #screenShareOverlay > div:first-child > div:first-child{font-size:12px}
+    #screenShareOverlay > div:first-child > div:last-child{flex-direction:column;gap:4px}
+    #screenShareOverlay > div:first-child button{padding:6px 10px;font-size:11px;min-height:auto}
+}
+
+/* 🔥 SMALL PHONE (max 480px) */
+@media(max-width:480px){
+    html{font-size:14px}
+    .page-title{font-size:22px}
+    .content{padding:16px 12px}
+    .btn{padding:10px 14px;font-size:12px;gap:5px}
+    .btn-sm{padding:7px 10px;font-size:11px}
+    .card{padding:16px;border-radius:12px}
+    .stat-grid{grid-template-columns:1fr;gap:8px}
+    .stat{padding:14px}
+    .stat-value{font-size:20px}
+    .login-card{padding:24px 20px}
+    .script-icon{width:40px;height:40px;font-size:16px;border-radius:10px}
+    .icon-preview{width:56px;height:56px;font-size:20px}
+    .chat-sidebar{max-height:180px}
+    .msg-avatar{width:28px;height:28px;font-size:11px;border-radius:8px}
+    .msg-username{font-size:12px}
+    .msg-content{font-size:12.5px}
+    .msg-time{font-size:9.5px}
+    .chat-input-area{padding:10px 12px}
+    .chat-input-area form{gap:6px}
+    .chat-input-area input{padding:10px 12px;font-size:14px;min-height:42px}
+    .chat-input-area .btn{padding:10px 14px;min-height:42px}
+    .badge{font-size:9.5px;padding:3px 8px}
+    .sidebar{width:85%}
+    #screenShareOverlay > div:first-child{padding:8px;flex-wrap:wrap}
+    #screenShareOverlay > div:first-child > div:first-child{font-size:11px;width:100%;margin-bottom:6px}
+}
+
+/* 🔥 LANDSCAPE PHONE */
+@media(max-height:500px) and (orientation:landscape){
+    .chat-layout{height:calc(100vh - 160px);min-height:auto}
+    .sidebar{padding:12px}
+    .brand{padding:4px 8px 12px;margin-bottom:10px}
+    .user-card{padding:8px}
+    .topbar{height:48px;padding:0 12px}
+    .content{padding:12px}
+    .page-title{font-size:22px;margin-bottom:4px}
+    .page-sub{margin-bottom:12px;font-size:12px}
+}
+
+/* 🔥 TOUCH DEVICES */
+@media(hover:none){
+    .channel-item{padding:11px 14px}
+    .nav-item{padding:13px 14px}
+    .member-item{padding:8px 10px}
+    .member-actions{opacity:1}
+    .channel-delete{opacity:1;width:24px;height:24px}
+    .btn-primary:hover{transform:none}
+}
 `;
 
-const TOAST_SCRIPT = `function copyText(t){navigator.clipboard.writeText(t).then(function(){var _t=document.createElement('div');_t.textContent='✅ Copied!';_t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;z-index:999999;box-shadow:0 10px 30px rgba(0,0,0,0.5);animation:copyToast 2s ease-in-out forwards;';document.body.appendChild(_t);setTimeout(function(){if(_t.parentNode)_t.parentNode.removeChild(_t)},2000)})}function confirmDelete(i,n){if(confirm('Delete "'+n+'"?'))window.location.href='/delete/'+i}`;
+const TOAST_SCRIPT = `function copyText(t){navigator.clipboard.writeText(t).then(function(){var _t=document.createElement('div');_t.textContent='✅ Copied!';_t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;z-index:999999;box-shadow:0 10px 30px rgba(0,0,0,0.5);animation:copyToast 2s ease-in-out forwards;max-width:90vw;text-align:center;';document.body.appendChild(_t);setTimeout(function(){if(_t.parentNode)_t.parentNode.removeChild(_t)},2000)})}function confirmDelete(i,n){if(confirm('Delete "'+n+'"?'))window.location.href='/delete/'+i}function toggleSidebar(){var s=document.querySelector('.sidebar');var o=document.querySelector('.mobile-overlay');s.classList.toggle('open');o.classList.toggle('active')}`;
 
 function renderLayout(opts) {
     var title = opts.title, pageTitle = opts.pageTitle, pageSubtitle = opts.pageSubtitle, content = opts.content, user = opts.user, activeNav = opts.activeNav;
     var isAdmin = user.role === 'ADMIN';
     var adminLink = isAdmin ? '<div class="nav-label">Admin</div><a href="/admin" class="nav-item ' + (activeNav === 'admin' ? 'active' : '') + '">Admin Panel</a>' : '';
     var faviconLink = '<link rel="icon" type="image/svg+xml" href="' + FAVICON_DATA + '">';
-    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + title + ' · ' + BRAND_SHORT + '</title>' + faviconLink + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="layout"><aside class="sidebar"><div class="brand"><div class="brand-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div><div class="brand-name">' + BRAND_SHORT + '</div><div class="brand-sub">By Zyrox-Kido</div></div></div><div class="nav-label">Workspace</div><a href="/" class="nav-item ' + (activeNav === 'dashboard' ? 'active' : '') + '">Dashboard</a><a href="/create" class="nav-item ' + (activeNav === 'create' ? 'active' : '') + '">Create Script</a><a href="/servers" class="nav-item ' + (activeNav === 'servers' ? 'active' : '') + '">Servers</a>' + adminLink + '<div class="sidebar-footer"><a href="/logout" class="user-card"><div class="user-avatar ' + (isAdmin ? 'user-avatar-admin' : '') + '">' + user.username[0].toUpperCase() + '</div><div><div class="user-name">' + user.username + '</div><div class="user-role">' + (isAdmin ? 'Admin' : 'Member') + '</div></div></a></div></aside><div class="main"><header class="topbar"><div class="topbar-title">' + pageTitle + '</div></header><div class="content"><div class="page-title">' + pageTitle + '</div>' + (pageSubtitle ? '<div class="page-sub">' + pageSubtitle + '</div>' : '') + content + '</div></div></div><script>' + TOAST_SCRIPT + '</script></body></html>';
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes"><meta name="theme-color" content="#080404"><title>' + title + ' · ' + BRAND_SHORT + '</title>' + faviconLink + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><button class="mobile-menu-btn" onclick="toggleSidebar()" style="position:fixed;top:12px;left:12px;z-index:100;display:none;" id="mobileMenuBtn">☰</button><div class="mobile-overlay" onclick="toggleSidebar()"></div><div class="layout"><aside class="sidebar"><div class="brand"><div class="brand-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div><div class="brand-name">' + BRAND_SHORT + '</div><div class="brand-sub">By Zyrox-Kido</div></div></div><div class="nav-label">Workspace</div><a href="/" class="nav-item ' + (activeNav === 'dashboard' ? 'active' : '') + '">Dashboard</a><a href="/create" class="nav-item ' + (activeNav === 'create' ? 'active' : '') + '">Create Script</a><a href="/servers" class="nav-item ' + (activeNav === 'servers' ? 'active' : '') + '">Servers</a>' + adminLink + '<div class="sidebar-footer"><a href="/logout" class="user-card"><div class="user-avatar ' + (isAdmin ? 'user-avatar-admin' : '') + '">' + user.username[0].toUpperCase() + '</div><div><div class="user-name">' + user.username + '</div><div class="user-role">' + (isAdmin ? 'Admin' : 'Member') + '</div></div></a></div></aside><div class="main"><header class="topbar"><div class="topbar-title">' + pageTitle + '</div></header><div class="content"><div class="page-title">' + pageTitle + '</div>' + (pageSubtitle ? '<div class="page-sub">' + pageSubtitle + '</div>' : '') + content + '</div></div></div><script>document.addEventListener("DOMContentLoaded",function(){function checkMobile(){var b=document.getElementById("mobileMenuBtn");if(window.innerWidth<=900){b.style.display="flex"}else{b.style.display="none";var s=document.querySelector(".sidebar");var o=document.querySelector(".mobile-overlay");if(s)s.classList.remove("open");if(o)o.classList.remove("active")}}checkMobile();window.addEventListener("resize",checkMobile);document.querySelectorAll(".nav-item").forEach(function(el){el.addEventListener("click",function(){if(window.innerWidth<=900){var s=document.querySelector(".sidebar");var o=document.querySelector(".mobile-overlay");if(s)s.classList.remove("open");if(o)o.classList.remove("active")}})});});</script><script>' + TOAST_SCRIPT + '</script></body></html>';
 }
 
 function renderScriptIcon(icon, fallbackText) {
@@ -266,14 +374,14 @@ function renderScriptIcon(icon, fallbackText) {
 // ==================== AUTH ====================
 app.get('/login', function(req, res) {
     var f = '<link rel="icon" type="image/svg+xml" href="' + FAVICON_DATA + '">';
-    res.send('<!DOCTYPE html><html><head><title>Login · ' + BRAND_SHORT + '</title>' + f + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div class="login-title">Welcome back</div><div class="login-sub">Sign in to continue</div><form method="POST" action="/login"><input type="text" name="username" placeholder="Username" required autofocus><input type="password" name="password" placeholder="Password" required><button type="submit" class="btn btn-primary" style="width:100%">Sign In</button></form><div class="login-err">' + (req.query.error ? 'Invalid credentials' : '') + '</div><a href="/register" class="login-link">Create account</a></div></div></body></html>');
+    res.send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5"><meta name="theme-color" content="#080404"><title>Login · ' + BRAND_SHORT + '</title>' + f + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div class="login-title">Welcome back</div><div class="login-sub">Sign in to continue</div><form method="POST" action="/login"><input type="text" name="username" placeholder="Username" required autofocus><input type="password" name="password" placeholder="Password" required><button type="submit" class="btn btn-primary" style="width:100%">Sign In</button></form><div class="login-err">' + (req.query.error ? 'Invalid credentials' : '') + '</div><a href="/register" class="login-link">Create account</a></div></div></body></html>');
 });
 app.post('/login', async function(req, res) {
     try { const { username, password } = req.body; const r = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]); if (r.rows.length === 0) return res.redirect('/login?error=1'); const u = r.rows[0]; if (u.password !== password) return res.redirect('/login?error=1'); req.session.user = { username: u.username, role: u.role }; res.redirect('/'); } catch (e) { res.redirect('/login?error=1'); }
 });
 app.get('/register', function(req, res) {
     var f = '<link rel="icon" type="image/svg+xml" href="' + FAVICON_DATA + '">';
-    res.send('<!DOCTYPE html><html><head><title>Register · ' + BRAND_SHORT + '</title>' + f + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div class="login-title">Create account</div><div class="login-sub">Join ' + BRAND_SHORT + '</div><form method="POST" action="/register"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><input type="password" name="confirmPassword" placeholder="Confirm password" required><button type="submit" class="btn btn-primary" style="width:100%">Create Account</button></form><div class="login-err">' + (req.query.error || '') + '</div><a href="/login" class="login-link">Back to sign in</a></div></div></body></html>');
+    res.send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5"><meta name="theme-color" content="#080404"><title>Register · ' + BRAND_SHORT + '</title>' + f + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div class="login-title">Create account</div><div class="login-sub">Join ' + BRAND_SHORT + '</div><form method="POST" action="/register"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><input type="password" name="confirmPassword" placeholder="Confirm password" required><button type="submit" class="btn btn-primary" style="width:100%">Create Account</button></form><div class="login-err">' + (req.query.error || '') + '</div><a href="/login" class="login-link">Back to sign in</a></div></div></body></html>');
 });
 app.post('/register', async function(req, res) {
     try { const { username, password, confirmPassword } = req.body; if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match'); if (username.length < 2 || password.length < 4) return res.redirect('/register?error=Min 2 chars, 4 chars pass'); const ex = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]); if (ex.rows.length > 0) return res.redirect('/register?error=Username taken'); const role = username === 'Z-K' ? 'ADMIN' : 'USER'; await pool.query('INSERT INTO users (username, password, role) VALUES ($1, $2, $3)', [username, password, role]); res.redirect('/login?registered=1'); } catch (e) { res.redirect('/register?error=Server error'); }
@@ -296,7 +404,7 @@ app.get('/', requireLogin, async function(req, res) {
                 let count = 0; try { count = JSON.parse(s.allowed_ids || '[]').length; } catch(e) {}
                 const ls = buildLoadstring(s.name, s.version, s.short_id);
                 const badge = s.access_type === 'whitelist' ? '<span class="badge badge-yellow">Whitelist (' + count + ')</span>' : '<span class="badge badge-green">Public</span>';
-                scriptsHtml += '<div class="card"><div style="display:flex;gap:12px;margin-bottom:14px;">' + renderScriptIcon(s.icon, s.name[0]) + '<div><div style="font-size:16px;font-weight:800;margin-bottom:6px;">' + s.name + '</div><div style="display:flex;gap:6px;">' + badge + '<span class="badge badge-purple">' + s.version + '</span></div></div></div><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">' + ls + '</div><div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">Copy Loadstring</button><a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">Logs</a><a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name.replace(/'/g, "\\'") + '\')">Delete</button></div></div>';
+                scriptsHtml += '<div class="card"><div style="display:flex;gap:12px;margin-bottom:14px;">' + renderScriptIcon(s.icon, s.name[0]) + '<div style="min-width:0;flex:1;"><div style="font-size:16px;font-weight:800;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + s.name + '</div><div style="display:flex;gap:6px;flex-wrap:wrap;">' + badge + '<span class="badge badge-purple">' + s.version + '</span></div></div></div><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">' + ls + '</div><div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">Copy Loadstring</button><a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">Logs</a><a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name.replace(/'/g, "\\'") + '\')">Delete</button></div></div>';
             }
             scriptsHtml += '</div>';
         }
@@ -307,7 +415,7 @@ app.get('/', requireLogin, async function(req, res) {
 // ==================== CREATE ====================
 app.get('/create', requireLogin, function(req, res) {
     var verOpts = ''; for (var i = 1; i <= 1000; i++) verOpts += '<option value="V' + i + '">V' + i + '</option>';
-    const content = '<div class="card" style="max-width:900px;"><form method="POST" action="/create" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div></div><div class="form-group"><label class="form-label">Icon Image (URL - optional)</label><div class="icon-preview" id="iconPreview"><img src="' + FAVICON_DATA + '" alt=""></div><input type="text" id="iconInput" name="icon" placeholder="https://example.com/icon.png" oninput="updateIconPreview(this.value)"></div><div class="form-group"><label class="form-label">Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public">Public</option><option value="whitelist">Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:none;"><label class="form-label">Roblox User IDs</label><div id="idList"><div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div></div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="public"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required placeholder="-- Write your Lua script here..."></textarea></div><div style="display:flex;gap:12px;"><button type="submit" class="btn btn-primary">Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div><script>function updateIconPreview(u){var p=document.getElementById("iconPreview");if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}}function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}document.addEventListener("DOMContentLoaded",updateAccessUI);</script>';
+    const content = '<div class="card" style="max-width:900px;"><form method="POST" action="/create" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div></div><div class="form-group"><label class="form-label">Icon Image (URL - optional)</label><div class="icon-preview" id="iconPreview"><img src="' + FAVICON_DATA + '" alt=""></div><input type="text" id="iconInput" name="icon" placeholder="https://example.com/icon.png" oninput="updateIconPreview(this.value)"></div><div class="form-group"><label class="form-label">Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public">Public</option><option value="whitelist">Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:none;"><label class="form-label">Roblox User IDs</label><div id="idList"><div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div></div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="public"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required placeholder="-- Write your Lua script here..."></textarea></div><div style="display:flex;gap:12px;flex-wrap:wrap;"><button type="submit" class="btn btn-primary">Save</button><a href="/" class="btn btn-ghost">Cancel</a></div></form></div><script>function updateIconPreview(u){var p=document.getElementById("iconPreview");if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}}function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}document.addEventListener("DOMContentLoaded",updateAccessUI);</script>';
     res.send(renderLayout({ title: 'Create', pageTitle: 'Create Script', pageSubtitle: 'Add a new Lua script', content: content, user: req.session.user, activeNav: 'create' }));
 });
 app.post('/create', requireLogin, async function(req, res) {
@@ -340,7 +448,7 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
         const ls = buildLoadstring(s.name, s.version, s.short_id);
         let verOpts = ''; for (let i = 1; i <= 1000; i++) verOpts += '<option value="V' + i + '"' + (s.version === 'V' + i ? ' selected' : '') + '>V' + i + '</option>';
         const ci = (s.icon && s.icon.trim()) ? s.icon : FAVICON_DATA;
-        const content = '<div class="card" style="max-width:900px;"><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" style="margin-bottom:18px;">' + ls + '</div><form method="POST" action="/edit/' + s.token + '" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div></div><div class="form-group"><label class="form-label">Icon Image (URL)</label><div class="icon-preview" id="iconPreview"><img src="' + ci.replace(/"/g, '&quot;') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt=""></div><input type="text" id="iconInput" name="icon" value="' + (s.icon || '').replace(/"/g, '&quot;') + '" placeholder="https://example.com/icon.png" oninput="updateIconPreview(this.value)"></div><div class="form-group"><label class="form-label">Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>Public</option><option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:' + (s.access_type === 'whitelist' ? 'block' : 'none') + ';"><label class="form-label">User IDs</label><div id="idList">' + idsHtml + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div><button type="submit" class="btn btn-primary">Save</button></form></div><script>function updateIconPreview(u){var p=document.getElementById("iconPreview");if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}}function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}</script>';
+        const content = '<div class="card" style="max-width:900px;"><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" style="margin-bottom:18px;">' + ls + '</div><form method="POST" action="/edit/' + s.token + '" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div></div><div class="form-group"><label class="form-label">Icon Image (URL)</label><div class="icon-preview" id="iconPreview"><img src="' + ci.replace(/"/g, '&quot;') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt=""></div><input type="text" id="iconInput" name="icon" value="' + (s.icon || '').replace(/"/g, '&quot;') + '" placeholder="https://example.com/icon.png" oninput="updateIconPreview(this.value)"></div><div class="form-group"><label class="form-label">Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>Public</option><option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:' + (s.access_type === 'whitelist' ? 'block' : 'none') + ';"><label class="form-label">User IDs</label><div id="idList">' + idsHtml + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div><button type="submit" class="btn btn-primary">Save</button></form></div><script>function updateIconPreview(u){var p=document.getElementById("iconPreview");if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}}function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}document.addEventListener("DOMContentLoaded",updateAccessUI);</script>';
         res.send(renderLayout({ title: 'Edit', pageTitle: 'Edit Script', pageSubtitle: s.name, content: content, user: req.session.user, activeNav: 'dashboard' }));
     } catch (e) { res.status(500).send('Error'); }
 });
@@ -367,18 +475,12 @@ app.get('/delete/:token', requireLogin, async function(req, res) {
 app.get('/:scriptName/:version/id=:shortId', async function(req, res) {
     try {
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        
-        // 🔥 BLOCK BROWSER ACCESS — kick code lang ibibigay
-        if (isBrowserRequest(req)) {
-            return res.send(buildFakeScript());
-        }
-        
+        if (isBrowserRequest(req)) { return res.send(buildFakeScript()); }
         const shortId = req.params.shortId;
         const r = await pool.query('SELECT * FROM scripts WHERE short_id = $1 LIMIT 1', [shortId]);
         if (r.rows.length === 0) { return res.status(404).send("-- Not found --"); }
         const s = r.rows[0];
         const accessType = s.access_type || 'public';
-        
         if (accessType === 'public') {
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, 'public', '', true, false]);
             return res.send(s.real_content);
@@ -390,19 +492,13 @@ app.get('/:scriptName/:version/id=:shortId', async function(req, res) {
 app.get('/api/raw', async function(req, res) {
     try {
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        
-        // 🔥 BLOCK BROWSER ACCESS
-        if (isBrowserRequest(req)) {
-            return res.send(buildFakeScript());
-        }
-        
+        if (isBrowserRequest(req)) { return res.send(buildFakeScript()); }
         const shortId = req.query.id;
         if (!shortId) { return res.status(400).send("-- Invalid --"); }
         const r = await pool.query('SELECT * FROM scripts WHERE short_id = $1 LIMIT 1', [shortId]);
         if (r.rows.length === 0) { return res.status(404).send("-- Not found --"); }
         const s = r.rows[0];
         const accessType = s.access_type || 'public';
-        
         if (accessType === 'public') {
             await pool.query('INSERT INTO execution_logs (script_id, user_id, username, allowed, kicked) VALUES ($1,$2,$3,$4,$5)', [s.id, 'public', '', true, false]);
             return res.send(s.real_content);
@@ -451,7 +547,7 @@ app.get('/logs/:token', requireLogin, async function(req, res) {
             const cls = l.allowed ? 'allowed' : 'kicked';
             const icon = l.allowed ? 'OK' : 'X';
             const badge = l.allowed ? '<span class="badge badge-green">Allowed</span>' : '<span class="badge badge-red">Kicked</span>';
-            rows += '<div class="log-item log-' + cls + '"><div class="log-icon ' + cls + '">' + icon + '</div><div style="flex:1;"><div style="font-weight:700;">' + (l.username || 'Unknown') + ' <span style="font-family:monospace;font-size:11px;color:var(--text3);">(' + l.user_id + ')</span></div><div style="font-size:11px;color:var(--text3);">' + new Date(l.created_at).toLocaleString() + '</div></div>' + badge + '</div>';
+            rows += '<div class="log-item log-' + cls + '"><div class="log-icon ' + cls + '">' + icon + '</div><div style="flex:1;min-width:0;"><div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (l.username || 'Unknown') + ' <span style="font-family:monospace;font-size:11px;color:var(--text3);">(' + l.user_id + ')</span></div><div style="font-size:11px;color:var(--text3);">' + new Date(l.created_at).toLocaleString() + '</div></div>' + badge + '</div>';
         }
         res.send(renderLayout({ title: 'Logs', pageTitle: 'Execution Logs', pageSubtitle: s.name, content: stats + (rows || '<div class="empty"><div>No logs yet</div></div>'), user: req.session.user, activeNav: 'dashboard' }));
     } catch (e) { res.status(500).send('Error'); }
@@ -465,7 +561,7 @@ app.get('/admin', requireLogin, requireAdmin, async function(req, res) {
         for (const x of u.rows) { 
             const isA = x.role === 'ADMIN'; 
             const scCount = await pool.query('SELECT COUNT(*) as c FROM scripts WHERE owner = $1', [x.username]);
-            userRows += '<div class="card" style="display:flex;align-items:center;gap:14px;padding:16px 20px;margin-bottom:8px;cursor:pointer;" onclick="window.location.href=\'/admin/user/' + encodeURIComponent(x.username) + '\'"><div class="user-avatar ' + (isA ? 'user-avatar-admin' : '') + '">' + x.username[0].toUpperCase() + '</div><div style="flex:1;"><div style="font-weight:700;">' + x.username + ' <span class="badge ' + (isA ? 'badge-admin' : 'badge-purple') + '">' + x.role + '</span></div><div style="font-size:12px;color:var(--text3);margin-top:4px;">' + scCount.rows[0].c + ' scripts</div></div><span style="color:var(--text3);font-size:20px;">→</span></div>'; 
+            userRows += '<div class="card" style="display:flex;align-items:center;gap:14px;padding:16px 20px;margin-bottom:8px;cursor:pointer;" onclick="window.location.href=\'/admin/user/' + encodeURIComponent(x.username) + '\'"><div class="user-avatar ' + (isA ? 'user-avatar-admin' : '') + '">' + x.username[0].toUpperCase() + '</div><div style="flex:1;min-width:0;"><div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + x.username + ' <span class="badge ' + (isA ? 'badge-admin' : 'badge-purple') + '">' + x.role + '</span></div><div style="font-size:12px;color:var(--text3);margin-top:4px;">' + scCount.rows[0].c + ' scripts</div></div><span style="color:var(--text3);font-size:20px;">→</span></div>'; 
         }
         res.send(renderLayout({ title: 'Admin', pageTitle: 'Admin Panel', pageSubtitle: u.rows.length + ' users', content: userRows, user: req.session.user, activeNav: 'admin' }));
     } catch (e) { res.status(500).send('Error'); }
@@ -488,11 +584,11 @@ app.get('/admin/user/:username', requireLogin, requireAdmin, async function(req,
                 let count = 0; try { count = JSON.parse(s.allowed_ids || '[]').length; } catch(e) {}
                 const ls = buildLoadstring(s.name, s.version, s.short_id);
                 const badge = s.access_type === 'whitelist' ? '<span class="badge badge-yellow">Whitelist (' + count + ')</span>' : '<span class="badge badge-green">Public</span>';
-                scriptRows += '<div class="card"><div style="display:flex;gap:12px;margin-bottom:14px;">' + renderScriptIcon(s.icon, s.name[0]) + '<div style="flex:1;"><div style="font-size:16px;font-weight:800;margin-bottom:6px;">' + s.name + '</div><div style="display:flex;gap:6px;">' + badge + '<span class="badge badge-purple">' + s.version + '</span></div></div></div><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">' + ls + '</div><div style="display:flex;gap:8px;margin-top:14px;"><a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">Logs</a><a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name.replace(/'/g, "\\'") + '\')">Delete</button></div></div>';
+                scriptRows += '<div class="card"><div style="display:flex;gap:12px;margin-bottom:14px;">' + renderScriptIcon(s.icon, s.name[0]) + '<div style="flex:1;min-width:0;"><div style="font-size:16px;font-weight:800;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + s.name + '</div><div style="display:flex;gap:6px;flex-wrap:wrap;">' + badge + '<span class="badge badge-purple">' + s.version + '</span></div></div></div><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">' + ls + '</div><div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">Logs</a><a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name.replace(/'/g, "\\'") + '\')">Delete</button></div></div>';
             }
             scriptRows += '</div>';
         }
-        const header = '<div class="card" style="display:flex;align-items:center;gap:20px;margin-bottom:24px;"><div class="user-avatar ' + (isTA ? 'user-avatar-admin' : '') + '" style="width:64px;height:64px;font-size:24px;">' + ti.username[0].toUpperCase() + '</div><div style="flex:1;"><div style="font-size:24px;font-weight:800;">' + ti.username + '</div><div><span class="badge ' + (isTA ? 'badge-admin' : 'badge-purple') + '">' + ti.role + '</span> <span class="badge badge-green">' + sc.rows.length + ' scripts</span></div></div><a href="/admin" class="btn btn-ghost btn-sm">← Back</a></div>';
+        const header = '<div class="card" style="display:flex;align-items:center;gap:20px;margin-bottom:24px;flex-wrap:wrap;"><div class="user-avatar ' + (isTA ? 'user-avatar-admin' : '') + '" style="width:64px;height:64px;font-size:24px;">' + ti.username[0].toUpperCase() + '</div><div style="flex:1;min-width:0;"><div style="font-size:24px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + ti.username + '</div><div><span class="badge ' + (isTA ? 'badge-admin' : 'badge-purple') + '">' + ti.role + '</span> <span class="badge badge-green">' + sc.rows.length + ' scripts</span></div></div><a href="/admin" class="btn btn-ghost btn-sm">← Back</a></div>';
         res.send(renderLayout({ title: ti.username, pageTitle: ti.username + "'s Scripts", content: header + scriptRows, user: req.session.user, activeNav: 'admin' }));
     } catch (e) { res.status(500).send('Error: ' + e.message); }
 });
@@ -505,23 +601,23 @@ app.get('/servers', requireLogin, async function(req, res) {
     for (const s of r.rows) {
         const isOwner = s.owner === me;
         const badge = isOwner ? '<span class="badge badge-yellow">Owner</span>' : '<span class="badge badge-purple">Member</span>';
-        cards += '<div class="card" style="cursor:pointer;" onclick="window.location.href=\'/server/' + s.id + '\'"><div style="display:flex;gap:14px;margin-bottom:14px;"><div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">' + (s.icon || '🎮') + '</div><div><div style="font-size:17px;font-weight:800;margin-bottom:6px;">' + s.name + '</div><div style="display:flex;gap:6px;">' + badge + '<span class="badge badge-purple">' + s.member_count + ' members</span></div></div></div><div class="copy-box" onclick="event.stopPropagation();copyText(\'' + s.invite_code + '\')">Invite: ' + s.invite_code + '</div></div>';
+        cards += '<div class="card" style="cursor:pointer;" onclick="window.location.href=\'/server/' + s.id + '\'"><div style="display:flex;gap:14px;margin-bottom:14px;"><div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">' + (s.icon || '🎮') + '</div><div style="min-width:0;flex:1;"><div style="font-size:17px;font-weight:800;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + s.name + '</div><div style="display:flex;gap:6px;flex-wrap:wrap;">' + badge + '<span class="badge badge-purple">' + s.member_count + ' members</span></div></div></div><div class="copy-box" onclick="event.stopPropagation();copyText(\'' + s.invite_code + '\')">Invite: ' + s.invite_code + '</div></div>';
     }
     const content = (r.rows.length === 0 ? '<div class="empty"><div class="empty-icon">🏠</div><div style="font-size:18px;font-weight:700;margin-bottom:20px;">No servers yet</div></div>' : '<div class="grid-servers">' + cards + '</div>') +
-        '<div style="margin-top:20px;display:flex;gap:10px;">' +
+        '<div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">' +
             '<button class="btn btn-primary" onclick="document.getElementById(\'createServerModal\').style.display=\'flex\'">Create Server</button>' +
             '<button class="btn btn-secondary" onclick="document.getElementById(\'joinServerModal\').style.display=\'flex\'">Join Server</button>' +
         '</div>' +
-        '<div id="createServerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;padding:20px;"><div class="card" style="width:440px;">' +
+        '<div id="createServerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;padding:20px;"><div class="card" style="width:440px;max-width:100%;">' +
             '<div style="font-size:20px;font-weight:800;margin-bottom:18px;">Create Server</div>' +
             '<div class="form-group"><label class="form-label">Name</label><input type="text" id="newServerName"></div>' +
             '<div class="form-group"><label class="form-label">Icon (emoji)</label><input type="text" id="newServerIcon" value="🎮" maxlength="2"></div>' +
-            '<div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn btn-ghost" onclick="document.getElementById(\'createServerModal\').style.display=\'none\'">Cancel</button><button class="btn btn-primary" onclick="createServer()">Create</button></div>' +
+            '<div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;"><button class="btn btn-ghost" onclick="document.getElementById(\'createServerModal\').style.display=\'none\'">Cancel</button><button class="btn btn-primary" onclick="createServer()">Create</button></div>' +
         '</div></div>' +
-        '<div id="joinServerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;padding:20px;"><div class="card" style="width:440px;">' +
+        '<div id="joinServerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;padding:20px;"><div class="card" style="width:440px;max-width:100%;">' +
             '<div style="font-size:20px;font-weight:800;margin-bottom:18px;">Join Server</div>' +
             '<div class="form-group"><label class="form-label">Invite Code</label><input type="text" id="joinInviteCode"></div>' +
-            '<div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn btn-ghost" onclick="document.getElementById(\'joinServerModal\').style.display=\'none\'">Cancel</button><button class="btn btn-primary" onclick="joinServer()">Join</button></div>' +
+            '<div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;"><button class="btn btn-ghost" onclick="document.getElementById(\'joinServerModal\').style.display=\'none\'">Cancel</button><button class="btn btn-primary" onclick="joinServer()">Join</button></div>' +
         '</div></div>' +
         '<script>' +
             'async function createServer(){const n=document.getElementById("newServerName").value.trim();const i=document.getElementById("newServerIcon").value.trim()||"🎮";if(!n)return alert("Name required");const r=await fetch("/api/servers/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:n,icon:i})});const d=await r.json();if(d.id)window.location.href="/server/"+d.id;else alert(d.error||"Error")}' +
@@ -605,9 +701,9 @@ app.get('/server/:id', requireLogin, async function(req, res) {
                 '<div id="voicePanel" style="display:none;margin:8px;padding:10px;border-radius:10px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);">' +
                     '<div style="font-size:10px;font-weight:800;color:#4ade80;text-transform:uppercase;margin-bottom:6px;">🔊 Voice Connected</div>' +
                     '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;" id="voiceChannelName">—</div>' +
-                    '<div style="display:flex;gap:6px;">' +
-                        '<button class="btn btn-danger btn-xs" onclick="leaveVoice()" style="flex:1;">Disconnect</button>' +
-                        '<button class="btn btn-secondary btn-xs" onclick="toggleMute()" id="muteBtn" style="flex:1;">Mute</button>' +
+                    '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+                        '<button class="btn btn-danger btn-xs" onclick="leaveVoice()" style="flex:1;min-width:80px;">Disconnect</button>' +
+                        '<button class="btn btn-secondary btn-xs" onclick="toggleMute()" id="muteBtn" style="flex:1;min-width:80px;">Mute</button>' +
                     '</div>' +
                     '<button class="btn btn-secondary btn-xs" onclick="toggleScreenShare()" id="shareBtn" style="width:100%;margin-top:6px;">Share Screen</button>' +
                 '</div>' +
@@ -617,7 +713,7 @@ app.get('/server/:id', requireLogin, async function(req, res) {
                 '</div>' +
             '</div>' +
             '<div class="chat-main">' +
-                '<div class="chat-header"><div style="display:flex;align-items:center;gap:8px;"><span id="currentChannelIcon" style="color:var(--text3);">#</span><span id="currentChannelName" style="font-weight:700;">Select channel</span></div></div>' +
+                '<div class="chat-header"><div style="display:flex;align-items:center;gap:8px;min-width:0;"><span id="currentChannelIcon" style="color:var(--text3);">#</span><span id="currentChannelName" style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Select channel</span></div></div>' +
                 '<div id="voiceView" style="display:none;flex:1;flex-direction:column;overflow-y:auto;">' +
                     '<div style="padding:20px;text-align:center;">' +
                         '<div style="font-size:60px;margin-bottom:10px;">🔊</div>' +
@@ -635,24 +731,24 @@ app.get('/server/:id', requireLogin, async function(req, res) {
             '<div class="members-list"><div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;padding:8px;">Members (' + membersR.rows.length + ')</div>' + mbHtml + '</div>' +
         '</div>' +
         '<div id="screenShareOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;width:100vw;height:100vh;background:#000;z-index:2147483647;flex-direction:column;margin:0;padding:0;overflow:hidden;">' +
-            '<div style="height:56px;padding:0 20px;display:flex;justify-content:space-between;align-items:center;background:rgba(10,5,5,0.98);border-bottom:1px solid var(--border);flex-shrink:0;">' +
+            '<div style="min-height:56px;padding:10px 20px;display:flex;justify-content:space-between;align-items:center;background:rgba(10,5,5,0.98);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;gap:8px;">' +
                 '<div style="font-size:14px;font-weight:700;color:#fff;">👁️ <span id="sharingUser">User</span> is sharing their screen</div>' +
                 '<div style="display:flex;gap:8px;">' +
                     '<button class="btn btn-secondary btn-sm" onclick="toggleFullscreen()">Fullscreen</button>' +
                     '<button class="btn btn-danger btn-sm" onclick="closeScreenView()">Close</button>' +
                 '</div>' +
             '</div>' +
-            '<div style="flex:1;display:flex;align-items:center;justify-content:center;background:#000;overflow:hidden;width:100%;height:calc(100vh - 56px);">' +
+            '<div style="flex:1;display:flex;align-items:center;justify-content:center;background:#000;overflow:hidden;width:100%;">' +
                 '<video id="screenVideo" autoplay playsinline style="max-width:100%;max-height:100%;object-fit:contain;display:block;"></video>' +
             '</div>' +
         '</div>' +
         '<div id="remoteAudios"></div>' +
-        '<div id="createChannelModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;">' +
-            '<div class="card" style="width:440px;">' +
+        '<div id="createChannelModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;padding:20px;">' +
+            '<div class="card" style="width:440px;max-width:100%;">' +
                 '<div style="font-size:18px;font-weight:800;margin-bottom:16px;">Create Channel</div>' +
                 '<div class="form-group"><label class="form-label">Name</label><input type="text" id="newChannelName"></div>' +
                 '<div class="form-group"><label class="form-label">Type</label><select id="newChannelType"><option value="text">💬 Text</option><option value="voice">🔊 Voice</option><option value="private">🔒 Private (Read-Only)</option></select></div>' +
-                '<div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn btn-ghost" onclick="document.getElementById(\'createChannelModal\').style.display=\'none\'">Cancel</button><button class="btn btn-primary" onclick="createChannel()">Create</button></div>' +
+                '<div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;"><button class="btn btn-ghost" onclick="document.getElementById(\'createChannelModal\').style.display=\'none\'">Cancel</button><button class="btn btn-primary" onclick="createChannel()">Create</button></div>' +
             '</div>' +
         '</div>' +
         '<script src="/socket.io/socket.io.js"></script>' +
