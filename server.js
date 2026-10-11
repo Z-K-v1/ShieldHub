@@ -15,11 +15,9 @@ if (!DATABASE_URL) { console.error('ERROR: DATABASE_URL not set!'); process.exit
 
 const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
-// ==================== FAVICON ====================
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff3b3b"/><stop offset="100%" stop-color="#cc0000"/></linearGradient></defs><rect width="100" height="100" rx="22" fill="url(#g)"/><text x="50" y="54" font-family="Inter,Arial,sans-serif" font-size="44" font-weight="900" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" letter-spacing="-2">ZK</text></svg>`;
 const FAVICON_DATA = 'data:image/svg+xml;base64,' + Buffer.from(FAVICON_SVG).toString('base64');
 
-// ==================== DATABASE INIT ====================
 async function initDB() {
     try {
         await pool.query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL, password VARCHAR(255) NOT NULL, role VARCHAR(20) DEFAULT 'USER', created_at TIMESTAMP DEFAULT NOW());`);
@@ -119,7 +117,6 @@ app.get('/js/voice.js', function(req, res) {
     res.sendFile(__dirname + '/js/voice.js');
 });
 
-// ==================== RESPONSIVE CSS ====================
 const LAYOUT_STYLES = `
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{--bg:#080404;--bg1:#0e0707;--bg2:#160b0b;--border:rgba(255,255,255,0.06);--border1:rgba(255,255,255,0.1);--text:#fff;--text1:#e0e0e0;--text2:#9a9a9a;--text3:#5a5a5a;--red:#ff3b3b;--red2:#cc0000;--red-dim:rgba(255,59,59,0.12);--purple:#b855ff;--green:#22c55e;--yellow:#ffbb44}
@@ -131,7 +128,7 @@ input,textarea,select{font-family:inherit;width:100%;padding:13px 15px;backgroun
 input:focus,textarea:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 4px var(--red-dim)}
 textarea{font-family:'JetBrains Mono',monospace;font-size:13px;min-height:300px;resize:vertical}
 .layout{display:flex;min-height:100vh;position:relative;z-index:1}
-.sidebar{width:270px;background:rgba(15,8,8,0.98);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-right:1px solid var(--border);padding:22px 14px;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform 0.3s ease}
+.sidebar{width:270px;background:rgba(15,8,8,0.98);backdrop-filter:blur(30px);border-right:1px solid var(--border);padding:22px 14px;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform 0.3s ease}
 .brand{display:flex;align-items:center;gap:11px;padding:6px 10px 18px;border-bottom:1px solid var(--border);margin-bottom:16px}
 .brand-logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:#fff;overflow:hidden;flex-shrink:0}
 .brand-logo img{width:100%;height:100%;object-fit:cover}
@@ -257,7 +254,7 @@ function renderLayout(opts) {
     var faviconLink = '<link rel="icon" type="image/svg+xml" href="' + FAVICON_DATA + '">';
     var mobileBtn = '<button class="mobile-menu-btn" onclick="toggleSidebar()" id="mobileMenuBtn">☰</button>';
     var mobileOverlay = '<div class="mobile-overlay" onclick="toggleSidebar()" id="mobileOverlay"></div>';
-    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes"><meta name="theme-color" content="#080404"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><title>' + title + ' · ' + BRAND_SHORT + '</title>' + faviconLink + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body>' + mobileBtn + mobileOverlay + '<div class="layout"><aside class="sidebar"><div class="brand"><div class="brand-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div><div class="brand-name">' + BRAND_SHORT + '</div><div class="brand-sub">By Zyrox-Kido</div></div></div><div class="nav-label">Workspace</div><a href="/" class="nav-item ' + (activeNav === 'dashboard' ? 'active' : '') + '">Dashboard</a><a href="/create" class="nav-item ' + (activeNav === 'create' ? 'active' : '') + '">Create Script</a><a href="/servers" class="nav-item ' + (activeNav === 'servers' ? 'active' : '') + '">Servers</a>' + adminLink + '<div class="sidebar-footer"><a href="/logout" class="user-card"><div class="user-avatar ' + (isAdmin ? 'user-avatar-admin' : '') + '">' + user.username[0].toUpperCase() + '</div><div><div class="user-name">' + user.username + '</div><div class="user-role">' + (isAdmin ? 'Admin' : 'Member') + '</div></div></a></div></aside><div class="main"><header class="topbar"><div class="topbar-title">' + pageTitle + '</div></header><div class="content"><div class="page-title">' + pageTitle + '</div>' + (pageSubtitle ? '<div class="page-sub">' + pageSubtitle + '</div>' : '') + content + '</div></div></div><script>document.addEventListener("DOMContentLoaded",function(){function checkMobile(){var b=document.getElementById("mobileMenuBtn");var s=document.querySelector(".sidebar");var o=document.querySelector(".mobile-overlay");if(window.innerWidth>900){if(b)b.style.display="none";if(s)s.classList.remove("open");if(o)o.classList.remove("active")}else{if(b)b.style.display="flex"}}checkMobile();window.addEventListener("resize",checkMobile);document.querySelectorAll(".nav-item").forEach(function(el){el.addEventListener("click",function(){if(window.innerWidth<=900){var s=document.querySelector(".sidebar");var o=document.querySelector(".mobile-overlay");if(s)s.classList.remove("open");if(o)o.classList.remove("active")}})});});</script><script>' + TOAST_SCRIPT + '</script></body></html>';
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes"><meta name="theme-color" content="#080404"><title>' + title + ' · ' + BRAND_SHORT + '</title>' + faviconLink + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body>' + mobileBtn + mobileOverlay + '<div class="layout"><aside class="sidebar"><div class="brand"><div class="brand-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div><div class="brand-name">' + BRAND_SHORT + '</div><div class="brand-sub">By Zyrox-Kido</div></div></div><div class="nav-label">Workspace</div><a href="/" class="nav-item ' + (activeNav === 'dashboard' ? 'active' : '') + '">Dashboard</a><a href="/create" class="nav-item ' + (activeNav === 'create' ? 'active' : '') + '">Create Script</a><a href="/servers" class="nav-item ' + (activeNav === 'servers' ? 'active' : '') + '">Servers</a>' + adminLink + '<div class="sidebar-footer"><a href="/logout" class="user-card"><div class="user-avatar ' + (isAdmin ? 'user-avatar-admin' : '') + '">' + user.username[0].toUpperCase() + '</div><div><div class="user-name">' + user.username + '</div><div class="user-role">' + (isAdmin ? 'Admin' : 'Member') + '</div></div></a></div></aside><div class="main"><header class="topbar"><div class="topbar-title">' + pageTitle + '</div></header><div class="content"><div class="page-title">' + pageTitle + '</div>' + (pageSubtitle ? '<div class="page-sub">' + pageSubtitle + '</div>' : '') + content + '</div></div></div><script>document.addEventListener("DOMContentLoaded",function(){function checkMobile(){var b=document.getElementById("mobileMenuBtn");var s=document.querySelector(".sidebar");var o=document.querySelector(".mobile-overlay");if(window.innerWidth>900){if(b)b.style.display="none";if(s)s.classList.remove("open");if(o)o.classList.remove("active")}else{if(b)b.style.display="flex"}}checkMobile();window.addEventListener("resize",checkMobile);document.querySelectorAll(".nav-item").forEach(function(el){el.addEventListener("click",function(){if(window.innerWidth<=900){var s=document.querySelector(".sidebar");var o=document.querySelector(".mobile-overlay");if(s)s.classList.remove("open");if(o)o.classList.remove("active")}})});});</script><script>' + TOAST_SCRIPT + '</script></body></html>';
 }
 
 function renderScriptIcon(icon, fallbackText) {
@@ -269,14 +266,14 @@ function renderScriptIcon(icon, fallbackText) {
 // ==================== AUTH ====================
 app.get('/login', function(req, res) {
     var f = '<link rel="icon" type="image/svg+xml" href="' + FAVICON_DATA + '">';
-    res.send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5"><meta name="theme-color" content="#080404"><title>Login · ' + BRAND_SHORT + '</title>' + f + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div class="login-title">Welcome back</div><div class="login-sub">Sign in to continue</div><form method="POST" action="/login"><input type="text" name="username" placeholder="Username" required autofocus><input type="password" name="password" placeholder="Password" required><button type="submit" class="btn btn-primary" style="width:100%">Sign In</button></form><div class="login-err">' + (req.query.error ? 'Invalid credentials' : '') + '</div><a href="/register" class="login-link">Create account</a></div></div></body></html>');
+    res.send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5"><title>Login · ' + BRAND_SHORT + '</title>' + f + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div class="login-title">Welcome back</div><div class="login-sub">Sign in to continue</div><form method="POST" action="/login"><input type="text" name="username" placeholder="Username" required autofocus><input type="password" name="password" placeholder="Password" required><button type="submit" class="btn btn-primary" style="width:100%">Sign In</button></form><div class="login-err">' + (req.query.error ? 'Invalid credentials' : '') + '</div><a href="/register" class="login-link">Create account</a></div></div></body></html>');
 });
 app.post('/login', async function(req, res) {
     try { const { username, password } = req.body; const r = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]); if (r.rows.length === 0) return res.redirect('/login?error=1'); const u = r.rows[0]; if (u.password !== password) return res.redirect('/login?error=1'); req.session.user = { username: u.username, role: u.role }; res.redirect('/'); } catch (e) { res.redirect('/login?error=1'); }
 });
 app.get('/register', function(req, res) {
     var f = '<link rel="icon" type="image/svg+xml" href="' + FAVICON_DATA + '">';
-    res.send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5"><meta name="theme-color" content="#080404"><title>Register · ' + BRAND_SHORT + '</title>' + f + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div class="login-title">Create account</div><div class="login-sub">Join ' + BRAND_SHORT + '</div><form method="POST" action="/register"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><input type="password" name="confirmPassword" placeholder="Confirm password" required><button type="submit" class="btn btn-primary" style="width:100%">Create Account</button></form><div class="login-err">' + (req.query.error || '') + '</div><a href="/login" class="login-link">Back to sign in</a></div></div></body></html>');
+    res.send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5"><title>Register · ' + BRAND_SHORT + '</title>' + f + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"><style>' + LAYOUT_STYLES + '</style></head><body><div class="login-wrap"><div class="login-card"><div class="login-logo"><img src="' + FAVICON_DATA + '" alt="ZK"></div><div class="login-title">Create account</div><div class="login-sub">Join ' + BRAND_SHORT + '</div><form method="POST" action="/register"><input type="text" name="username" placeholder="Username" required><input type="password" name="password" placeholder="Password" required><input type="password" name="confirmPassword" placeholder="Confirm password" required><button type="submit" class="btn btn-primary" style="width:100%">Create Account</button></form><div class="login-err">' + (req.query.error || '') + '</div><a href="/login" class="login-link">Back to sign in</a></div></div></body></html>');
 });
 app.post('/register', async function(req, res) {
     try { const { username, password, confirmPassword } = req.body; if (password !== confirmPassword) return res.redirect('/register?error=Passwords do not match'); if (username.length < 2 || password.length < 4) return res.redirect('/register?error=Min 2 chars, 4 chars pass'); const ex = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username]); if (ex.rows.length > 0) return res.redirect('/register?error=Username taken'); const role = username === 'Z-K' ? 'ADMIN' : 'USER'; await pool.query('INSERT INTO users (username, password, role) VALUES ($1, $2, $3)', [username, password, role]); res.redirect('/login?registered=1'); } catch (e) { res.redirect('/register?error=Server error'); }
@@ -317,68 +314,27 @@ app.get('/create', requireLogin, function(req, res) {
                 '<div class="form-group"><label class="form-label">Script Name</label><input type="text" name="name" required autofocus placeholder="e.g., Fly UI"></div>' +
                 '<div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div>' +
             '</div>' +
-            '<div class="form-group"><label class="form-label">Icon Image (URL - optional)</label><div class="icon-preview" id="iconPreview"><img src="' + FAVICON_DATA + '" alt=""></div><input type="text" id="iconInput" name="icon" placeholder="https://example.com/icon.png" oninput="updateIconPreview(this.value)"></div>' +
+            '<div class="form-group"><label class="form-label">Icon Image (URL - optional)</label><div class="icon-preview" id="iconPreview"><img src="' + FAVICON_DATA + '" alt=""></div><input type="text" id="iconInput" name="icon" placeholder="https://example.com/icon.png" oninput="var p=document.getElementById(\'iconPreview\');if(this.value.trim()){p.innerHTML=\'<img src=\\\'\'+this.value+\'\\\' onerror=\\\'this.style.display=&quot;none&quot;\\\'>\'}"></div>' +
             '<div class="form-group">' +
                 '<label class="form-label">Access Type</label>' +
-                '<select id="accessType" onchange="toggleIdSection()">' +
+                '<select id="accessType" name="access_type" onchange="var w=document.getElementById(\'idListWrap\');if(this.value===\'whitelist\'){w.style.display=\'block\'}else{w.style.display=\'none\'}">' +
                     '<option value="public">Public (Everyone can use)</option>' +
                     '<option value="whitelist">Whitelist (Specific User IDs only)</option>' +
                 '</select>' +
-                '<input type="hidden" name="access_type" id="accessTypeHidden" value="public">' +
             '</div>' +
             '<div class="form-group" id="idListWrap" style="display:none;">' +
                 '<label class="form-label">Roblox User IDs</label>' +
                 '<div id="idList">' +
-                    '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div>' +
+                    '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="this.parentNode.remove()">×</button></div>' +
                 '</div>' +
-                '<button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button>' +
+                '<button type="button" class="btn btn-success btn-sm" onclick="var l=document.getElementById(\'idList\');var d=document.createElement(\'div\');d.className=\'id-row\';d.innerHTML=\'<input type=text class=id-input placeholder=&quot;Roblox User ID&quot; inputmode=numeric><button type=button onclick=this.parentNode.remove()>×</button>\';l.appendChild(d)">+ Add User</button>' +
                 '<div style="font-size:12px;color:var(--text3);margin-top:10px;">Only users in this list can execute the script.</div>' +
             '</div>' +
             '<input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]">' +
             '<div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required placeholder="-- Write your Lua script here..."></textarea></div>' +
-            '<div style="display:flex;gap:12px;flex-wrap:wrap;"><button type="submit" class="btn btn-primary" onclick="return prepareSubmit()">Save</button><a href="/" class="btn btn-ghost">Cancel</a></div>' +
+            '<div style="display:flex;gap:12px;flex-wrap:wrap;"><button type="submit" class="btn btn-primary" onclick="var ids=[];document.querySelectorAll(\'.id-input\').forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById(\'allowedIdsHidden\').value=JSON.stringify(ids);return true">Save</button><a href="/" class="btn btn-ghost">Cancel</a></div>' +
         '</form>' +
-    '</div>' +
-    '<script>' +
-        'function toggleIdSection(){' +
-            'var s=document.getElementById("accessType");' +
-            'var w=document.getElementById("idListWrap");' +
-            'var h=document.getElementById("accessTypeHidden");' +
-            'if(s&&w){' +
-                'if(s.value==="whitelist"){w.style.display="block"}else{w.style.display="none"}' +
-                'if(h){h.value=s.value}' +
-            '}' +
-        '}' +
-        'function updateIconPreview(u){' +
-            'var p=document.getElementById("iconPreview");' +
-            'if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}' +
-            'else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}' +
-        '}' +
-        'function addIdRow(){' +
-            'var l=document.getElementById("idList");' +
-            'var d=document.createElement("div");' +
-            'd.className="id-row";' +
-            'd.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';' +
-            'l.appendChild(d)' +
-        '}' +
-        'function removeIdRow(b){b.parentNode.remove()}' +
-        'function prepareSubmit(){' +
-            'var s=document.getElementById("accessType");' +
-            'var h=document.getElementById("accessTypeHidden");' +
-            'if(h){h.value=s.value}' +
-            'var ids=[];' +
-            'document.querySelectorAll(".id-input").forEach(function(el){' +
-                'var v=el.value.trim();' +
-                'if(v&&/^[0-9]+$/.test(v))ids.push(v)' +
-            '});' +
-            'document.getElementById("allowedIdsHidden").value=JSON.stringify(ids);' +
-            'return true' +
-        '}' +
-        'window.addEventListener("load",function(){' +
-            'var s=document.getElementById("accessType");' +
-            'if(s){toggleIdSection()}' +
-        '});' +
-    '</script>';
+    '</div>';
     res.send(renderLayout({ title: 'Create', pageTitle: 'Create Script', pageSubtitle: 'Add a new Lua script', content: content, user: req.session.user, activeNav: 'create' }));
 });
 app.post('/create', requireLogin, async function(req, res) {
@@ -396,7 +352,7 @@ app.post('/create', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).send('Error: ' + e.message); }
 });
 
-// ==================== EDIT — FIXED ====================
+// ==================== EDIT ====================
 app.get('/edit/:token', requireLogin, async function(req, res) {
     try {
         const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]);
@@ -407,8 +363,8 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
         const escaped = s.real_content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         let ids = []; try { ids = JSON.parse(s.allowed_ids || '[]'); } catch(e) {}
         let idsHtml = ''; 
-        for (const i of ids) idsHtml += '<div class="id-row"><input type="text" class="id-input" value="' + i + '" inputmode="numeric" placeholder="Roblox User ID"><button type="button" onclick="removeIdRow(this)">×</button></div>';
-        if (!idsHtml) idsHtml = '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button></div>';
+        for (const i of ids) idsHtml += '<div class="id-row"><input type="text" class="id-input" value="' + i + '" inputmode="numeric" placeholder="Roblox User ID"><button type="button" onclick="this.parentNode.remove()">×</button></div>';
+        if (!idsHtml) idsHtml = '<div class="id-row"><input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="this.parentNode.remove()">×</button></div>';
         const ls = buildLoadstring(s.name, s.version, s.short_id);
         let verOpts = ''; 
         for (let i = 1; i <= 1000; i++) verOpts += '<option value="V' + i + '"' + (s.version === 'V' + i ? ' selected' : '') + '>V' + i + '</option>';
@@ -423,70 +379,25 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
                     '<div class="form-group"><label class="form-label">Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div>' +
                     '<div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div>' +
                 '</div>' +
-                '<div class="form-group"><label class="form-label">Icon Image (URL)</label><div class="icon-preview" id="iconPreview"><img src="' + ci.replace(/"/g, '&quot;') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt=""></div><input type="text" id="iconInput" name="icon" value="' + (s.icon || '').replace(/"/g, '&quot;') + '" placeholder="https://example.com/icon.png" oninput="updateIconPreview(this.value)"></div>' +
+                '<div class="form-group"><label class="form-label">Icon Image (URL)</label><div class="icon-preview" id="iconPreview"><img src="' + ci.replace(/"/g, '&quot;') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt=""></div><input type="text" id="iconInput" name="icon" value="' + (s.icon || '').replace(/"/g, '&quot;') + '" placeholder="https://example.com/icon.png" oninput="var p=document.getElementById(\'iconPreview\');if(this.value.trim()){p.innerHTML=\'<img src=\\\'\'+this.value+\'\\\' onerror=\\\'this.style.display=&quot;none&quot;\\\'>\'}"></div>' +
                 '<div class="form-group">' +
                     '<label class="form-label">Access Type</label>' +
-                    '<select id="accessType" onchange="toggleIdSection()">' +
+                    '<select id="accessType" name="access_type" onchange="var w=document.getElementById(\'idListWrap\');if(this.value===\'whitelist\'){w.style.display=\'block\'}else{w.style.display=\'none\'}">' +
                         '<option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>Public (Everyone can use)</option>' +
                         '<option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>Whitelist (Specific User IDs only)</option>' +
                     '</select>' +
-                    '<input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '">' +
                 '</div>' +
                 '<div class="form-group" id="idListWrap" style="' + (isWhitelist ? '' : 'display:none;') + '">' +
                     '<label class="form-label">Roblox User IDs</label>' +
                     '<div id="idList">' + idsHtml + '</div>' +
-                    '<button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button>' +
+                    '<button type="button" class="btn btn-success btn-sm" onclick="var l=document.getElementById(\'idList\');var d=document.createElement(\'div\');d.className=\'id-row\';d.innerHTML=\'<input type=text class=id-input placeholder=&quot;Roblox User ID&quot; inputmode=numeric><button type=button onclick=this.parentNode.remove()>×</button>\';l.appendChild(d)">+ Add User</button>' +
                     '<div style="font-size:12px;color:var(--text3);margin-top:10px;">Only users in this list can execute the script. Users not on the list will see "Script in protection".</div>' +
                 '</div>' +
                 '<input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]">' +
                 '<div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div>' +
-                '<button type="submit" class="btn btn-primary" onclick="return prepareSubmit()">Save</button>' +
+                '<button type="submit" class="btn btn-primary" onclick="var ids=[];document.querySelectorAll(\'.id-input\').forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById(\'allowedIdsHidden\').value=JSON.stringify(ids);return true">Save</button>' +
             '</form>' +
-        '</div>' +
-        '<script>' +
-            'function toggleIdSection(){' +
-                'var s=document.getElementById("accessType");' +
-                'var w=document.getElementById("idListWrap");' +
-                'var h=document.getElementById("accessTypeHidden");' +
-                'if(s&&w){' +
-                    'if(s.value==="whitelist"){w.style.display="block"}else{w.style.display="none"}' +
-                    'if(h){h.value=s.value}' +
-                '}' +
-            '}' +
-            'function updateIconPreview(u){' +
-                'var p=document.getElementById("iconPreview");' +
-                'if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}' +
-                'else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}' +
-            '}' +
-            'function addIdRow(){' +
-                'var l=document.getElementById("idList");' +
-                'var d=document.createElement("div");' +
-                'd.className="id-row";' +
-                'd.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';' +
-                'l.appendChild(d)' +
-            '}' +
-            'function removeIdRow(b){b.parentNode.remove()}' +
-            'function prepareSubmit(){' +
-                'var s=document.getElementById("accessType");' +
-                'var h=document.getElementById("accessTypeHidden");' +
-                'if(h){h.value=s.value}' +
-                'var ids=[];' +
-                'document.querySelectorAll(".id-input").forEach(function(el){' +
-                    'var v=el.value.trim();' +
-                    'if(v&&/^[0-9]+$/.test(v))ids.push(v)' +
-                '});' +
-                'document.getElementById("allowedIdsHidden").value=JSON.stringify(ids);' +
-                'return true' +
-            '}' +
-            'window.addEventListener("load",function(){' +
-                'var s=document.getElementById("accessType");' +
-                'if(s){toggleIdSection()}' +
-            '});' +
-        '</script>';
-        
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
+        '</div>';
         res.send(renderLayout({ title: 'Edit', pageTitle: 'Edit Script', pageSubtitle: s.name, content: content, user: req.session.user, activeNav: 'dashboard' }));
     } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
 });
@@ -783,13 +694,11 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         'window.SERVER_ID=' + JSON.stringify(serverId) + ';' +
         'window.ME=' + JSON.stringify(me) + ';' +
         'window.IS_MANAGER=' + (canManage ? 'true' : 'false') + ';' +
-        'console.log("Window vars set:", window.SERVER_ID, window.ME);' +
         '</script>';
         res.send(renderLayout({ title: srv.name, pageTitle: srv.name, pageSubtitle: membersR.rows.length + ' members', content: content, user: req.session.user, activeNav: 'servers' }));
     } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
 });
 
-// ==================== KICK USER ====================
 app.post('/api/servers/:id/kick', requireLogin, async function(req, res) {
     try {
         const serverId = parseInt(req.params.id);
@@ -807,7 +716,6 @@ app.post('/api/servers/:id/kick', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ==================== CHANNEL APIs ====================
 app.post('/api/servers/:id/channels', requireLogin, async function(req, res) {
     try {
         const serverId = parseInt(req.params.id);
@@ -874,7 +782,6 @@ app.post('/api/channels/:id/send', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ==================== SOCKET.IO ====================
 const voiceRooms = {};
 
 io.on('connection', function(socket) {
@@ -927,7 +834,6 @@ io.on('connection', function(socket) {
     });
 });
 
-// ==================== START ====================
 server.listen(PORT, function() {
     console.log('ShieldHub v3.0 - ' + BRAND_NAME);
     console.log('Public | Whitelist | Voice | Screen Share | Kick | Private Chat');
