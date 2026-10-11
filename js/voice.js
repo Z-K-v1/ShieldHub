@@ -26,7 +26,6 @@
     let myUsername = window.ME;
     let myServerId = window.SERVER_ID;
 
-    // Fallback
     if (!myUsername || myUsername === 'undefined' || myUsername === undefined) {
         const nameEl = document.querySelector('.user-name');
         if (nameEl) myUsername = nameEl.textContent.trim();
@@ -38,9 +37,6 @@
     let analyser = null;
     let voiceParticipants = [];
 
-    // ==================================================
-    // FULLSCREEN HELPERS
-    // ==================================================
     function enterFullscreen(el) {
         if (!el) return;
         try {
@@ -59,9 +55,6 @@
         } catch(e) {}
     }
 
-    // ==================================================
-    // SWITCH CHANNEL
-    // ==================================================
     window.switchChannel = async function(id, name, type, readOnly, canChat) {
         currentChannelId = id;
         currentChannelType = type;
@@ -127,9 +120,6 @@
         }
     };
 
-    // ==================================================
-    // TEXT CHAT
-    // ==================================================
     function renderMessages(msgs) {
         const box = document.getElementById('chatMessages');
         if (msgs.length === 0) {
@@ -214,9 +204,6 @@
         } catch(e) { console.error(e); }
     };
 
-    // ==================================================
-    // CREATE / DELETE CHANNEL
-    // ==================================================
     window.openCreateChannel = function(isVoice) {
         document.getElementById('createChannelModal').style.display = 'flex';
         if (isVoice) document.getElementById('newChannelType').value = 'voice';
@@ -250,9 +237,6 @@
         } catch(e) { alert('Error: ' + e.message); }
     };
 
-    // ==================================================
-    // KICK USER
-    // ==================================================
     window.kickUser = async function(username) {
         if (!confirm('Kick ' + username + ' from this server?')) return;
         try {
@@ -267,9 +251,6 @@
         } catch(e) { alert('Error: ' + e.message); }
     };
 
-    // ==================================================
-    // VOICE: JOIN / LEAVE
-    // ==================================================
     window.joinVoice = async function() {
         if (localStream) return;
         try {
@@ -313,9 +294,6 @@
         document.getElementById('muteBtn').textContent = track.enabled ? 'Mute' : 'Unmute';
     };
 
-    // ==================================================
-    // VOICE: PEER CONNECTION
-    // ==================================================
     function createPeerConnection(username) {
         if (peerConnections[username]) {
             try { peerConnections[username].close(); } catch(e){}
@@ -342,9 +320,6 @@
         return pc;
     }
 
-    // ==================================================
-    // VOICE: SOCKET EVENTS
-    // ==================================================
     socket.on('voice-user-list', async function(users) {
         for (const username of users) {
             if (username === myUsername) continue;
@@ -414,10 +389,6 @@
         });
     }
 
-    // ==================================================
-    // SCREEN SHARE
-    // 🔥 FIX: Hindi na auto-view ang sariling screen
-    // ==================================================
     window.toggleScreenShare = async function() {
         if (isSharing) { stopScreenShare(); return; }
         try {
@@ -427,11 +398,6 @@
             document.getElementById('shareBtn').className = 'btn btn-danger btn-xs';
             socket.emit('screen-share-start', { serverId: myServerId, channelId: currentChannelId, username: myUsername });
             screenStream.getVideoTracks()[0].onended = function() { stopScreenShare(); };
-            
-            // 🔥 HUWAG i-view ang sarili mong screen automatically
-            // Ang ibang users lang ang makakakita ng screen share mo
-            // Kung gusto mo i-view ang sarili mo, i-click ang "View Screen" button mo
-            
             for (const username of voiceParticipants) {
                 if (username === myUsername) continue;
                 const pc = new RTCPeerConnection(ICE_CONFIG);
@@ -531,12 +497,7 @@
         }
     });
 
-    // ==================================================
-    // VIEW USER SCREEN — FIXED
-    // 🔥 Only works if user is ACTUALLY sharing
-    // ==================================================
     window.viewUserScreen = function(username) {
-        // 🔥 VIEWING OWN SCREEN
         if (username === myUsername) {
             if (screenStream) {
                 document.getElementById('screenVideo').srcObject = screenStream;
@@ -550,7 +511,6 @@
             }
             return;
         }
-        // 🔥 VIEWING ANOTHER USER'S SCREEN
         if (screenConnections[username]) {
             document.getElementById('sharingUser').textContent = username;
             const overlay = document.getElementById('screenShareOverlay');
@@ -578,9 +538,6 @@
         }
     };
 
-    // ==================================================
-    // SPEAKING DETECTION
-    // ==================================================
     function setupSpeakingDetection() {
         if (!localStream) return;
         try {
