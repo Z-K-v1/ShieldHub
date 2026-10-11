@@ -1,6 +1,6 @@
 // ==================================================
 // ShieldHub Voice + Screen Share (WebRTC) - CLIENT SIDE
-// Private/Voice channels: only Admin / Server Owner / Channel Creator can chat
+// Click user → view their screen | Click "me" → view own screen
 // ==================================================
 
 (function() {
@@ -388,6 +388,10 @@
         renderVoiceParticipants();
     });
 
+    // ==================================================
+    // VOICE PARTICIPANTS RENDER
+    // 🔥 ALL participants (including yourself) get "View Screen" button
+    // ==================================================
     function renderVoiceParticipants() {
         const box = document.getElementById('voiceUsers');
         if (!box) return;
@@ -400,7 +404,6 @@
             const isMe = username === myUsername;
             const div = document.createElement('div');
             div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(22,11,11,0.6);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;';
-            // 🔥 ALL participants get View Screen button (including yourself)
             div.innerHTML = 
                 '<div id="ring-' + username + '" style="position:relative;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:20px;flex-shrink:0;">' +
                     username[0].toUpperCase() +
@@ -426,12 +429,12 @@
             document.getElementById('shareBtn').className = 'btn btn-danger btn-xs';
             socket.emit('screen-share-start', { serverId: myServerId, channelId: currentChannelId, username: myUsername });
             screenStream.getVideoTracks()[0].onended = function() { stopScreenShare(); };
+            // Show own screen share in the overlay (you can click "me" in participant list to view again)
             document.getElementById('screenVideo').srcObject = screenStream;
-            document.getElementById('sharingUser').textContent = 'You';
+            document.getElementById('sharingUser').textContent = 'You (your screen)';
             const overlay = document.getElementById('screenShareOverlay');
             overlay.style.display = 'flex';
             document.body.classList.add('screenshare-lock');
-            // 🔥 Auto-fullscreen
             setTimeout(() => enterFullscreen(overlay), 100);
             for (const username of voiceParticipants) {
                 if (username === myUsername) continue;
@@ -533,10 +536,11 @@
     });
 
     // ==================================================
-    // VIEW SCREEN (Other users + Yourself)
+    // 🔥 VIEW USER SCREEN
+    // Click user → view their screen | Click "me" → view own screen
     // ==================================================
     window.viewUserScreen = function(username) {
-        // 🔥 Clicking your own "View Screen" button → view your own screen share
+        // 🔥 Clicking your own "View Screen" button → view your own screen
         if (username === myUsername) {
             if (screenStream) {
                 document.getElementById('screenVideo').srcObject = screenStream;
@@ -550,7 +554,7 @@
             }
             return;
         }
-        // 🔥 Clicking another user's "View Screen" button → view their screen share
+        // 🔥 Clicking another user's "View Screen" button → view their screen
         if (screenConnections[username]) {
             document.getElementById('sharingUser').textContent = username;
             const overlay = document.getElementById('screenShareOverlay');
