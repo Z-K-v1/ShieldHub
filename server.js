@@ -29,7 +29,6 @@ async function initDB() {
         await pool.query(`CREATE TABLE IF NOT EXISTS channels (id SERIAL PRIMARY KEY, server_id INTEGER NOT NULL, name VARCHAR(50) NOT NULL, type VARCHAR(10) DEFAULT 'text', read_only BOOLEAN DEFAULT FALSE, created_by VARCHAR(50) NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
         await pool.query(`CREATE TABLE IF NOT EXISTS chat_messages (id SERIAL PRIMARY KEY, channel_id INTEGER NOT NULL, username VARCHAR(50) NOT NULL, role VARCHAR(20) DEFAULT 'USER', message TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW());`);
 
-        // Media support
         await pool.query(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(20) DEFAULT 'text';`);
         await pool.query(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS file_data TEXT;`);
         await pool.query(`ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS file_name VARCHAR(255);`);
@@ -224,13 +223,19 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:13px;min-height:300px;
 .chat-messages::-webkit-scrollbar-track{background:transparent}
 .chat-messages::-webkit-scrollbar-thumb{background:rgba(255,59,59,0.4);border-radius:4px}
 .chat-messages::-webkit-scrollbar-thumb:hover{background:rgba(255,59,59,0.7)}
-.chat-message{display:flex;gap:10px;align-items:flex-start}
+.chat-message{display:flex;gap:10px;align-items:flex-start;position:relative;padding:4px 8px;border-radius:8px}
+.chat-message:hover{background:rgba(255,255,255,0.02)}
+.chat-message:hover .msg-actions{opacity:1}
 .msg-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff;flex-shrink:0}
 .msg-body{flex:1;min-width:0}
 .msg-meta{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
 .msg-username{font-weight:700;font-size:13px}
 .msg-time{font-size:10.5px;color:var(--text3);font-weight:600}
-.msg-content{font-size:13.5px;line-height:1.5;word-wrap:break-word}
+.msg-content{font-size:13.5px;line-height:1.5;word-wrap:break-word;user-select:text}
+.msg-actions{position:absolute;top:4px;right:8px;display:flex;gap:4px;opacity:0;transition:opacity 0.15s;background:rgba(0,0,0,0.7);padding:4px;border-radius:8px;backdrop-filter:blur(8px)}
+.msg-action-btn{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text2);background:transparent;cursor:pointer;transition:all 0.15s}
+.msg-action-btn:hover{background:rgba(255,59,59,0.2);color:#ff5555}
+.msg-action-btn.copy:hover{background:rgba(34,197,94,0.2);color:#4ade80}
 .chat-input-area{padding:14px 18px;border-top:1px solid var(--border);background:var(--bg);flex-shrink:0}
 .chat-input-area form{display:flex;gap:8px;align-items:center}
 .chat-input-area input{flex:1;margin:0;background:var(--bg2);border-color:transparent;min-width:0}
@@ -255,7 +260,7 @@ body.screenshare-lock{overflow:hidden!important}
 @media(max-width:1024px){.chat-layout{grid-template-columns:220px 1fr 180px}.content{padding:24px}.grid-scripts{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}.grid-servers{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}}
 @media(max-width:900px){html{font-size:15px}.mobile-menu-btn{display:flex}.sidebar{transform:translateX(-100%);box-shadow:0 0 40px rgba(0,0,0,0.8)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}.topbar{padding:0 16px 0 66px;height:60px}.topbar-title{font-size:14px;max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.content{padding:20px 16px}.page-title{font-size:26px;letter-spacing:-0.8px}.page-sub{font-size:13px;margin-bottom:20px}.btn{padding:11px 18px;font-size:12.5px;min-height:44px}.btn-sm{padding:8px 12px;font-size:11.5px;min-height:36px}.card{padding:20px;border-radius:14px}.grid-2{grid-template-columns:1fr;gap:12px}.grid-scripts{grid-template-columns:1fr}.grid-servers{grid-template-columns:1fr}.stat-grid{grid-template-columns:1fr 1fr;gap:10px}.stat{padding:16px;border-radius:12px}.stat-value{font-size:22px}.stat-label{font-size:10px}.login-card{padding:32px 24px;border-radius:18px}.login-logo{width:64px;height:64px;font-size:24px}.login-title{font-size:22px}.chat-layout{grid-template-columns:1fr;height:auto;min-height:calc(100vh - 200px);max-height:none}.members-list{display:none}.chat-sidebar{max-height:220px;border-right:none;border-bottom:1px solid var(--border)}.chat-main{min-height:400px;height:calc(100vh - 200px)}.chat-messages{min-height:200px;max-height:calc(100vh - 320px)}.msg-avatar{width:32px;height:32px;font-size:12px}.msg-content{font-size:13px}.script-icon{width:46px;height:46px;font-size:18px}.icon-preview{width:64px;height:64px;font-size:24px}input,textarea,select{font-size:16px;padding:12px 14px;min-height:46px}textarea{min-height:200px;font-size:13px}.form-group{margin-bottom:16px}.form-label{font-size:11px}.log-item{padding:12px;gap:10px}.log-icon{width:32px;height:32px;font-size:12px}.channel-item{padding:10px 14px}.id-row button{width:44px;height:44px;font-size:18px}}
 @media(max-width:480px){html{font-size:14px}.page-title{font-size:22px}.content{padding:16px 12px}.btn{padding:10px 14px;font-size:12px;gap:5px}.btn-sm{padding:7px 10px;font-size:11px}.card{padding:16px;border-radius:12px}.stat-grid{grid-template-columns:1fr;gap:8px}.stat{padding:14px}.stat-value{font-size:20px}.login-card{padding:24px 20px}.script-icon{width:40px;height:40px;font-size:16px;border-radius:10px}.icon-preview{width:56px;height:56px;font-size:20px}.chat-sidebar{max-height:180px}.msg-avatar{width:28px;height:28px;font-size:11px;border-radius:8px}.badge{font-size:9.5px;padding:3px 8px}.sidebar{width:85%}}
-@media(hover:none){.channel-item{padding:11px 14px}.nav-item{padding:13px 14px}.member-item{padding:8px 10px}.member-actions{opacity:1}.channel-delete{opacity:1;width:24px;height:24px}.btn-primary:hover{transform:none}}
+@media(hover:none){.channel-item{padding:11px 14px}.nav-item{padding:13px 14px}.member-item{padding:8px 10px}.member-actions{opacity:1}.channel-delete{opacity:1;width:24px;height:24px}.btn-primary:hover{transform:none}.msg-actions{opacity:1}}
 `;
 
 const TOAST_SCRIPT = `function copyText(t){navigator.clipboard.writeText(t).then(function(){var _t=document.createElement('div');_t.textContent='✅ Copied!';_t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;z-index:999999;box-shadow:0 10px 30px rgba(0,0,0,0.5);animation:copyToast 2s ease-in-out forwards;max-width:90vw;text-align:center;';document.body.appendChild(_t);setTimeout(function(){if(_t.parentNode)_t.parentNode.removeChild(_t)},2000)})}function confirmDelete(i,n){if(confirm('Delete "'+n+'"?'))window.location.href='/delete/'+i}function toggleSidebar(){var s=document.querySelector('.sidebar');var o=document.querySelector('.mobile-overlay');s.classList.toggle('open');o.classList.toggle('active')}`;
@@ -709,6 +714,8 @@ app.get('/server/:id', requireLogin, async function(req, res) {
         'window.SERVER_ID=' + JSON.stringify(serverId) + ';' +
         'window.ME=' + JSON.stringify(me) + ';' +
         'window.IS_MANAGER=' + (canManage ? 'true' : 'false') + ';' +
+        'window.IS_GLOBAL_ADMIN=' + (isGlobalAdmin ? 'true' : 'false') + ';' +
+        'window.SERVER_OWNER=' + JSON.stringify(srv.owner) + ';' +
         '</script>';
         res.send(renderLayout({ title: srv.name, pageTitle: srv.name, pageSubtitle: membersR.rows.length + ' members', content: content, user: req.session.user, activeNav: 'servers' }));
     } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
@@ -771,7 +778,6 @@ app.post('/api/channels/:id/delete', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 🔥 MESSAGES — updated with media support
 app.get('/api/channels/:id/messages', requireLogin, async function(req, res) {
     try {
         const cid = parseInt(req.params.id);
@@ -790,7 +796,6 @@ app.get('/api/channels/:id/messages', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 🔥 SEND — updated with media support
 app.post('/api/channels/:id/send', requireLogin, async function(req, res) {
     try {
         const cid = parseInt(req.params.id);
@@ -824,6 +829,35 @@ app.post('/api/channels/:id/send', requireLogin, async function(req, res) {
             [cid, me, req.session.user.role, msg || '', message_type, file_data, file_name]
         );
         io.to('channel-' + cid).emit('chat-message', { channelId: cid });
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 🔥 DELETE MESSAGE
+app.post('/api/messages/:id/delete', requireLogin, async function(req, res) {
+    try {
+        const mid = parseInt(req.params.id);
+        if (!mid || isNaN(mid)) return res.status(400).json({ error: 'Invalid message ID' });
+        
+        const msgR = await pool.query(
+            'SELECT m.*, c.server_id, s.owner as server_owner FROM chat_messages m JOIN channels c ON m.channel_id = c.id JOIN servers s ON c.server_id = s.id WHERE m.id = $1',
+            [mid]
+        );
+        if (msgR.rows.length === 0) return res.status(404).json({ error: 'Message not found' });
+        
+        const msg = msgR.rows[0];
+        const me = req.session.user.username;
+        const isAdmin = req.session.user.role === 'ADMIN';
+        const isServerOwner = msg.server_owner === me;
+        const isAuthor = msg.username === me;
+        
+        // Admin, server owner, or author can delete
+        if (!isAdmin && !isServerOwner && !isAuthor) {
+            return res.status(403).json({ error: 'You cannot delete this message' });
+        }
+        
+        await pool.query('DELETE FROM chat_messages WHERE id = $1', [mid]);
+        io.to('channel-' + msg.channel_id).emit('message-deleted', { messageId: mid, channelId: msg.channel_id });
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -881,7 +915,7 @@ io.on('connection', function(socket) {
 });
 
 server.listen(PORT, function() {
-    console.log('ShieldHub v3.0 - ' + BRAND_NAME);
-    console.log('Public | Whitelist | Voice | Screen Share | Kick | Private Chat | Media');
+    console.log('ShieldHub v3.1 - ' + BRAND_NAME);
+    console.log('Public | Whitelist | Voice | Screen Share | Kick | Private Chat | Media | Copy | Delete');
     console.log('Server running on port ' + PORT);
 });
