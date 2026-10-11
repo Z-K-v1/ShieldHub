@@ -31,6 +31,27 @@
     let voiceParticipants = [];
 
     // ==================================================
+    // FULLSCREEN HELPERS
+    // ==================================================
+    function enterFullscreen(el) {
+        if (!el) return;
+        try {
+            if (el.requestFullscreen) el.requestFullscreen().catch(e => console.warn('FS blocked:', e));
+            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+            else if (el.msRequestFullscreen) el.msRequestFullscreen();
+        } catch(e) { console.warn('Fullscreen failed:', e); }
+    }
+    function exitFullscreen() {
+        try {
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
+                if (document.exitFullscreen) document.exitFullscreen().catch(e=>{});
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                else if (document.msExitFullscreen) document.msExitFullscreen();
+            }
+        } catch(e) {}
+    }
+
+    // ==================================================
     // SWITCH CHANNEL
     // ==================================================
     window.switchChannel = async function(id, name, type, readOnly, canChat) {
@@ -379,6 +400,7 @@
             const isMe = username === myUsername;
             const div = document.createElement('div');
             div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(22,11,11,0.6);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;';
+            // 🔥 ALL participants get View Screen button (including yourself)
             div.innerHTML = 
                 '<div id="ring-' + username + '" style="position:relative;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--red),var(--red2));display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:20px;flex-shrink:0;">' +
                     username[0].toUpperCase() +
@@ -387,7 +409,7 @@
                     '<div style="font-weight:700;font-size:14px;">' + username + (isMe ? ' (you)' : '') + '</div>' +
                     '<div style="font-size:11px;color:#4ade80;">● Speaking</div>' +
                 '</div>' +
-                (isMe ? '<span style="font-size:11px;color:var(--text3);">You</span>' : '<button class="btn btn-primary btn-xs" onclick="event.stopPropagation();viewUserScreen(\'' + username + '\')">View Screen</button>');
+                '<button class="btn btn-primary btn-xs" onclick="event.stopPropagation();viewUserScreen(\'' + username + '\')">View Screen</button>';
             box.appendChild(div);
         });
     }
@@ -406,7 +428,11 @@
             screenStream.getVideoTracks()[0].onended = function() { stopScreenShare(); };
             document.getElementById('screenVideo').srcObject = screenStream;
             document.getElementById('sharingUser').textContent = 'You';
-            document.getElementById('screenShareOverlay').style.display = 'flex';
+            const overlay = document.getElementById('screenShareOverlay');
+            overlay.style.display = 'flex';
+            document.body.classList.add('screenshare-lock');
+            // 🔥 Auto-fullscreen
+            setTimeout(() => enterFullscreen(overlay), 100);
             for (const username of voiceParticipants) {
                 if (username === myUsername) continue;
                 const pc = new RTCPeerConnection(ICE_CONFIG);
@@ -428,6 +454,8 @@
         document.getElementById('shareBtn').textContent = 'Share Screen';
         document.getElementById('shareBtn').className = 'btn btn-secondary btn-xs';
         document.getElementById('screenShareOverlay').style.display = 'none';
+        document.body.classList.remove('screenshare-lock');
+        exitFullscreen();
         socket.emit('screen-share-stop', { serverId: myServerId, channelId: currentChannelId, username: myUsername });
     };
 
@@ -445,6 +473,8 @@
         const overlay = document.getElementById('screenShareOverlay');
         if (overlay.style.display === 'flex' && document.getElementById('sharingUser').textContent === data.username) {
             overlay.style.display = 'none';
+            document.body.classList.remove('screenshare-lock');
+            exitFullscreen();
         }
     });
 
@@ -456,7 +486,10 @@
             videoEl.srcObject = event.streams[0];
             videoEl.play().catch(e => console.warn(e));
             document.getElementById('sharingUser').textContent = username;
-            document.getElementById('screenShareOverlay').style.display = 'flex';
+            const overlay = document.getElementById('screenShareOverlay');
+            overlay.style.display = 'flex';
+            document.body.classList.add('screenshare-lock');
+            setTimeout(() => enterFullscreen(overlay), 100);
         };
         pc.onicecandidate = function(event) {
             if (event.candidate) socket.emit('screen-ice', { to: socketId, candidate: event.candidate });
@@ -473,7 +506,10 @@
             videoEl.srcObject = event.streams[0];
             videoEl.play().catch(e => console.warn(e));
             document.getElementById('sharingUser').textContent = data.username;
-            document.getElementById('screenShareOverlay').style.display = 'flex';
+            const overlay = document.getElementById('screenShareOverlay');
+            overlay.style.display = 'flex';
+            document.body.classList.add('screenshare-lock');
+            setTimeout(() => enterFullscreen(overlay), 100);
         };
         pc.onicecandidate = function(event) {
             if (event.candidate) socket.emit('screen-ice', { to: data.from, candidate: event.candidate });
@@ -496,10 +532,31 @@
         }
     });
 
+    // ==================================================
+    // VIEW SCREEN (Other users + Yourself)
+    // ==================================================
     window.viewUserScreen = function(username) {
+        // 🔥 Clicking your own "View Screen" button → view your own screen share
+        if (username === myUsername) {
+            if (screenStream) {
+                document.getElementById('screenVideo').srcObject = screenStream;
+                document.getElementById('sharingUser').textContent = 'You (your screen)';
+                const overlay = document.getElementById('screenShareOverlay');
+                overlay.style.display = 'flex';
+                document.body.classList.add('screenshare-lock');
+                setTimeout(() => enterFullscreen(overlay), 100);
+            } else {
+                alert('You are not sharing your screen right now.');
+            }
+            return;
+        }
+        // 🔥 Clicking another user's "View Screen" button → view their screen share
         if (screenConnections[username]) {
             document.getElementById('sharingUser').textContent = username;
-            document.getElementById('screenShareOverlay').style.display = 'flex';
+            const overlay = document.getElementById('screenShareOverlay');
+            overlay.style.display = 'flex';
+            document.body.classList.add('screenshare-lock');
+            setTimeout(() => enterFullscreen(overlay), 100);
         } else {
             alert(username + ' is not sharing their screen right now.');
         }
@@ -507,15 +564,17 @@
 
     window.closeScreenView = function() {
         document.getElementById('screenShareOverlay').style.display = 'none';
+        document.body.classList.remove('screenshare-lock');
+        exitFullscreen();
     };
 
     window.toggleFullscreen = function() {
         const overlay = document.getElementById('screenShareOverlay');
-        if (!document.fullscreenElement) {
-            if (overlay.requestFullscreen) overlay.requestFullscreen();
-            else if (overlay.webkitRequestFullscreen) overlay.webkitRequestFullscreen();
+        const video = document.getElementById('screenVideo');
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+            enterFullscreen(video || overlay);
         } else {
-            if (document.exitFullscreen) document.exitFullscreen();
+            exitFullscreen();
         }
     };
 
