@@ -218,10 +218,11 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:12.5px;min-height:300p
 .member-kick:hover{background:rgba(220,38,38,0.4)}
 #screenShareOverlay{display:none}
 body.screenshare-lock{overflow:hidden!important}
+@keyframes copyToast{0%{opacity:0;transform:translate(-50%,20px)}15%{opacity:1;transform:translate(-50%,0)}85%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-20px)}}
 @media(max-width:900px){.sidebar{transform:translateX(-100%)}.main{margin-left:0}.content{padding:20px}.chat-layout{grid-template-columns:1fr}.members-list{display:none}}
 `;
 
-const TOAST_SCRIPT = `function copyText(t){navigator.clipboard.writeText(t).then(function(){alert('Copied!')})}function confirmDelete(i,n){if(confirm('Delete "'+n+'"?'))window.location.href='/delete/'+i}`;
+const TOAST_SCRIPT = `function copyText(t){navigator.clipboard.writeText(t).then(function(){var _t=document.createElement('div');_t.textContent='✅ Copied!';_t.style.cssText='position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;padding:12px 24px;border-radius:10px;font-weight:700;font-size:14px;z-index:999999;box-shadow:0 10px 30px rgba(0,0,0,0.5);animation:copyToast 2s ease-in-out forwards;';document.body.appendChild(_t);setTimeout(function(){if(_t.parentNode)_t.parentNode.removeChild(_t)},2000)})}function confirmDelete(i,n){if(confirm('Delete "'+n+'"?'))window.location.href='/delete/'+i}`;
 
 function renderLayout(opts) {
     var title = opts.title, pageTitle = opts.pageTitle, pageSubtitle = opts.pageSubtitle, content = opts.content, user = opts.user, activeNav = opts.activeNav;
