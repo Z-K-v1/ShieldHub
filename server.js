@@ -283,7 +283,7 @@ app.get('/', requireLogin, async function(req, res) {
                 let count = 0; try { count = JSON.parse(s.allowed_ids || '[]').length; } catch(e) {}
                 const ls = buildLoadstring(s.name, s.version, s.short_id);
                 const badge = s.access_type === 'whitelist' ? '<span class="badge badge-yellow">Whitelist (' + count + ')</span>' : '<span class="badge badge-green">Public</span>';
-                scriptsHtml += '<div class="card"><div style="display:flex;gap:12px;margin-bottom:14px;">' + renderScriptIcon(s.icon, s.name[0]) + '<div><div style="font-size:16px;font-weight:800;margin-bottom:6px;">' + s.name + '</div><div style="display:flex;gap:6px;">' + badge + '<span class="badge badge-purple">' + s.version + '</span></div></div></div><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">' + ls + '</div><div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">Copy Loadstring</button><a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">Logs</a><a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name + '\')">Delete</button></div></div>';
+                scriptsHtml += '<div class="card"><div style="display:flex;gap:12px;margin-bottom:14px;">' + renderScriptIcon(s.icon, s.name[0]) + '<div><div style="font-size:16px;font-weight:800;margin-bottom:6px;">' + s.name + '</div><div style="display:flex;gap:6px;">' + badge + '<span class="badge badge-purple">' + s.version + '</span></div></div></div><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">' + ls + '</div><div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">Copy Loadstring</button><a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">Logs</a><a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">Edit</a><button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name.replace(/'/g, "\\'") + '\')">Delete</button></div></div>';
             }
             scriptsHtml += '</div>';
         }
@@ -327,7 +327,7 @@ app.get('/edit/:token', requireLogin, async function(req, res) {
         const ls = buildLoadstring(s.name, s.version, s.short_id);
         let verOpts = ''; for (let i = 1; i <= 1000; i++) verOpts += '<option value="V' + i + '"' + (s.version === 'V' + i ? ' selected' : '') + '>V' + i + '</option>';
         const currentIcon = (s.icon && s.icon.trim()) ? s.icon : FAVICON_DATA;
-        const content = '<div class="card" style="max-width:900px;"><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" style="margin-bottom:18px;">' + ls + '</div><form method="POST" action="/edit/' + s.token + '" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div></div><div class="form-group"><label class="form-label">Icon Image (URL)</label><div class="icon-preview" id="iconPreview"><img src="' + currentIcon.replace(/"/g, '&quot;') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt=""></div><input type="text" id="iconInput" name="icon" value="' + (s.icon || '').replace(/"/g, '&quot;') + '" placeholder="https://example.com/icon.png (optional)" oninput="updateIconPreview(this.value)"></div><div class="form-group"><label class="form-label">Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>Public</option><option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:' + (s.access_type === 'whitelist' ? 'block' : 'none') + ';"><label class="form-label">User IDs</label><div id="idList">' + idsHtml + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div><button type="submit" class="btn btn-primary">Save</button></form></div><script>function updateIconPreview(u){var p=document.getElementById("iconPreview");if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}}function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}</script>';
+        const content = '<div class="card" style="max-width:900px;"><div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" style="margin-bottom:18px;">' + ls + '</div><div style="margin-bottom:14px;font-size:12px;color:var(--text3);">Owner: <strong style="color:var(--text2);">' + s.owner + '</strong></div><form method="POST" action="/edit/' + s.token + '" onsubmit="return prepareSubmit(this)"><div class="grid-2" style="margin-bottom:18px;"><div class="form-group"><label class="form-label">Name</label><input type="text" name="name" value="' + s.name.replace(/"/g, '&quot;') + '" required></div><div class="form-group"><label class="form-label">Version</label><select name="version" required>' + verOpts + '</select></div></div><div class="form-group"><label class="form-label">Icon Image (URL)</label><div class="icon-preview" id="iconPreview"><img src="' + currentIcon.replace(/"/g, '&quot;') + '" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt=""></div><input type="text" id="iconInput" name="icon" value="' + (s.icon || '').replace(/"/g, '&quot;') + '" placeholder="https://example.com/icon.png (optional)" oninput="updateIconPreview(this.value)"></div><div class="form-group"><label class="form-label">Access Type</label><select id="accessType" onchange="updateAccessUI()"><option value="public"' + (s.access_type === 'public' ? ' selected' : '') + '>Public</option><option value="whitelist"' + (s.access_type === 'whitelist' ? ' selected' : '') + '>Whitelist</option></select></div><div class="form-group" id="idListWrap" style="display:' + (s.access_type === 'whitelist' ? 'block' : 'none') + ';"><label class="form-label">User IDs</label><div id="idList">' + idsHtml + '</div><button type="button" class="btn btn-success btn-sm" onclick="addIdRow()">+ Add User</button></div><input type="hidden" name="access_type" id="accessTypeHidden" value="' + s.access_type + '"><input type="hidden" name="allowed_ids" id="allowedIdsHidden" value="[]"><div class="form-group"><label class="form-label">Lua Code</label><textarea name="content" required>' + escaped + '</textarea></div><button type="submit" class="btn btn-primary">Save</button></form></div><script>function updateIconPreview(u){var p=document.getElementById("iconPreview");if(u&&u.trim()){p.innerHTML=\'<img src="\'+u.replace(/"/g,"&quot;")+\'" onerror="this.onerror=null;this.parentNode.innerHTML=\'ZK\'" alt="">\'}else{p.innerHTML=\'<img src="' + FAVICON_DATA + '" alt="">\'}}function updateAccessUI(){document.getElementById("idListWrap").style.display=document.getElementById("accessType").value==="whitelist"?"block":"none"}function addIdRow(){var l=document.getElementById("idList");var d=document.createElement("div");d.className="id-row";d.innerHTML=\'<input type="text" class="id-input" placeholder="Roblox User ID" inputmode="numeric"><button type="button" onclick="removeIdRow(this)">×</button>\';l.appendChild(d)}function removeIdRow(b){b.parentNode.remove()}function prepareSubmit(){var s=document.getElementById("accessType");document.getElementById("accessTypeHidden").value=s.value;if(s.value==="whitelist"){var ids=[];document.querySelectorAll(".id-input").forEach(function(el){var v=el.value.trim();if(v&&/^[0-9]+$/.test(v))ids.push(v)});document.getElementById("allowedIdsHidden").value=JSON.stringify(ids)}else{document.getElementById("allowedIdsHidden").value="[]"}}</script>';
         res.send(renderLayout({ title: 'Edit', pageTitle: 'Edit Script', pageSubtitle: s.name, content: content, user: req.session.user, activeNav: 'dashboard' }));
     } catch (e) { res.status(500).send('Error'); }
 });
@@ -347,7 +347,7 @@ app.post('/edit/:token', requireLogin, async function(req, res) {
 });
 
 app.get('/delete/:token', requireLogin, async function(req, res) {
-    try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.redirect('/'); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]); await pool.query('DELETE FROM execution_logs WHERE script_id = $1', [s.id]); res.redirect('/'); } catch (e) { res.status(500).send('Error'); }
+    try { const r = await pool.query('SELECT * FROM scripts WHERE token = $1', [req.params.token]); if (r.rows.length === 0) return res.redirect('/'); const s = r.rows[0]; const isAdmin = req.session.user.role === 'ADMIN'; if (s.owner !== req.session.user.username && !isAdmin) return res.status(403).send("Denied"); await pool.query('DELETE FROM scripts WHERE token = $1', [req.params.token]); await pool.query('DELETE FROM execution_logs WHERE script_id = $1', [s.id]); const back = req.query.back === 'admin' ? '/admin' : '/'; res.redirect(back); } catch (e) { res.status(500).send('Error'); }
 });
 
 // ==================== PRETTY URL LOADSTRING ====================
@@ -455,11 +455,70 @@ app.get('/logs/:token', requireLogin, async function(req, res) {
 // ==================== ADMIN ====================
 app.get('/admin', requireLogin, requireAdmin, async function(req, res) {
     try {
+        // === USERS LIST ===
         const u = await pool.query('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
-        let rows = '';
-        for (const x of u.rows) { const isA = x.role === 'ADMIN'; rows += '<div class="card" style="display:flex;align-items:center;gap:14px;"><div class="user-avatar ' + (isA ? 'user-avatar-admin' : '') + '">' + x.username[0] + '</div><div style="flex:1;"><div style="font-weight:700;">' + x.username + ' <span class="badge ' + (isA ? 'badge-admin' : 'badge-purple') + '">' + x.role + '</span></div></div></div>'; }
-        res.send(renderLayout({ title: 'Admin', pageTitle: 'Admin Panel', pageSubtitle: u.rows.length + ' users', content: rows || '<div class="empty">No users</div>', user: req.session.user, activeNav: 'admin' }));
-    } catch (e) { res.status(500).send('Error'); }
+        let userRows = '';
+        for (const x of u.rows) { 
+            const isA = x.role === 'ADMIN'; 
+            userRows += '<div class="card" style="display:flex;align-items:center;gap:14px;padding:16px 20px;margin-bottom:8px;"><div class="user-avatar ' + (isA ? 'user-avatar-admin' : '') + '">' + x.username[0].toUpperCase() + '</div><div style="flex:1;"><div style="font-weight:700;">' + x.username + ' <span class="badge ' + (isA ? 'badge-admin' : 'badge-purple') + '">' + x.role + '</span></div></div></div>'; 
+        }
+
+        // === ALL SCRIPTS FROM ALL USERS ===
+        const sc = await pool.query('SELECT * FROM scripts ORDER BY created_at DESC');
+        let scriptRows = '';
+        if (sc.rows.length === 0) {
+            scriptRows = '<div class="empty"><div style="font-size:48px;margin-bottom:14px;">ZK</div><div style="font-size:18px;font-weight:700;margin-bottom:8px;">No scripts yet</div><a href="/create" class="btn btn-primary">Create Script</a></div>';
+        } else {
+            scriptRows = '<div class="grid-scripts">';
+            for (const s of sc.rows) {
+                let count = 0; try { count = JSON.parse(s.allowed_ids || '[]').length; } catch(e) {}
+                const ls = buildLoadstring(s.name, s.version, s.short_id);
+                const badge = s.access_type === 'whitelist' 
+                    ? '<span class="badge badge-yellow">Whitelist (' + count + ')</span>' 
+                    : '<span class="badge badge-green">Public</span>';
+                scriptRows += '<div class="card">' +
+                    '<div style="display:flex;gap:12px;margin-bottom:14px;">' + 
+                        renderScriptIcon(s.icon, s.name[0]) + 
+                        '<div style="flex:1;min-width:0;">' +
+                            '<div style="font-size:16px;font-weight:800;margin-bottom:6px;">' + s.name + '</div>' +
+                            '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + badge + 
+                                '<span class="badge badge-purple">' + s.version + '</span>' +
+                                '<span class="badge badge-admin">By: ' + s.owner + '</span>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="copy-box" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')" title="Click to copy">' + ls + '</div>' +
+                    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">' +
+                        '<button class="btn btn-primary btn-sm" onclick="copyText(\'' + ls.replace(/'/g, "\\'") + '\')">Copy Loadstring</button>' +
+                        '<a href="/logs/' + s.token + '" class="btn btn-secondary btn-sm">Logs</a>' +
+                        '<a href="/edit/' + s.token + '" class="btn btn-ghost btn-sm">Edit</a>' +
+                        '<button class="btn btn-danger btn-sm" onclick="confirmDelete(\'' + s.token + '\', \'' + s.name.replace(/'/g, "\\'") + '\')">Delete</button>' +
+                    '</div>' +
+                '</div>';
+            }
+            scriptRows += '</div>';
+        }
+
+        const content = 
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px;">' +
+                '<div style="font-size:22px;font-weight:800;">Users (' + u.rows.length + ')</div>' +
+            '</div>' +
+            userRows +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin:36px 0 20px;flex-wrap:wrap;gap:12px;">' +
+                '<div style="font-size:22px;font-weight:800;">All Scripts (' + sc.rows.length + ')</div>' +
+                '<a href="/create" class="btn btn-primary">+ New Script</a>' +
+            '</div>' +
+            scriptRows;
+
+        res.send(renderLayout({ 
+            title: 'Admin', 
+            pageTitle: 'Admin Panel', 
+            pageSubtitle: u.rows.length + ' users · ' + sc.rows.length + ' scripts total', 
+            content: content, 
+            user: req.session.user, 
+            activeNav: 'admin' 
+        }));
+    } catch (e) { console.error(e); res.status(500).send('Error: ' + e.message); }
 });
 
 // ==================== SERVERS ====================
@@ -590,5 +649,5 @@ server.listen(PORT, function() {
     console.log('ShieldHub v3.0 - ' + BRAND_NAME);
     console.log('Public = Everyone can use | Whitelist = Auto-kick if not in list');
     console.log('Pretty URL: /:name/:version/id=:shortId');
-    console.log('Custom Icon support + ZK Favicon');
+    console.log('Admin Panel: View/Edit/Delete/Create all scripts');
 });
