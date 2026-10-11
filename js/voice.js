@@ -1,6 +1,6 @@
 // ==================================================
 // ShieldHub Voice + Screen Share (WebRTC) - CLIENT SIDE
-// 🔥 Fixed: Smart auto-scroll + Image + Voice Message
+// 🔥 Fixed: Smart scroll + Image + Voice + Copy + Delete
 // ==================================================
 
 (function() {
@@ -26,6 +26,8 @@
     let isSharing = false;
     let myUsername = window.ME;
     let myServerId = window.SERVER_ID;
+    let myServerOwner = window.SERVER_OWNER || '';
+    let isGlobalAdmin = window.IS_GLOBAL_ADMIN === true;
 
     if (!myUsername || myUsername === 'undefined' || myUsername === undefined) {
         const nameEl = document.querySelector('.user-name');
@@ -162,7 +164,7 @@
     };
 
     // ==================================================
-    // 🔥 RENDER TEXT MESSAGES (with media support)
+    // 🔥 RENDER MESSAGES (with copy + delete)
     // ==================================================
     function renderMessages(msgs) {
         const box = document.getElementById('chatMessages');
@@ -186,6 +188,8 @@
             const av = isA ? 'linear-gradient(135deg,#ffaa00,#ff6600)' : 'linear-gradient(135deg,var(--red),var(--red2))';
             const div = document.createElement('div');
             div.className = 'chat-message';
+            div.dataset.messageId = m.id;
+            div.dataset.username = m.username;
 
             let contentHtml = '';
             const type = m.message_type || 'text';
@@ -194,17 +198,29 @@
                 contentHtml = '<div class="msg-content"><img src="' + m.file_data + '" style="max-width:280px;max-height:280px;border-radius:10px;cursor:pointer;display:block;margin-top:4px;" onclick="window.open(this.src,\'_blank\')" alt="image"></div>';
                 if (m.message) contentHtml += '<div class="msg-content" style="margin-top:6px;">' + escapeHtml(m.message) + '</div>';
             } else if (type === 'voice' && m.file_data) {
-                contentHtml = '<div class="msg-content"><audio controls src="' + m.file_data + '" style="max-width:260px;height:36px;margin-top:4px;"></audio></div>';
+                contentHtml = '<div class="msg-content"><audio controls preload="none" src="' + m.file_data + '" style="max-width:260px;height:36px;margin-top:4px;"></audio></div>';
                 if (m.message) contentHtml += '<div class="msg-content" style="margin-top:6px;">' + escapeHtml(m.message) + '</div>';
             } else {
                 contentHtml = '<div class="msg-content">' + escapeHtml(m.message) + '</div>';
             }
 
+            // Can delete? (admin, server owner, or author)
+            const canDelete = isGlobalAdmin || m.username === myUsername || myServerOwner === myUsername;
+
+            // Build action buttons
+            let actionsHtml = '<div class="msg-actions">';
+            actionsHtml += '<button class="msg-action-btn copy" title="Copy" onclick="copyMessageText(this)">📋</button>';
+            if (canDelete) {
+                actionsHtml += '<button class="msg-action-btn delete" title="Delete" onclick="deleteMessage(' + m.id + ')">🗑️</button>';
+            }
+            actionsHtml += '</div>';
+
             div.innerHTML = '<div class="msg-avatar" style="background:' + av + '">' + m.username[0].toUpperCase() + '</div>' +
                 '<div class="msg-body"><div class="msg-meta"><span class="msg-username">' + m.username + '</span>' +
                 (isA ? '<span class="badge badge-admin">Admin</span>' : '') +
                 '<span class="msg-time">' + m.created_at + '</span></div>' +
-                contentHtml + '</div>';
+                contentHtml + '</div>' +
+                actionsHtml;
             box.appendChild(div);
         });
 
@@ -229,7 +245,7 @@
             if (type === 'image' && m.file_data) {
                 body = '<img src="' + m.file_data + '" style="max-width:200px;border-radius:8px;display:block;margin-top:4px;cursor:pointer;" onclick="window.open(this.src,\'_blank\')">';
             } else if (type === 'voice' && m.file_data) {
-                body = '<audio controls src="' + m.file_data + '" style="max-width:220px;height:32px;margin-top:4px;"></audio>';
+                body = '<audio controls preload="none" src="' + m.file_data + '" style="max-width:220px;height:32px;margin-top:4px;"></audio>';
             } else {
                 body = '<span style="color:var(--text1);">' + escapeHtml(m.message) + '</span>';
             }
@@ -244,6 +260,56 @@
     function escapeHtml(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
+
+    // 🔥 COPY MESSAGE TEXT
+    window.copyMessageText = function(btn) {
+        const msgEl = btn.closest('.chat-message');
+        if (!msgEl) return;
+        const body = msgEl.querySelector('.msg-body');
+        if (!body) return;
+        
+        // Get username + time + text content
+        const usernameEl = body.querySelector('.msg-username');
+        const timeEl = body.querySelector('.msg-time');
+        const contentEls = body.querySelectorAll('.msg-content');
+        
+        let text = '';
+        if (usernameEl) text += usernameEl.textContent + ' ';
+        if (timeEl) text += '(' + timeEl.textContent + ')\n';
+        
+        contentEls.forEach(function(el) {
+            const img = el.querySelector('img');
+            const audio = el.querySelector('audio');
+            if (img) {
+                text += '[Image]\n';
+            } else if (audio) {
+                text += '[Voice Message]\n';
+            } else {
+                text += el.textContent + '\n';
+            }
+        });
+        
+        navigator.clipboard.writeText(text.trim()).then(function() {
+            const toast = document.createElement('div');
+            toast.textContent = '✅ Copied!';
+            toast.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;padding:10px 20px;border-radius:10px;font-weight:700;font-size:13px;z-index:999999;box-shadow:0 10px 30px rgba(0,0,0,0.5);';
+            document.body.appendChild(toast);
+            setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 1500);
+        });
+    };
+
+    // 🔥 DELETE MESSAGE
+    window.deleteMessage = async function(messageId) {
+        if (!confirm('Delete this message?')) return;
+        try {
+            const r = await fetch('/api/messages/' + messageId + '/delete', { method: 'POST' });
+            const d = await r.json();
+            if (d.error) { alert(d.error); return; }
+            // Remove from UI
+            const msgEl = document.querySelector('.chat-message[data-message-id="' + messageId + '"]');
+            if (msgEl) msgEl.remove();
+        } catch(e) { alert('Error: ' + e.message); }
+    };
 
     // ==================================================
     // SEND MESSAGE
@@ -270,7 +336,7 @@
         } catch(e) { console.error(e); }
     };
 
-    // 🔥 SEND IMAGE
+    // 🔥 SEND IMAGE (walang prompt, diretso send)
     window.sendImage = function() {
         if (!currentChannelId || currentChannelType === 'voice' || !currentCanChat) return;
         const fileInput = document.createElement('input');
@@ -283,13 +349,12 @@
             const reader = new FileReader();
             reader.onload = async function(ev) {
                 const base64 = ev.target.result;
-                const caption = prompt('Add a caption (optional):') || '';
                 try {
                     const r = await fetch('/api/channels/' + currentChannelId + '/send', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            message: caption,
+                            message: '',
                             message_type: 'image',
                             file_data: base64,
                             file_name: file.name
@@ -767,6 +832,14 @@
         if (data.username === myUsername) {
             alert('You have been kicked from this server.');
             window.location.href = '/servers';
+        }
+    });
+
+    // 🔥 MESSAGE DELETED BY SOMEONE ELSE
+    socket.on('message-deleted', function(data) {
+        if (currentChannelId && data.channelId === currentChannelId) {
+            const msgEl = document.querySelector('.chat-message[data-message-id="' + data.messageId + '"]');
+            if (msgEl) msgEl.remove();
         }
     });
 
