@@ -1,6 +1,6 @@
 // ==================================================
 // ShieldHub Voice + Screen Share (WebRTC) - CLIENT SIDE
-// 🔥 Fixed: Smart auto-scroll (hindi mawawala typing)
+// 🔥 Fixed: Smart auto-scroll (hindi mawawala typing at scroll)
 // ==================================================
 
 (function() {
@@ -38,6 +38,7 @@
     let analyser = null;
     let voiceParticipants = [];
     let lastMessageCount = 0;
+    let isUserScrolling = false; // 🔥 Flag para hindi pilit mag-scroll
 
     function enterFullscreen(el) {
         if (!el) return;
@@ -60,6 +61,11 @@
     // ==================================================
     // 🔥 SMART SCROLL — hindi pilit kung nagbabasa sa taas
     // ==================================================
+    function isScrolledToBottom(box) {
+        if (!box) return true;
+        return (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+    }
+
     function smartScrollToBottom(force) {
         const box = document.getElementById('chatMessages');
         if (!box) return;
@@ -68,17 +74,28 @@
         const inputActive = document.activeElement && document.activeElement.id === 'chatInput';
         if (inputActive && !force) return;
         
-        // Check kung nasa baba na ang user
-        const isAtBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 150;
+        // 🔥 Wag mag-scroll kung user ay nag-scroll pataas
+        if (isUserScrolling && !force) return;
         
-        // 🔥 Mag-scroll lang kung:
+        // Mag-scroll lang kung:
         // - Nasa baba na ang user, O
         // - Nag-force tayo (e.g., nag-send o nag-load)
-        if (isAtBottom || force) {
+        if (isScrolledToBottom(box) || force) {
             box.scrollTop = box.scrollHeight;
-            setTimeout(function() { box.scrollTop = box.scrollHeight; }, 50);
-            setTimeout(function() { box.scrollTop = box.scrollHeight; }, 150);
         }
+    }
+
+    // ==================================================
+    // 🔥 TRACK USER SCROLL
+    // ==================================================
+    function attachScrollTracker() {
+        const box = document.getElementById('chatMessages');
+        if (!box || box._scrollTracked) return;
+        box._scrollTracked = true;
+        
+        box.addEventListener('scroll', function() {
+            isUserScrolling = !isScrolledToBottom(box);
+        }, { passive: true });
     }
 
     // ==================================================
@@ -91,6 +108,7 @@
         if (type === 'voice') currentCanChat = !!canChat;
         else currentCanChat = !readOnly;
         lastMessageCount = 0;
+        isUserScrolling = false;
 
         document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
         const el = document.querySelector('.channel-item[data-channel-id="' + id + '"]');
@@ -148,6 +166,8 @@
                 setTimeout(function() { smartScrollToBottom(true); }, 100);
             } catch(e) { console.error(e); }
             socket.emit('join-channel', id);
+            // 🔥 I-attach ang scroll tracker
+            setTimeout(attachScrollTracker, 200);
         }
     };
 
@@ -168,6 +188,10 @@
         const hasNewMessages = msgs.length > lastMessageCount;
         lastMessageCount = msgs.length;
 
+        // 🔥 I-save ang scroll position bago i-render
+        const wasAtBottom = isScrolledToBottom(box);
+        const oldScrollTop = box.scrollTop;
+
         box.innerHTML = '';
         msgs.forEach(function(m) {
             const isA = m.role === 'ADMIN';
@@ -182,9 +206,13 @@
             box.appendChild(div);
         });
 
-        // 🔥 Smart scroll: mag-scroll kung may bagong message at nasa baba
-        if (hasNewMessages) {
-            smartScrollToBottom(false);
+        // 🔥 Ibalik ang scroll position kung hindi naman nag-send
+        if (!isUserScrolling && wasAtBottom) {
+            // Nasa baba dati — manatili sa baba
+            box.scrollTop = box.scrollHeight;
+        } else {
+            // Nagbabasa sa taas — ibalik ang dating position
+            box.scrollTop = oldScrollTop;
         }
     }
 
@@ -228,9 +256,10 @@
             if (d.error) { alert(d.error); return; }
             const r2 = await fetch('/api/channels/' + currentChannelId + '/messages');
             const msgs = await r2.json();
+            isUserScrolling = false; // 🔥 Reset scroll flag pag nag-send
             renderMessages(msgs);
             // 🔥 Force scroll agad pag nag-send
-            setTimeout(function() { smartScrollToBottom(true); }, 100);
+            setTimeout(function() { smartScrollToBottom(true); }, 50);
         } catch(e) { console.error(e); }
     };
 
@@ -642,18 +671,21 @@
                         if (box) setTimeout(function() { box.scrollTop = box.scrollHeight; }, 50);
                     });
             } else {
+                // 🔥 Check kung nagbabasa sa taas bago mag-render
+                const box = document.getElementById('chatMessages');
+                if (box && isUserScrolling) return;
+                
                 fetch('/api/channels/' + currentChannelId + '/messages')
                     .then(r => r.json())
                     .then(msgs => {
                         renderMessages(msgs);
-                        setTimeout(function() { smartScrollToBottom(false); }, 50);
                     });
             }
         }
     });
 
     // ==================================================
-    // 🔥 AUTO-REFRESH CHAT — hindi pilit kung may naka-focus
+    // 🔥 AUTO-REFRESH CHAT — hindi pilit kung nagbabasa o nagta-type
     // ==================================================
     setInterval(function() {
         if (currentChannelId && currentChannelType !== 'voice') {
@@ -661,11 +693,14 @@
             const inputActive = document.activeElement && document.activeElement.id === 'chatInput';
             if (inputActive) return;
             
+            // 🔥 Wag mag-refresh kung nag-scroll pataas ang user (nagbabasa)
+            const box = document.getElementById('chatMessages');
+            if (box && isUserScrolling) return;
+            
             fetch('/api/channels/' + currentChannelId + '/messages')
                 .then(r => r.json())
                 .then(msgs => {
                     renderMessages(msgs);
-                    setTimeout(function() { smartScrollToBottom(false); }, 50);
                 })
                 .catch(e => {});
         }
@@ -675,6 +710,7 @@
     // 🔥 SCROLL SA BABA PAG LOAD
     // ==================================================
     window.addEventListener('load', function() {
+        attachScrollTracker();
         setTimeout(function() { smartScrollToBottom(true); }, 500);
         setTimeout(function() { smartScrollToBottom(true); }, 1000);
     });
