@@ -597,7 +597,6 @@ app.get('/server/:id', requireLogin, async function(req, res) {
             '</div>' +
             '<div class="members-list"><div style="font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;padding:8px;">Members (' + membersR.rows.length + ')</div>' + mbHtml + '</div>' +
         '</div>' +
-        // === FIXED SCREEN SHARE OVERLAY ===
         '<div id="screenShareOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;width:100vw;height:100vh;background:#000;z-index:2147483647;flex-direction:column;margin:0;padding:0;overflow:hidden;">' +
             '<div style="height:56px;padding:0 20px;display:flex;justify-content:space-between;align-items:center;background:rgba(10,5,5,0.98);border-bottom:1px solid var(--border);flex-shrink:0;">' +
                 '<div style="font-size:14px;font-weight:700;color:#fff;">👁️ <span id="sharingUser">User</span> is sharing their screen</div>' +
