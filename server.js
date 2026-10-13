@@ -37,6 +37,28 @@ async function initDB() {
         await pool.query(`ALTER TABLE scripts ADD COLUMN IF NOT EXISTS icon TEXT DEFAULT '';`);
         await pool.query(`ALTER TABLE channels ADD COLUMN IF NOT EXISTS read_only BOOLEAN DEFAULT FALSE;`);
 
+        // 🔥 FIX: Migrate old public_content column
+        try {
+            const colCheck = await pool.query(`
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'scripts' AND column_name = 'public_content'
+            `);
+            if (colCheck.rows.length > 0) {
+                await pool.query(`UPDATE scripts SET real_content = COALESCE(real_content, public_content, '') WHERE real_content IS NULL`);
+                await pool.query(`ALTER TABLE scripts DROP COLUMN IF EXISTS public_content`);
+                console.log('✅ Migrated public_content → real_content');
+            }
+        } catch(e) { console.log('Migration note:', e.message); }
+
+        // Siguraduhing may default at NOT NULL ang real_content
+        try {
+            await pool.query(`ALTER TABLE scripts ALTER COLUMN real_content SET DEFAULT ''`);
+        } catch(e) {}
+        try {
+            await pool.query(`UPDATE scripts SET real_content = '' WHERE real_content IS NULL`);
+            await pool.query(`ALTER TABLE scripts ALTER COLUMN real_content SET NOT NULL`);
+        } catch(e) {}
+
         const noShort = await pool.query(`SELECT id FROM scripts WHERE short_id IS NULL`);
         for (const row of noShort.rows) {
             let shortId; let exists = true;
@@ -232,10 +254,11 @@ textarea{font-family:'JetBrains Mono',monospace;font-size:13px;min-height:300px;
 .msg-username{font-weight:700;font-size:13px}
 .msg-time{font-size:10.5px;color:var(--text3);font-weight:600}
 .msg-content{font-size:13.5px;line-height:1.5;word-wrap:break-word;user-select:text}
-.msg-actions{position:absolute;top:4px;right:8px;display:flex;gap:4px;opacity:0;transition:opacity 0.15s;background:rgba(0,0,0,0.7);padding:4px;border-radius:8px;backdrop-filter:blur(8px)}
-.msg-action-btn{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text2);background:transparent;cursor:pointer;transition:all 0.15s}
+.msg-actions{position:absolute;top:4px;right:8px;display:flex;gap:4px;opacity:0;transition:opacity 0.15s;background:rgba(0,0,0,0.7);padding:4px;border-radius:8px;backdrop-filter:blur(8px);user-select:none;-webkit-user-select:none}
+.msg-action-btn{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text2);background:transparent;cursor:pointer;transition:all 0.15s;border:none;padding:0;font-family:inherit}
 .msg-action-btn:hover{background:rgba(255,59,59,0.2);color:#ff5555}
 .msg-action-btn.copy:hover{background:rgba(34,197,94,0.2);color:#4ade80}
+.msg-actions button:focus{outline:none}
 .chat-input-area{padding:14px 18px;border-top:1px solid var(--border);background:var(--bg);flex-shrink:0}
 .chat-input-area form{display:flex;gap:8px;align-items:center}
 .chat-input-area input{flex:1;margin:0;background:var(--bg2);border-color:transparent;min-width:0}
@@ -833,7 +856,6 @@ app.post('/api/channels/:id/send', requireLogin, async function(req, res) {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 🔥 DELETE MESSAGE
 app.post('/api/messages/:id/delete', requireLogin, async function(req, res) {
     try {
         const mid = parseInt(req.params.id);
@@ -851,7 +873,6 @@ app.post('/api/messages/:id/delete', requireLogin, async function(req, res) {
         const isServerOwner = msg.server_owner === me;
         const isAuthor = msg.username === me;
         
-        // Admin, server owner, or author can delete
         if (!isAdmin && !isServerOwner && !isAuthor) {
             return res.status(403).json({ error: 'You cannot delete this message' });
         }
